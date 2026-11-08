@@ -60,8 +60,9 @@ class TransportViewTests(unittest.TestCase):
         low = self.view(bbox, 11, {"metro", "bus"})
         self.assertEqual(len(low["features"]), 1)
         self.assertEqual(low["features"][0]["properties"]["transport_type"], "metro")
-        high = self.view(bbox, 14, {"bus"})
-        self.assertEqual(len(high["features"]), 3)
+        high = self.view(bbox, 16, {"bus"})
+        self.assertEqual(len(high["features"]), 2)
+        self.assertTrue(all(f["geometry"]["type"] == "Point" for f in high["features"]))
         self.assertTrue(
             all(f["properties"]["transport_type"] == "bus" for f in high["features"])
         )
@@ -70,6 +71,12 @@ class TransportViewTests(unittest.TestCase):
         )
         empty = self.view([11, 40, 11.5, 40.5], 14, {"metro", "bus"})
         self.assertEqual(empty["features"], [])
+
+    def test_bus_routes_require_explicit_selection(self):
+        """Ordinary map omits bus lines; selected-line view retains route and stops."""
+        data=transport_view([0,0,1,1],11,{"metro"},self.root,SERVICE_DAY,routes={"bus"})
+        self.assertEqual(len(data["features"]),3)
+        self.assertEqual(sum(f["properties"]["kind"]=="route" for f in data["features"]),1)
 
     def test_date_rollover_and_service_exception(self):
         """A new day with an exception needs no new download and displays no service."""
@@ -84,7 +91,7 @@ class TransportViewTests(unittest.TestCase):
         )
         data = self.view([12, 41, 13, 43], 14, {"metro", "bus"})
         self.assertEqual(data["availability"], "available")
-        self.assertEqual(len(data["features"]), 4)
+        self.assertEqual(len(data["features"]), 3)
         self.assertEqual(data["refresh"]["result"], "failed")
 
     def test_stale_refresh_is_flagged(self):

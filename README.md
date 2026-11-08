@@ -117,16 +117,13 @@ and the scope are in [v0.1 plan](docs/v01-plan.md).
 
 ## Limits
 
-The local preview has an optional metro/rail/tram/bus layer under Cerca → Layer,
-drawn by `app/frontend/static/js/transport-layer.js`; `map.js` wires service
-badges/cards and focus actions. Enable Trasporti and select Metro/Treni/Tram/Autobus
-independently. Metro and rail routes show at all zooms, tram routes from zoom 12,
-thin muted bus routes from 13; rail stations from 12, metro stations from 13,
-tram and bus stops from 14, always above the lines. Same-named metro platforms
-within 150 m are shown as one station marker
-("M A B B1" at Termini) listing every source `stop_id`; this is display grouping,
-not deduplication. Bus and tram stops stay the feed's directional stops. A legend
-sits under the toggle. No request is sent while the map has no size.
+The local preview has a separate floating **Livelli** control, independent from
+**Filtri**. Metro/Treni/Tram/Autobus and cycleways can be enabled individually;
+layers start off. Metro routes remain visible at overview zoom, tram routes from
+12; rail stations from 12, metro stations from 13, tram stops from 14 and bus stops
+from 16. Bus routes appear only on line selection/focus. Timed rail shows regional/
+metropolitan stations without approximate NeTEx polylines; OSM local rail retains
+its actual topology. See [discovery UX](docs/discovery-ux.md) for the current contract.
 
 `/api/preview/transport` reads the sibling workspace `.local/transport` files;
 `EGI_TRANSPORT_ROOT` can explicitly select another runtime directory at startup.
@@ -135,11 +132,11 @@ Only `load_active` in `app/backend/transport.py` knows that layout; it follows
 `tests/fixtures/transport-root` and, when the importer sits alongside, check that
 the copy still matches the producer's.
 Parameters: west/south/east/north (WGS84 bbox), zoom (0–19), modes (any of
-`metro`, `tram`, `bus`, comma-separated). It returns GeoJSON plus active-version and refresh metadata.
+`metro`, `rail`, `tram`, `bus`, comma-separated). It returns GeoJSON plus active-version and refresh metadata.
 Bounding boxes select intersecting route shapes. Below zoom 17 the response uses the
 importer's simplified levels (50 m from zoom 11, 12 m from 13, 3 m from 15); full
 source shapes from zoom 17. Responses over 1 KB are gzip-compressed (level 5).
-Bus geometry is suppressed below zoom 13, and points follow the above thresholds.
+Ordinary bus geometry is suppressed; focus and point thresholds follow the rules above.
 The browser debounces viewport requests, cancels old requests and rechecks every
 minute. That refresh only reads local files; the importer checks upstream every
 six hours independently via launchd. Missing/expired transport is explicit and
@@ -162,16 +159,14 @@ in `app/backend/transit_nearby.py` and `app/backend/osm_rail.py`; unavailable or
 out-of-calendar timed sources contribute no timed rows, while an independent OSM
 runtime may still supply untimed rows. Service data remains usable.
 
-The "Vicino a" section lists stops (same-named stops within 150 m form one stop;
-metro stations first, then by walking time), each with its lines and their next
-departures. "Mostra tutte le N linee sulla mappa" sits on top, "Mostra linee" next
-to each stop name, and each line chip is itself a button for that line alone. Both close the sheet, switch to the map and call `transport.focus()`: the
-layer then requests `/api/preview/transport?routes=<route_id,...>` (at most 80; the
-whole lines with all their stops, regardless of viewport, zoom and mode boxes),
-draws each bus line in its own palette colour with its code label next to the
-service, highlights the nearby stops in yellow and fits the map to the service and
-those stops (zoom ≤ 16). Only the focused service's own map pin stays visible. A
-chip at the top names the view; ✕ returns to the normal layer and all pins.
+The service card's **Trasporti nelle vicinanze** section starts closed. It shows
+physical stop groups by distance across modes, with expandable lines/alerts and
+focus buttons; destination countdowns are omitted. Selected bus lines retain their
+full route geometry and stops, while approximate NeTEx rail geometry is suppressed.
+The focus chip resets the view. **Posizione** instead offers departures near an
+explicitly chosen origin, with their update time and refresh action. Address search,
+map selection and geolocation share that origin. See the
+[API and behavior contract](docs/discovery-ux.md).
 
 ### Scheduled departures
 
@@ -245,9 +240,8 @@ Rome dataset was found; the data is not verified by EGI.
 built from Trenitalia's NeTEx; `transport.ROOTS` lists both and the `*_all` helpers
 merge them (features, nearby lines, departures). Rail shows as mode `rail`: dashed
 green lines by train category (REG, RV, FR, IC…), FS station markers from zoom 12,
-"Stazione ferroviaria" groups in "Vicino a" (800 m), and the "Treni" checkbox. For
-each category only destinations with trips left are listed, soonest first (at most
-four in the card, eight in popups). Scheduled times only; no FL codes in the source.
+"Stazione ferroviaria" groups in "Vicino a" (800 m), and the "Treni" checkbox. Only regional/metropolitan source categories are shown; origin departures and
+stop popups prioritize destinations with trips left. Scheduled times only; no FL codes in the source.
 
 ### Metromare and Roma–Viterbo without times
 
@@ -275,3 +269,13 @@ The approved operations bundle installed the daily rail job and pruned four old
 derived Roma transport versions, preserving original captures and active data.
 Actual verification and limits are in the shared
 [operations record](../.scratch/post-handoff/operations-plan.md).
+
+### Discovery revision (2026-11-09)
+
+Filtri is shared across map/list and moves inline in the desktop list. Menu includes
+Rubrica/emergencies. Cards place organization and opening state near the header;
+unknown hours stay neutral, closing within 60 minutes is orange. Pins distinguish
+single services, service-weighted multi sites and geographic clusters. See
+[discovery UX and Nominatim configuration](docs/discovery-ux.md). Verification preview
+for this change runs separately on `http://127.0.0.1:8002/map?city_id=1&lang=it`;
+the existing 8001 server was left running after process-control approval was denied.

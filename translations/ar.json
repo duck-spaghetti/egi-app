@@ -36,7 +36,7 @@
     "list": "قائمة",
     "map_view": "خريطة",
     "change_view": "تغيير العرض",
-    "filters": "الفلاتر",
+    "filters": "عوامل التصفية",
     "search": "بحث",
     "location": "الموقع",
     "more": "المزيد",
@@ -97,7 +97,8 @@
     "report_error_action": "الإبلاغ عن خطأ",
     "email_action": "البريد الإلكتروني",
     "social_action": "شبكات اجتماعية",
-    "telegram_action": "تلغرام"
+    "telegram_action": "تلغرام",
+    "menu": "القائمة"
   },
   "contribute": {
     "title": "خدمة جديدة",

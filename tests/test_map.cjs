@@ -7,7 +7,7 @@ const transportSource = fs.readFileSync(path.join(__dirname, '../app/frontend/st
 let source = fs.readFileSync(path.join(__dirname, '../app/frontend/static/js/map.js'), 'utf8');
 // Isolate pure adaptation/filter helpers; real browser bootstrap is checked separately.
 source = source.replace(/init\(\)\.catch\(\(error\) => \{[\s\S]*?\n\}\);/, '');
-const fakeElement = () => ({classList:{add(){},remove(){},toggle(){}}, setAttribute(){}, addEventListener(){}, querySelectorAll:()=>[], innerHTML:'', textContent:'', scrollTop:0, dataset:{}});
+const fakeElement = () => ({classList:{add(){},remove(){},toggle(){}}, setAttribute(){}, addEventListener(){}, querySelector:()=>null, querySelectorAll:()=>[], innerHTML:'', textContent:'', scrollTop:0, dataset:{}});
 const sandbox = {document:{getElementById:()=>fakeElement(), querySelector:()=>fakeElement(), querySelectorAll:()=>[]}, window:{EGI_MAP_CONTEXT:{languageCode:'it'},EGI_I18N:{t:(_key,_args,fallback)=>fallback||''}}, console, URLSearchParams};
 vm.createContext(sandbox);
 vm.runInContext(transportSource + '\nthis.TransportLayer = TransportLayer;',sandbox);
@@ -51,13 +51,15 @@ vm.runInContext(`
   let opening=sourceOpeningStatus(schedule,at('2026-11-09T08:00:00Z'));
   if(opening.label!=='Aperto ora') throw Error('opening boundary or overlapping ranges broken');
   opening=sourceOpeningStatus(schedule,at('2026-11-09T14:00:00Z'));
-  if(opening.label!=='Aperto ora · chiude tra 3 h') throw Error('three-hour closing threshold broken');
+  if(opening.label!=='Aperto ora') throw Error('closing time appears before sixty-minute threshold');
   opening=sourceOpeningStatus(schedule,at('2026-11-09T13:59:00Z'));
   if(opening.label!=='Aperto ora') throw Error('closing countdown appeared too early');
   opening=sourceOpeningStatus(schedule,at('2026-11-09T07:30:00Z'));
-  if(opening.label!=='Apre tra 30 min') throw Error('opening countdown broken');
+  if(opening.label!=='Chiuso ora · apre oggi alle 09:00') throw Error('opening countdown broken');
   opening=sourceOpeningStatus(schedule,at('2026-11-09T17:00:00Z'));
-  if(opening.kind!=='unknown') throw Error('closing boundary became open or falsely closed');
+  if(opening.kind!=='closed') throw Error('closing boundary became open or falsely closed');
+  if(sourceOpeningStatus(schedule,at('2026-11-09T16:00:00Z')).label!=='Aperto ora · chiude alle 18:00') throw Error('sixty-minute closing threshold');
+  if(sourceOpeningStatus(schedule,at('2026-11-09T15:59:00Z')).kind!=='open') throw Error('orange shown too early');
   const summer=sourceOpeningStatus(hours([['09:00','18:00']]),at('2026-07-06T07:00:00Z'));
   if(summer.kind!=='open') throw Error('Rome summer timezone ignored');
   if(sourceOpeningStatus(hours([]),at('2026-11-09T09:00:00Z')).kind!=='unknown') throw Error('missing day became closed');
@@ -96,7 +98,7 @@ vm.runInContext(`
   const groups=many.map((r,i)=>({stop_name:'Stop '+i,modes:['bus'],walk_min:r.walk_min,distance_m:r.distance_m,wheelchair:'unknown',lines:[r]}));
   const html=renderTransitRows({availability:'available',lines:many,stops:groups});
   if((html.match(/class="transit-stop-group"/g)||[]).length!==8 || !html.includes('Altre 4 fermate') || !html.includes('notturna') || (html.match(/data-focus-stop=/g)||[]).length!==8) throw Error('stop groups, overflow or night tag wrong');
-  if(!html.includes('linea d’aria') || !html.includes('Orari programmati, non in tempo reale')) throw Error('estimate not qualified');
+  if(!html.includes('linea d’aria') || !html.includes('Le partenze dal tuo punto di riferimento')) throw Error('estimate not qualified');
   if(!renderTransitRows({availability:'outside_calendar'}).includes('non disponibile per oggi')) throw Error('outside calendar not explained');
   if(!renderTransitRows({availability:'available',lines:[]}).includes('Nessuna linea')) throw Error('empty result not explained');
   const bounds=(w,s,e,n)=>({getWest:()=>w,getSouth:()=>s,getEast:()=>e,getNorth:()=>n});
@@ -138,7 +140,8 @@ vm.runInContext(`
   if(!TransportLayer.wheelchairText('unknown').includes('non indicata') || !TransportLayer.wheelchairText('yes').includes('Accessibile')) throw Error('wheelchair text wrong');
   const r49=row('49','bus',2,{next:[{headsign:'Termini',times:[{time:'08:00',in_min:10}]},{headsign:'Ostia',times:[]}]});
   const rowHtml=renderTransitRows({availability:'available',lines:[r49],stops:[{stop_name:'X',modes:['bus'],walk_min:2,distance_m:80,wheelchair:'yes',lines:[r49]}]});
-  if(!rowHtml.includes('→ Termini: 08:00 (tra 10 min)') || !rowHtml.includes('→ Ostia: nessun’altra corsa oggi') || !rowHtml.includes('accessibile in sedia a rotelle')) throw Error('row departures or accessibility missing');
+  if(rowHtml.includes('08:00') || rowHtml.includes('nessun’altra corsa oggi') || !rowHtml.includes('accessibile in sedia a rotelle') || !rowHtml.includes('<details class="destination-transit">')) throw Error('destination leaked countdowns or lost collapsed accessibility');
+  if(!transitLine({...r49,origin:true}).includes('08:00 (tra 10 min)')) throw Error('origin lost departures');
   const live=TransportLayer.directionTimes({realtime:[{time:'22:07',in_min:6,delay_min:4}],times:[{time:'22:03',in_min:2}]});
   if(!live.live || live.text!=='22:07 (tra 6 min · +4′)') throw Error('realtime text wrong: '+live.text);
   if(live.scheduled!=='22:03 (tra 2 min)') throw Error('scheduled times hidden when realtime exists');
@@ -150,7 +153,7 @@ vm.runInContext(`
   if(!TransportLayer.realtimeNote({realtime:{status:'stale'}}).includes('non aggiornato')) throw Error('stale realtime not explained');
   const gr={stop_name:'P',modes:['bus'],walk_min:1,distance_m:30,wheelchair:'unknown',stop_ids:['s9'],lines:[row('89','bus',1,{route_id:'89'})]};
   const withAlert=renderTransitRows({availability:'available',lines:gr.lines,stops:[gr],alerts:[{header:'Deviazione 89',routes:['89'],stops:[]},{header:'Altro',routes:['64'],stops:[]}],realtime:{status:'live'}});
-  if(!withAlert.includes('Deviazione 89') || withAlert.includes('Altro') || !withAlert.includes('tempo reale')) throw Error('stop alerts filtering or live note wrong');
+  if(!withAlert.includes('Deviazione 89') || withAlert.includes('Altro') || withAlert.includes('previsione in tempo reale')) throw Error('stop alerts filtering or live note wrong');
   if(CycleLayer.style('separated').dashArray || !CycleLayer.style('lane').dashArray || CycleLayer.style('unknown')!==CycleLayer.style('path')) throw Error('cycle styles wrong');
   if(CycleLayer.popupHtml({label:'Corsia ciclabile',name:'<x>',surface:'asphalt',oneway:true}).includes('<x>') || !CycleLayer.popupHtml({label:'Corsia',name:''}).includes('OpenStreetMap')) throw Error('cycle popup escaping/attribution');
   if(!CycleLayer.statusText({availability:'available',min_zoom:12,features:[]},11).includes('zoom 12')) throw Error('cycle zoom hint missing');

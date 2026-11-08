@@ -97,7 +97,8 @@
     "report_error_action": "Signaler une erreur",
     "email_action": "Email",
     "social_action": "Social",
-    "telegram_action": "Telegram"
+    "telegram_action": "Telegram",
+    "menu": "Menu"
   },
   "contribute": {
     "title": "Nouveau service",

@@ -7,3 +7,7 @@ The existing 30-second/visibility-change status refresh now also refreshes filte
 Checks: JavaScript syntax and Node checks passed, including deterministic open/upcoming/unknown/ambiguous membership, exact closing boundary and disabling the facet. All 9 HTTP/presentation tests passed. Browser DOM verified the selected checkbox and 11 matching list entries, all showing Aperto ora or its closing countdown at the time of inspection; no warning/error logs. The screenshot shows the filtered map. Browser checkbox action reporting was inconsistent with the verified resulting checked state; disabling was verified in the deterministic Node seam rather than claimed as a successful browser interaction.
 
 No database/schema/importer changes, new dependencies, publication or Git actions. Self-review performed. This remains a source-derived, unreviewed indication in Europe/Rome, not a verification of live availability. Reload the map for updated scripts/template.
+
+Current behavior was subsequently revised under approved discovery UX r1 on
+2026-11-09; see [the maintained contract](discovery-ux.md). This record describes
+its historical acceptance, including older opening/countdown wording.

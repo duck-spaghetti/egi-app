@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import NamedTuple
 from zoneinfo import ZoneInfo
 
-from .transit_nearby import display_code, stop_index
+from .transit_nearby import display_code, stop_index, local_route
 
 ROOT = Path(
     os.environ.get(
@@ -110,7 +110,7 @@ def intersects(a: list, b: list) -> bool:
 
 
 LINE_MIN_ZOOM = {"metro": 0, "rail": 0, "tram": 12, "bus": 13}
-STOP_MIN_ZOOM = {"metro": 13, "rail": 12, "tram": 14, "bus": 14}
+STOP_MIN_ZOOM = {"metro": 13, "rail": 12, "tram": 14, "bus": 16}
 MODE_ORDER = {"metro": 0, "rail": 1, "tram": 2, "bus": 3}
 STATION_RADIUS_M = 150
 
@@ -193,7 +193,9 @@ def transport_view(
     implying old scheduled service is operating today. No live availability claim.
     With routes (focus view), only those route_ids are returned, whole and at any
     zoom, with every stop they call at; bbox, modes and zoom thresholds are ignored
-    except for choosing the geometry detail level.
+    except for choosing the geometry detail level. Long-distance rail is always
+    excluded; approximate timed rail geometry is suppressed even in focus.
+    Ordinary bus views contain stops only, from zoom 16.
     """
     today = day or datetime.now(ZoneInfo("Europe/Rome")).date().isoformat()
     result = {
@@ -223,6 +225,9 @@ def transport_view(
             props = feature["properties"]
             if props["kind"] == "route":
                 mode = props["transport_type"]
+                # NeTEx geometry joins stations approximately, not actual rail tracks.
+                if mode == "rail" or (mode == "bus" and routes is None):
+                    continue
                 if routes is not None:
                     if props["route_id"] not in routes:
                         continue
@@ -244,6 +249,8 @@ def transport_view(
             memberships = []
             for route_id, services in props["services_by_route"].items():
                 route = network["routes"][route_id]
+                if not local_route(route):
+                    continue
                 if routes is not None:
                     wanted = route_id in routes
                 else:

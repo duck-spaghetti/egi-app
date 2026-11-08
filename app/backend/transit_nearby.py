@@ -27,6 +27,14 @@ METHOD = {
 _indexes: dict[str, "StopIndex"] = {}
 
 
+LOCAL_RAIL_CODES = {"REG", "RV", "MET", "SFM", "DIR"}
+
+
+def local_route(route: dict) -> bool:
+    """Keep regional/metropolitan source categories and all non-rail modes."""
+    return route.get("mode") != "rail" or route.get("code") in LOCAL_RAIL_CODES
+
+
 def walk_minutes(distance_m: float) -> int:
     """Estimated minutes on foot, rounded up, at least one."""
     return max(1, math.ceil(distance_m * DETOUR_FACTOR / WALK_M_PER_MIN))
@@ -103,6 +111,8 @@ def nearby_lines(
     calls: dict[str, list[tuple[dict, list]]] = defaultdict(list)
     for distance, stop, point in index.near(lon, lat, max(RADIUS_M.values())):
         for route_id, services in stop["services_by_route"].items():
+            if not local_route(index.routes[route_id]):
+                continue
             mode = index.routes[route_id]["mode"]
             if distance > RADIUS_M[mode] or not active_services.intersection(services):
                 continue
@@ -150,8 +160,8 @@ def group_by_stop(rows: list[dict]) -> list[dict]:
     """Group line rows by physical stop: same stop name within SIBLING_M.
 
     Each group has the stop name, the union of stop_ids, the nearest distance and
-    walking time, its modes and its lines (rows) in line order. Groups with a metro
-    line come first, then by walking time, so the card reads "stop → its lines".
+    walking time, its modes and its lines (rows) in line order. Groups are ordered
+    by distance across all modes, with stable name/ID ties.
     """
     groups: list[dict] = []
     for row in rows:
@@ -181,7 +191,7 @@ def group_by_stop(rows: list[dict]) -> list[dict]:
     for group in groups:
         group["lines"].sort(key=line_sort_key)
         group["modes"] = sorted({r["mode"] for r in group["lines"]}, key=["metro", "rail", "tram", "bus"].index)
-    return sorted(groups, key=lambda g: ({"metro": 0, "rail": 1}.get(g["modes"][0], 2), g["walk_min"], g["distance_m"]))
+    return sorted(groups, key=lambda g: (g["distance_m"], g["stop_name"].casefold(), sorted(g["stop_ids"])))
 
 
 def summary(rows: list[dict]) -> dict:

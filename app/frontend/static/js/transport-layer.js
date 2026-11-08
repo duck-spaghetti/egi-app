@@ -79,7 +79,7 @@ const TransportLayer = (() => {
   function stopIconHtml(props, highlighted = false) {
     const near = highlighted ? " tl-near" : "";
     if (props.transport_type === "rail") {
-      return `<span class="tl-station tl-rail${near}"><span class="tl-roundel tl-train">${TRAIN_GLYPH}</span>${lineChips(props.routes)}</span>`;
+      return `<span class="tl-station tl-rail${near}"><span class="tl-roundel tl-train">${TRAIN_GLYPH}</span>${props.untimed ? "" : lineChips((props.routes || []).slice(0,3))}</span>`;
     }
     if (props.kind === "station" || props.transport_type === "metro") {
       return `<span class="tl-station${near}"><span class="tl-roundel">M</span>${lineChips(props.routes)}</span>`;
@@ -191,7 +191,7 @@ const TransportLayer = (() => {
 
   function create(map, elements) {
     const layer = L.layerGroup().addTo(map);
-    const modes = new Set(MODES);
+    const modes = new Set(elements.modes ? MODES.filter(mode=>elements.modes[mode]?.checked) : MODES);
     let visible = false;
     let features = [];
     let request = null;
@@ -256,6 +256,7 @@ const TransportLayer = (() => {
 
     async function load() {
       request?.abort();
+      if (!visible) return;
       if (!modes.size && !focused) {
         features = [];
         render();
@@ -300,7 +301,7 @@ const TransportLayer = (() => {
     /** Fill an open stop popup with the next departures of its (focused) lines. */
     async function loadDepartures(popup, stopIds, props) {
       const params = new URLSearchParams({stops: stopIds.join(","), limit: "3"});
-      const routeIds = focused ? focused.routeIds : (props.routes || []).map(r => r.route_id);
+      const routeIds = (props.routes || []).map(r => r.route_id).filter(id => !focused || focused.routeIds.includes(id));
       if (routeIds.length) params.set("routes", routeIds.join(","));
       let data = null;
       try {
@@ -350,13 +351,22 @@ const TransportLayer = (() => {
       if (reload) schedule();
     }
 
-    elements.toggle?.addEventListener("click", () => setVisible(!visible));
+    elements.toggle?.addEventListener("click", () => {
+      const next=!visible;
+      modes.clear();
+      for (const mode of MODES) {
+        if(next) modes.add(mode);
+        if(elements.modes?.[mode]) elements.modes[mode].checked=next;
+      }
+      setVisible(next);
+    });
     for (const mode of MODES) {
       elements.modes?.[mode]?.addEventListener("change", event => {
         if (event.target.checked) modes.add(mode); else modes.delete(mode);
         features = [];
         render();
-        schedule();
+        if (focused) clearFocus(false);
+        setVisible(modes.size > 0);
       });
     }
     map.on("moveend", schedule);

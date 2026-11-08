@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from .transit_nearby import display_code, stop_index
+from .transit_nearby import local_route, display_code, stop_index
 from .transport import ROOT, load_active
 
 ROME = ZoneInfo("Europe/Rome")
@@ -146,7 +146,7 @@ def next_departures(
         for stop, route, direction, headsign, service, minutes in query_departures(
             path, stop_ids[:MAX_STOPS], route_ids
         ):
-            if route not in network["routes"]:
+            if route not in network["routes"] or not local_route(network["routes"][route]):
                 continue
             key = (stop, route, direction, headsign)
             times = groups.setdefault(key, [])
@@ -163,7 +163,7 @@ def next_departures(
                 pattern = patterns.get(trip_id)
                 if not pattern or epoch < now_epoch - 30 or (route_ids is not None and pattern[0] not in route_ids):
                     continue
-                if pattern[0] not in network["routes"]:
+                if pattern[0] not in network["routes"] or not local_route(network["routes"][pattern[0]]):
                     continue
                 predicted.setdefault((stop, *pattern), []).append((epoch, delay))
                 groups.setdefault((stop, *pattern), [])

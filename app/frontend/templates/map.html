@@ -20,20 +20,22 @@
         <div class="list-sort"><label for="sort-services">Ordina per</label><select id="sort-services"><option value="name">Nome del servizio</option><option value="distance">Distanza in linea d’aria</option></select><button type="button" id="pick-reference">Scegli punto sulla mappa</button></div>
         <p class="source-note" id="reference-status">Scegli una posizione per ordinare per distanza</p>
       </div>
-      <div id="poi-list"></div>
+      <p id="active-filter-summary" class="active-filter-summary" role="status"></p>
+      <div class="list-content"><aside id="list-filter-host" aria-label="Filtri servizi"></aside><div id="poi-list"></div></div>
     </div>
 
     <div class="map-brand" aria-label="EGI">
       <img src="/static/assets/icons/egi-logo.svg" alt="EGI" class="brand-logo" />
     </div>
+    <button type="button" class="nav-btn layers-trigger" data-sheet="layers" aria-label="Livelli della mappa"><span class="control-icon">▱</span><span class="control-label">Livelli</span></button>
     <span class="map-city-tag" id="city-label">{{ city.name if city else "Roma" }}</span>
 
     <div class="floating-actions" aria-label="Controlli mappa">
       <button class="nav-btn" data-sheet="filters">
         <span class="control-icon">
-          <img src="/static/assets/icons/default/search.svg" alt="" aria-hidden="true" />
+          <img src="/static/assets/icons/ui/filters.svg" alt="" aria-hidden="true" />
         </span>
-        <span class="control-label" data-i18n="map.search">Cerca</span>
+        <span class="control-label" data-i18n="map.filters">Filtri</span>
       </button>
       <button class="view-toggle" id="view-toggle" aria-label="Cambia vista" data-i18n-aria-label="map.change_view">
         <span class="view-toggle-track" aria-hidden="true">
@@ -52,12 +54,7 @@
         <span class="control-icon">
           <img src="/static/assets/icons/ui/menu-dots.svg" alt="" aria-hidden="true" />
         </span>
-        <span class="control-label" data-i18n="map.more">Altro</span>
-      </button>
-      <button class="nav-btn nav-btn-sos" data-sheet="sos" aria-label="SOS">
-        <span class="control-icon">
-          <img src="/static/assets/icons/ui/phone.svg" alt="" aria-hidden="true" />
-        </span>
+        <span class="control-label" data-i18n="map.menu">Menu</span>
       </button>
       <button class="nav-btn nav-btn-location" data-sheet="location">
         <span class="control-icon">
@@ -92,10 +89,10 @@
 <div class="sheet" id="sheet-filters">
   <div class="grabber"></div>
   <div class="sheet-head">
-    <h2 data-i18n="map.search">Cerca</h2>
+    <h2 data-i18n="map.filters">Filtri</h2>
     <button class="sheet-close" data-close data-i18n="common.close">Chiudi</button>
   </div>
-  <div class="sheet-body">
+  <div class="sheet-body" id="filter-sheet-host"><div id="filter-controls">
     <div class="filter-group service-search">
       <label for="service-query">Cerca servizio, struttura, prestazione o indirizzo</label>
       <input id="service-query" type="search" placeholder="Es. doccia, italiano, appuntamento…" autocomplete="off">
@@ -116,23 +113,31 @@
     <div class="filter-group service-search">
       <label for="access-filter">Indicazione di accesso o destinatario</label><select id="access-filter"></select>
     </div>
-    <div class="filter-group">
-      <h3>Layer</h3>
+
+    <div class="filter-actions">
+      <button class="btn" id="reset-filters" data-i18n="map.deselect_all">Deseleziona tutto</button>
+      <button class="btn primary" id="select-all-filters" data-i18n="map.select_all">Seleziona tutto</button>
+    </div>
+  </div></div>
+</div>
+
+<div class="sheet layer-panel" id="sheet-layers"><div class="sheet-head"><h2>Livelli della mappa</h2><button class="sheet-close" data-close>Chiudi</button></div><div class="sheet-body">    <div class="filter-group">
+      <h3>Trasporti</h3>
       <button class="layer-toggle" id="transport-toggle" type="button" aria-pressed="false">
         <span class="dot"></span>
-        <span>Trasporti · metro, treni, tram e autobus</span>
+        <span>Tutti i trasporti</span>
       </button>
       <div id="transport-modes" class="transport-modes">
-        <label><input type="checkbox" id="transport-metro" checked> Metro</label>
-        <label><input type="checkbox" id="transport-rail" checked> Treni</label>
-        <label><input type="checkbox" id="transport-tram" checked> Tram</label>
-        <label><input type="checkbox" id="transport-bus" checked> Autobus</label>
+        <label><input type="checkbox" id="transport-metro"> Metro</label>
+        <label><input type="checkbox" id="transport-rail"> Treni</label>
+        <label><input type="checkbox" id="transport-tram"> Tram</label>
+        <label><input type="checkbox" id="transport-bus"> Autobus</label>
       </div>
       <ul class="transport-legend" aria-label="Legenda trasporti">
         <li><span class="tl-station"><span class="tl-roundel">M</span><span class="tl-chip" style="--line-color:#E27439">A</span><span class="tl-chip" style="--line-color:#0570B5">B</span><span class="tl-chip" style="--line-color:#008456">C</span></span> Stazione metro e linee</li>
-        <li><span class="tl-station tl-rail"><span class="tl-roundel tl-train">FS</span><span class="tl-chip" style="--line-color:#00704A">REG</span></span> Stazione ferroviaria e categorie di treno (linee tratteggiate)</li>
+        <li><span class="tl-station tl-rail"><span class="tl-roundel tl-train">FS</span><span class="tl-chip" style="--line-color:#00704A">REG</span></span> Stazioni dei treni regionali e metropolitani</li>
         <li><span class="tl-stop tl-tram">T</span> Fermata tram (da zoom 14; linee da zoom 12)</li>
-        <li><span class="tl-stop tl-bus"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M4 1.5h8a2 2 0 0 1 2 2V12a1 1 0 0 1-1 1v1.25a.75.75 0 0 1-1.5 0V13h-7v1.25a.75.75 0 0 1-1.5 0V13a1 1 0 0 1-1-1V3.5a2 2 0 0 1 2-2Zm0 2v4h8v-4Zm.75 6.25a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm6.5 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/></svg></span> Fermata autobus (da zoom 14; percorsi sottili da zoom 13)</li>
+        <li><span class="tl-stop tl-bus"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M4 1.5h8a2 2 0 0 1 2 2V12a1 1 0 0 1-1 1v1.25a.75.75 0 0 1-1.5 0V13h-7v1.25a.75.75 0 0 1-1.5 0V13a1 1 0 0 1-1-1V3.5a2 2 0 0 1 2-2Zm0 2v4h8v-4Zm.75 6.25a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm6.5 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/></svg></span> Fermata autobus da zoom 16; percorsi solo selezionando una linea</li>
       </ul>
       <p id="transport-status" class="source-note" role="status">Verifica dati trasporti…</p>
       <button class="layer-toggle" id="cycle-toggle" type="button" aria-pressed="false">
@@ -148,16 +153,10 @@
       <p id="cycle-status" class="source-note" role="status" hidden></p>
       <p class="source-note">Piste ciclabili da OpenStreetMap (© OpenStreetMap contributors, ODbL), non verificate da EGI; visibili da zoom 12.</p>
       <p class="source-note">Bus e tram: previsioni in tempo reale dove disponibili. Metro e treni Trenitalia: orari programmati. Ferrovie OSM: senza orari. Le corse soppresse non sono segnalate. Ingrandisci per vedere i percorsi bus e le fermate.
-        Fonte: <a href="https://romamobilita.it/sistemi-e-tecnologie/open-data/" target="_blank" rel="noopener">Roma Servizi per la Mobilità</a>; treni: Trenitalia NeTEx dal <a href="https://www.cciss.it/nap/mmtis/public/catalog/Dataset/1077621" target="_blank" rel="noopener">NAP nazionale</a> (orario programmato, percorsi approssimati tra stazioni). Metromare e Roma–Viterbo: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors, ODbL 1.0</a>, senza orari; servizio odierno non verificato. Roma–Giardinetti esclusa: nei dati OSM esaminati risulta dismessa.
+        Fonte: <a href="https://romamobilita.it/sistemi-e-tecnologie/open-data/" target="_blank" rel="noopener">Roma Servizi per la Mobilità</a>; treni: Trenitalia NeTEx dal <a href="https://www.cciss.it/nap/mmtis/public/catalog/Dataset/1077621" target="_blank" rel="noopener">NAP nazionale</a> (orario programmato, sole stazioni, senza tratte approssimate). Metromare e Roma–Viterbo: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors, ODbL 1.0</a>, senza orari; servizio odierno non verificato. Roma–Giardinetti esclusa: nei dati OSM esaminati risulta dismessa.
         Licenze da chiarire: per Roma le ricognizioni dei cataloghi hanno indicato CC BY-SA e CC BY 4.0; per NeTEx la scheda NAP non indica una licenza. Preview locale non revisionata.</p>
     </div>
-
-    <div class="filter-actions">
-      <button class="btn" id="reset-filters" data-i18n="map.deselect_all">Deseleziona tutto</button>
-      <button class="btn primary" id="select-all-filters" data-i18n="map.select_all">Seleziona tutto</button>
-    </div>
-  </div>
-</div>
+</div></div>
 
 <div class="sheet" id="sheet-location">
   <div class="grabber"></div>
@@ -181,13 +180,18 @@
 
     <div class="loc-section service-search">
       <h3>Oppure scegli un riferimento</h3>
-      <p class="source-note">Puoi scegliere un punto dalla lista o inserire coordinate. Le distanze sono in linea d’aria.</p>
+      <form id="address-search-form">
+        <label for="addr-input">Cerca indirizzo o luogo pubblico a Roma e dintorni</label>
+        <input id="addr-input" type="search" minlength="3" maxlength="200" autocomplete="off" required>
+        <button class="btn" type="submit" id="address-submit">Cerca indirizzo</button>
+      </form>
+      <p class="source-note">La ricerca invia il testo a Nominatim. Non inserire dati personali o riservati. Nessun invio automatico della posizione. Dati © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>.</p>
+      <p id="address-search-status" role="status"></p>
+      <div id="address-results"></div>
       <button type="button" id="pick-reference-location">Scegli un punto sulla mappa</button>
-      <label for="reference-lat">Latitudine</label><input id="reference-lat" type="number" step="any" min="-90" max="90" placeholder="41.9028">
-      <label for="reference-lng">Longitudine</label><input id="reference-lng" type="number" step="any" min="-180" max="180" placeholder="12.4964">
-      <button type="button" id="apply-reference">Usa questo punto</button>
       <button type="button" id="clear-reference">Rimuovi riferimento</button>
       <div class="suggestions" id="suggestions"></div>
+      <details id="origin-transit"><summary>Mezzi vicino al punto scelto</summary><div id="origin-transit-body">Scegli una posizione per vedere fermate e partenze vicine.</div></details>
     </div>
   </div>
 </div>
@@ -195,7 +199,7 @@
 <div class="sheet" id="sheet-settings">
   <div class="grabber"></div>
   <div class="sheet-head">
-    <h2 id="settings-title" data-i18n="map.more">Altro</h2>
+    <h2 id="settings-title" data-i18n="map.menu">Menu</h2>
     <div class="sheet-head-actions">
       <button class="sheet-back-head hidden" id="settings-back-head" type="button" data-i18n="common.back">
         <span class="arrow" aria-hidden="true">←</span>
@@ -206,6 +210,8 @@
   </div>
   <div class="sheet-body">
     <div id="settings-main">
+      <div class="settings-section-title">Rubrica</div>
+      <div class="menu-directory"><button class="btn" id="open-emergency">Numeri di emergenza · 112 e altri contatti</button><button class="btn" id="open-directory">Servizi a distanza</button></div>
       <div class="settings-section-title" data-i18n="map.preferences">Preferenze</div>
       <div class="settings-list">
         <div class="row" data-sub="city">

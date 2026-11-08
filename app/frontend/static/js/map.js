@@ -37,6 +37,9 @@ let markersLayer;
 let transport;
 let userMarker;
 let cityBounds;
+let sheetReturnFocus = null;
+let originRequest = null;
+let addressRequest = null;
 
 init().catch((error) => {
   console.error("Preview load failed", error);
@@ -52,6 +55,8 @@ async function init() {
   applyShellTranslations();
   initMap();
   bindUi();
+  syncFilterLayout();
+  window.matchMedia("(min-width: 960px)").addEventListener("change", syncFilterLayout);
   applyInitialUserLocation();
   await loadData();
   renderFilters();
@@ -96,7 +101,8 @@ function initMap() {
   markersLayer.addTo(map);
   map.setView(cityCenter, Number(context.zoom));
   const minCityZoom = map.getBoundsZoom(cityBounds, true, [18, 18]);
-  map.setMinZoom(Math.max(6, minCityZoom - 2));
+  map.setMinZoom(Math.max(9, minCityZoom));
+  map.on("resize", () => map.setMinZoom(Math.max(9, map.getBoundsZoom(cityBounds, true, [18,18]))));
   map.setMaxBounds(cityBounds);
   map.panInsideBounds(cityBounds, { animate: false });
   CycleLayer.create(map, {
@@ -166,11 +172,34 @@ function bindUi() {
   }
   document.getElementById("pick-reference").addEventListener("click",chooseReferencePoint);
   document.getElementById("pick-reference-location").addEventListener("click",chooseReferencePoint);
-  document.getElementById("apply-reference").addEventListener("click",()=>{
-    const lat=document.getElementById("reference-lat").value.trim();
-    const lng=document.getElementById("reference-lng").value.trim();
-    if (!lat || !lng) return showToast("Inserisci entrambe le coordinate");
-    setUserLocation(Number(lat),Number(lng),"Punto scelto");
+  document.getElementById("address-search-form").addEventListener("submit", event => {
+    event.preventDefault();
+    void geocodeAddress(document.getElementById("addr-input").value.trim());
+  });
+  document.getElementById("open-emergency").addEventListener("click", () => openSheet("sheet-sos"));
+  document.getElementById("open-directory").addEventListener("click", () => {
+    state.filters.section="directory";
+    state.filters.q=""; state.filters.type=""; state.filters.prestation=""; state.filters.access="";
+    state.filters.openNow=false; state.filters.cats=new Set(state.categories.map(c=>c.slug));
+    document.getElementById("section-filter").value="directory";
+    document.getElementById("service-query").value="";
+    document.getElementById("open-now-filter").checked=false;
+    renderFilters(); closeSheets();
+    if (state.view!=="list") toggleView();
+    refresh();
+  });
+  document.getElementById("origin-transit").addEventListener("toggle", event => {
+    if (event.target.open) void loadOriginTransit();
+  });
+  document.addEventListener("keydown", event => {
+    if (event.key==="Escape") closeSheets();
+    if (event.key!=="Tab") return;
+    const sheet=document.querySelector(".sheet.shown");
+    if (!sheet) return;
+    const controls=[...sheet.querySelectorAll('button,input,select,a[href],summary,[tabindex="0"]')].filter(el=>el.getClientRects().length && !el.disabled);
+    const first=controls[0], last=controls.at(-1);
+    if (event.shiftKey && (document.activeElement===first || !sheet.contains(document.activeElement))) {event.preventDefault();last?.focus();}
+    else if (!event.shiftKey && (document.activeElement===last || !sheet.contains(document.activeElement))) {event.preventDefault();first?.focus();}
   });
   document.getElementById("clear-reference").addEventListener("click",()=>{
     state.userLoc=null; state.choosingReference=false; state.filters.order="name";
@@ -178,6 +207,8 @@ function bindUi() {
     document.getElementById("reference-status").textContent="Scegli una posizione per ordinare per distanza";
     if (userMarker) {userMarker.remove();userMarker=null;}
     locStatus.className="loc-status";locStatus.textContent="Nessun riferimento scelto";
+    document.getElementById("origin-transit-body").textContent="Scegli una posizione per vedere fermate e partenze vicine.";
+    originRequest?.abort();
     refresh();
   });
   document.querySelectorAll(".nav-btn").forEach((button) => {
@@ -203,12 +234,6 @@ function bindUi() {
     refresh();
   });
   document.getElementById("geo-btn").addEventListener("click", locateUser);
-  document.getElementById("addr-input")?.addEventListener("keydown", async (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      await geocodeAddress(event.target.value.trim());
-    }
-  });
   document.querySelectorAll("[data-sub]").forEach((row) => {
     row.addEventListener("click", () => showSettingsPage(row.dataset.sub));
   });
@@ -219,15 +244,20 @@ function bindUi() {
 }
 
 function openSheet(id) {
+  if (id === "sheet-filters" && state.view === "list" && window.matchMedia("(min-width: 960px)").matches) {
+    document.getElementById("service-query").focus(); return;
+  }
+  sheetReturnFocus = document.activeElement;
   document.querySelectorAll(".sheet").forEach((sheet) => sheet.classList.remove("shown"));
   const sheet = document.getElementById(id);
   if (sheet) {
     sheet.classList.add("shown");
+    sheet.querySelector("button,input,select")?.focus();
   }
   backdrop.classList.add("shown");
   document.querySelectorAll(".nav-btn").forEach((button) => button.classList.remove("active"));
   if (id === "sheet-filters") document.querySelector('[data-sheet="filters"]').classList.add("active");
-  if (id === "sheet-sos") document.querySelector('[data-sheet="sos"]').classList.add("active");
+  if (id === "sheet-sos") document.querySelector('[data-sheet="settings"]').classList.add("active");
   if (id === "sheet-location") document.querySelector('[data-sheet="location"]').classList.add("active");
   if (id === "sheet-settings") document.querySelector('[data-sheet="settings"]').classList.add("active");
 }
@@ -265,6 +295,7 @@ function closeSheets() {
   backdrop.classList.remove("shown");
   document.querySelectorAll(".nav-btn").forEach((button) => button.classList.remove("active"));
   showSettingsPage("main");
+  sheetReturnFocus?.focus?.();
 }
 
 function toggleView() {
@@ -272,6 +303,19 @@ function toggleView() {
   listView.classList.toggle("shown", state.view === "list");
   stage.classList.toggle("list-mode", state.view === "list");
   updateViewToggle();
+  syncFilterLayout();
+  closeSheets();
+  if (state.view === "map") requestAnimationFrame(() => map.invalidateSize());
+}
+
+function syncFilterLayout() {
+  const inline = state.view === "list" && window.matchMedia("(min-width: 960px)").matches;
+  const host = document.getElementById(inline ? "list-filter-host" : "filter-sheet-host");
+  host.appendChild(document.getElementById("filter-controls"));
+  stage.classList.toggle("inline-filters", inline);
+  if (inline && document.getElementById("sheet-filters").classList.contains("shown")) {
+    closeSheets(); document.getElementById("service-query").focus();
+  }
 }
 
 function updateViewToggle() {
@@ -354,7 +398,7 @@ function transitNext(row) {
 /** One line of a stop: the chip is a button that shows that line on the map. */
 function transitLine(row) {
   const night = row.night ? `<span class="night-tag">notturna</span>` : "";
-  return `<li class="transit-line"><button type="button" class="line-chip-button" data-focus-route="${escapeHtml(row.route_id)}" aria-label="Mostra ${escapeHtml(modeName(row.mode))} ${escapeHtml(row.code)} sulla mappa">${lineChip(row)}</button>${night}<span class="transit-next-wrap">${transitNext(row) || '<span class="transit-next">Orari non disponibili</span>'}</span></li>`;
+  return `<li class="transit-line"><button type="button" class="line-chip-button" data-focus-route="${escapeHtml(row.route_id)}" aria-label="Mostra ${escapeHtml(modeName(row.mode))} ${escapeHtml(row.code)} sulla mappa">${lineChip(row)}</button>${night}<span class="transit-next-wrap">${row.origin ? transitNext(row) || '<span class="transit-next">Orari non disponibili</span>' : row.untimed ? '<span class="source-note">Senza orari · OpenStreetMap</span>' : ""}</span></li>`;
 }
 
 /** Alerts naming one of the group's lines or stops. */
@@ -372,11 +416,11 @@ function transitStopGroup(group, index, alerts = []) {
   const icon = metro ? '<span class="tl-roundel">M</span>' : rail ? `<span class="tl-roundel tl-train">${TransportLayer.TRAIN_GLYPH}</span>` : group.modes[0] === "tram" ? '<span class="tl-stop tl-tram">T</span>' : '<span class="tl-stop tl-bus">Bus</span>';
   const wheelchair = group.wheelchair === "yes" ? ` · <span class="wheelchair-tag">accessibile in sedia a rotelle</span>` : group.wheelchair === "no" ? " · non accessibile in sedia a rotelle" : "";
   const count = group.lines.length;
-  return `<li class="transit-stop-group"><div class="transit-stop-head"><span class="transit-stop-icon">${icon}</span><span class="transit-text"><span class="transit-stop">${place} ${escapeHtml(group.stop_name)}</span><span class="transit-meta">circa ${group.walk_min} min a piedi · ${group.distance_m} m in linea d’aria · ${count} ${count === 1 ? "linea" : "linee"}${wheelchair}</span></span><button type="button" class="transit-row-focus" data-focus-stop="${index}" aria-label="Mostra sulla mappa le linee di ${escapeHtml(group.stop_name)}">Mostra linee</button></div>${TransportLayer.alertsHtml(stopAlerts(group, alerts), new Set(group.lines.map(line => line.route_id)))}<ul class="transit-lines">${group.lines.map(transitLine).join("")}</ul></li>`;
+  return `<li class="transit-stop-group"><div class="transit-stop-head"><span class="transit-stop-icon">${icon}</span><span class="transit-text"><span class="transit-stop">${place} ${escapeHtml(group.stop_name)}</span><span class="transit-meta">circa ${group.walk_min} min a piedi · ${group.distance_m} m in linea d’aria · ${count} ${count === 1 ? "linea" : "linee"}${wheelchair}</span></span><button type="button" class="transit-row-focus" data-focus-stop="${index}" aria-label="Mostra sulla mappa le linee di ${escapeHtml(group.stop_name)}">Mostra linee</button></div><details class="stop-lines"><summary>Linee e dettagli</summary>${TransportLayer.alertsHtml(stopAlerts(group, alerts), new Set(group.lines.map(line => line.route_id)))}<ul class="transit-lines">${group.lines.map(transitLine).join("")}</ul></details></li>`;
 }
 
 function renderTransitRows(data) {
-  const head = "<h3>Vicino a</h3>";
+  const head = "";
   if (data.availability !== "available") {
     const reason = data.availability === "outside_calendar" ? "Orario dei trasporti non disponibile per oggi." : "Dati sui trasporti non disponibili al momento.";
     return `${head}<p class="source-note">${reason}</p>`;
@@ -389,7 +433,7 @@ function renderTransitRows(data) {
   const rest = stops.slice(TRANSIT_STOPS_SHOWN);
   const more = rest.length ? `<details class="transit-more-lines"><summary>Altre ${rest.length} fermate</summary><ul class="transit-list">${rest.map((g, i) => transitStopGroup(g, i + TRANSIT_STOPS_SHOWN, alerts)).join("")}</ul></details>` : "";
   const all = `<button type="button" class="transit-focus-all" data-focus-route="*">Mostra tutte le ${lines.length} linee sulla mappa</button>`;
-  return `${head}${all}<ul class="transit-list">${shown}</ul>${more}<p class="source-note">${TransportLayer.realtimeNote(data)} ${TRANSIT_NOTE}</p>`;
+  return `<details class="destination-transit"><summary>Trasporti nelle vicinanze · ${stops.length} fermate${stops.length ? ` · la più vicina a ${stops[0].distance_m} m` : ""}</summary>${all}<ul class="transit-list">${shown}</ul>${more}<p class="source-note">Fermate vicino al servizio. Le partenze dal tuo punto di riferimento sono in Posizione. ${TRANSIT_NOTE}</p></details>`;
 }
 
 async function loadTransitDetail(poi) {
@@ -541,6 +585,8 @@ function applyShellTranslations() {
 }
 
 function refresh() {
+  const summary = document.getElementById("active-filter-summary");
+  if (summary) summary.textContent = `Filtri: ${state.filters.cats.size} bisogni${state.filters.q ? ` · “${state.filters.q}”` : ""}${state.filters.openNow ? " · aperti ora" : ""}${[state.filters.type,state.filters.prestation ? "prestazione selezionata" : "",state.filters.access,state.filters.section!=="all" ? document.getElementById("section-filter").selectedOptions?.[0]?.textContent : ""].filter(Boolean).map(v=>` · ${v}`).join("")}`;
   const list = filteredPois();
   // In the transport focus view only the focused service's site stays on the map.
   renderMarkers(state.focusSiteKey ? state.pois.filter(poi => sourceSiteKey(poi) === state.focusSiteKey) : list);
@@ -564,7 +610,7 @@ function filteredPois(now = new Date()) {
   if (state.filters.section==="directory") list=list.filter(p=>p.raw?.placement?.section==="directory");
   if (state.filters.section==="services") list=list.filter(p=>p.raw?.placement?.section!=="directory");
   if (state.filters.section==="needs_position") list=list.filter(p=>p.raw?.placement?.section!=="directory" && (p.latitude===null || p.longitude===null));
-  if (state.filters.openNow) list=list.filter(p=>sourceOpeningStatus(p.raw?.hours_display,now).kind==="open");
+  if (state.filters.openNow) list=list.filter(p=>["open","closing"].includes(sourceOpeningStatus(p.raw?.hours_display,now).kind));
   if (state.userLoc) list=list.map(p=>({...p,_dist:p.raw?.placement?.section!=="directory" && Number.isFinite(p.latitude) && Number.isFinite(p.longitude) ? distanceKm(state.userLoc,{lat:p.latitude,lng:p.longitude}) : null}));
   return list.sort((a,b)=>{
     const distance=state.filters.order==="distance" && state.userLoc ? (a._dist??Infinity)-(b._dist??Infinity) : 0;
@@ -596,7 +642,7 @@ function renderMarkers(list) {
   const matched = new Set(list.map(p => p.id));
   siteGroups(list).forEach(items => {
     const categories = [...new Map(items.map(p => {const c=resolveCategory(p); return [c?.slug,c];})).values()].filter(Boolean);
-    const poi = {...items[0], group_count:items.length, site_categories:categories};
+    const poi = {...items[0], group_count:items.length, site_categories:categories, site_weights:categories.map(c=>items.filter(item=>resolveCategory(item)?.slug===c.slug).length)};
     const label = `${poi.raw?.facility_name || poi.title}: ${items.length} servizi · ${categories.map(c=>categoryCaption(c.label || c.slug)).join(", ")}`;
     const marker=L.marker([poi.latitude,poi.longitude],{icon:makePin(poi),alt:label,title:label});
     marker.on("click",()=>openServiceChooser(items,matched));
@@ -651,16 +697,17 @@ async function openDetail(id) {
     <h2 class="detail-name">${escapeHtml(poi.title)}</h2>
     <p class="facility-name">Presso ${escapeHtml(raw.facility_name || raw.name || "Gruppo da verificare")}</p>
     <p class="detail-address">${escapeHtml(poi.address || raw.placement?.label || "Indirizzo non indicato")}</p>
+    <p class="detail-organization"><strong>Organizzazione indicata:</strong> ${escapeHtml(raw.organization_raw || "Non indicata")}</p>
+    <p class="source-note">${escapeHtml(raw.placement?.label || "Posizione da verificare")} · Ruolo dell’organizzazione da verificare.</p>
+    ${openingBadge(poi)}
     ${renderDetailHeaderActions(poi)}
     <p class="source-note">Helpinet · dati non revisionati.${raw.itinerant_source?" Servizio itinerante: il punto della fonte non è una sede fissa verificata.":""}</p>
     ${transitSectionShell(poi)}
     <section class="detail-section"><h3>Descrizione</h3><p>${escapeHtml(description)}</p>${!raw.description && summary?.text?'<span class="derived-label">Sintesi ricavata dai campi della fonte · non descrizione originale</span>':""}</section>
     <section class="detail-section"><h3>Prestazioni indicate</h3><div class="service-chips">${prestations.map(v=>`<span class="service-chip">${escapeHtml(v.nome)}</span>`).join("") || "Non indicate"}</div></section>
     <section class="detail-section"><h3>Accesso e destinatari</h3>${renderSourceAccess(raw.access_display)}</section>
-    <section class="detail-section"><h3>Orari del servizio</h3>${openingBadge(poi)}${renderSourceHours(raw.hours_display)}</section>
+    <section class="detail-section"><h3>Orari del servizio</h3>${renderSourceHours(raw.hours_display)}</section>
     <section class="detail-section"><h3>Contatti di questo servizio</h3>${renderContacts(poi.contacts || [])}</section>
-    <section class="detail-section"><h3>Posizione</h3><p>${escapeHtml(raw.placement?.label || "Posizione da verificare")}</p>${poi.latitude!==null && poi.longitude!==null?`<p class="coordinates">${poi.latitude}, ${poi.longitude} · coordinate della fonte</p>`:""}<p>${escapeHtml(poi.address || "Indirizzo non indicato")}</p></section>
-    <section class="detail-section"><h3>Organizzazione indicata</h3><p>${escapeHtml(raw.organization_raw || "Non indicata")}</p><p class="source-note">Il ruolo dell’ente è da verificare; struttura e organizzazione sono distinte.</p></section>
     ${siblings.length?`<section class="detail-section"><h3>Altri servizi presso ${escapeHtml(raw.facility_name || "questo gruppo")}</h3><p class="source-note">Collegamento provvisorio dal gruppo Helpinet. Ogni scheda mantiene orari, accesso e contatti indipendenti.</p>${siblings.map(serviceButton).join("")}</section>`:""}
     <details class="detail-section"><summary>Provenienza e dati originali</summary><p>Osservazione locale: ${escapeHtml(raw.observed_at || "—")}. Acquisizione originale sconosciuta.</p><pre class="source-evidence">${escapeHtml(JSON.stringify({record:raw.source_locator,gruppo:raw.source_group,sintesi:raw.derived_summary,campi_originali:raw.source_values,da_verificare:raw.review_required},null,2))}</pre></details>`;
   bindServiceButtons();
@@ -714,11 +761,17 @@ function locateUser() {
 
 function setUserLocation(lat,lng,label) {
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat)>90 || Math.abs(lng)>180) return showToast("Coordinate non valide");
+  if (!isWithinCityBounds(lat,lng)) return showToast("Scegli un punto nell’area di Roma e dintorni");
   state.userLoc={lat,lng,label}; state.filters.order="distance";
   document.getElementById("sort-services").value="distance";
-  document.getElementById("reference-status").textContent=`Distanze in linea d’aria da ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  const named = !/^(Punto|Posizione rilevata|Detected)/i.test(label);
+  const display = named ? label : `${label} · ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  document.getElementById("reference-status").textContent=`Distanze in linea d’aria da ${display}`;
   locStatus.className="loc-status ok";
-  locStatus.textContent=label;
+  locStatus.textContent=display;
+  document.getElementById("origin-transit-body").textContent="Apri per caricare fermate e partenze dal punto scelto.";
+  originRequest?.abort();
+  if (document.getElementById("origin-transit").open) void loadOriginTransit();
   if (isWithinCityBounds(lat,lng)) map.setView([lat,lng],13);
   closeSheets();refresh();
 }
@@ -746,11 +799,55 @@ function clearInitialUserLocationParams(params) {
 }
 
 async function geocodeAddress(address) {
-  if (!address) return;
-  suggestions.classList.remove("shown");
-  locStatus.className = "loc-status err";
-  locStatus.innerHTML = `<span class="label">${escapeHtml(t("map.position"))}</span>${escapeHtml(t("common.not_available"))}`;
-  showToast("Ricerca indirizzo non disponibile");
+  if (address.length<3) return;
+  addressRequest?.abort();
+  const current=new AbortController(); addressRequest=current;
+  const status=document.getElementById("address-search-status");
+  const results=document.getElementById("address-results");
+  results.replaceChildren(); status.textContent="Cerco indirizzo…";
+  try {
+    const response=await fetch("/api/preview/address-search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:address}),signal:current.signal});
+    if (!response.ok) throw Error("unavailable");
+    const data=await response.json();
+    if (current.signal.aborted) return;
+    status.textContent=data.results.length ? "Scegli un risultato:" : "Nessun risultato nell’area di Roma e dintorni. Prova un indirizzo più preciso o scegli sulla mappa.";
+    for (const row of data.results) {
+      const button=document.createElement("button"); button.type="button"; button.className="address-result"; button.textContent=row.label;
+      button.addEventListener("click",()=>{setUserLocation(row.lat,row.lon,row.label); results.replaceChildren(); status.textContent="Indirizzo selezionato.";});
+      results.appendChild(button);
+    }
+  } catch(error) {
+    if (current.signal.aborted) return;
+    status.textContent="Ricerca indirizzo non disponibile. Puoi usare la geolocalizzazione o scegliere sulla mappa.";
+  }
+}
+
+async function loadOriginTransit() {
+  if (!state.userLoc) return;
+  originRequest?.abort();
+  const current=new AbortController(); originRequest=current;
+  const origin=state.userLoc;
+  const node=document.getElementById("origin-transit-body");
+  node.textContent="Carico fermate e partenze vicine…";
+  try {
+    const response=await fetch(`/api/preview/transit/origin?${new URLSearchParams({lat:origin.lat,lon:origin.lng})}`,{signal:current.signal});
+    if (!response.ok) throw Error("unavailable");
+    const data=await response.json();
+    if (current.signal.aborted || state.userLoc!==origin) return;
+    const stops=data.stops || [];
+    stops.forEach(g=>g.lines.forEach(line=>line.origin=true));
+    node.innerHTML=`<p class="source-note">Dal riferimento: ${escapeHtml(origin.label)}. Distanze in linea d’aria; verifica di poter raggiungere la fermata in tempo.</p><ul class="transit-list">${stops.map((g,i)=>transitStopGroup(g,i,data.alerts)).join("")}</ul>${!stops.length ? "Nessuna fermata nei dati disponibili vicino al punto scelto." : ""}<p class="source-note">${TransportLayer.realtimeNote(data)} Aggiornato alle ${escapeHtml(data.now || "—")}.</p><button type="button" data-refresh-origin>Aggiorna partenze</button>`;
+    node.querySelector("[data-refresh-origin]")?.addEventListener("click",loadOriginTransit);
+    node.querySelectorAll("[data-focus-route]").forEach(button=>button.addEventListener("click",()=>focusOriginLines(data.lines.filter(row=>row.route_id===button.dataset.focusRoute))));
+    node.querySelectorAll("[data-focus-stop]").forEach(button=>button.addEventListener("click",()=>focusOriginLines(stops[Number(button.dataset.focusStop)].lines)));
+  } catch(error) {if (!current.signal.aborted) node.textContent="Mezzi vicini non disponibili al momento. La ricerca servizi resta disponibile.";}
+}
+
+function focusOriginLines(lines) {
+  const origin=state.userLoc;
+  if (!origin || !lines.length) return;
+  closeSheets(); if (state.view!=="map") toggleView();
+  transport.focus({routeIds:lines.map(r=>r.route_id),label:`Mezzi vicino a ${origin.label}`,stopIds:lines.flatMap(r=>r.stop_ids),points:[[origin.lat,origin.lng],...lines.map(r=>[r.stop_point[1],r.stop_point[0]])]});
 }
 
 function renderHours(hours) {
@@ -1241,12 +1338,14 @@ function costLabel(costTag) {
 
 function makePin(poi) {
   const categories = poi.site_categories || [resolveCategory(poi) || {label:poi.category_label,color:poi.category_color,icon_path:poi.category_icon_path}];
-  const colorStops=categories.map((c,i)=>`${c.color || "#555"} ${i*100/categories.length}% ${(i+1)*100/categories.length}%`).join(",");
-  const icons=categories.slice(0,4).map(c=>{
-    const url=normalizeCategoryIconPath(c.icon_path);
-    return url ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(categoryCaption(c.label || c.slug))}">` : `<span>${escapeHtml(markerFallbackLabel(c.label || c.slug))}</span>`;
-  }).join("");
-  return L.divIcon({className:"",html:`<div class="site-pin" style="background:conic-gradient(${colorStops})"><span class="site-pin-icons count-${Math.min(categories.length,4)}">${icons}</span>${poi.group_count>1?`<span class="site-pin-count">${poi.group_count}</span>`:""}</div>`,iconSize:[44,44],iconAnchor:[22,44]});
+  const weights = poi.site_weights || categories.map(()=>1);
+  const total = weights.reduce((a,b)=>a+b,0);
+  let position=0;
+  const colorStops=categories.map((c,i)=>{const start=position; position+=weights[i]/total*100; return `${c.color || "#555"} ${start}% ${position}%`;}).join(",");
+  const c=categories[0];
+  const icon=normalizeCategoryIconPath(c.icon_path);
+  const content=poi.group_count>1 ? `<span class="site-total">${poi.group_count}</span>` : `<span class="single-pin-icon">${icon ? `<img src="${escapeHtml(icon)}" alt="">` : escapeHtml(markerFallbackLabel(c.label || c.slug))}</span>`;
+  return L.divIcon({className:"",html:`<div class="site-pin ${poi.group_count>1 ? "multi" : "single"}" style="background:conic-gradient(${colorStops})">${content}</div>`,iconSize:[44,44],iconAnchor:[22,44]});
 }
 
 function userIcon() {
@@ -1606,16 +1705,16 @@ function sourceOpeningStatus(display, now = new Date()) {
   const active=merged.find(([a,b])=>a<=minute && minute<b);
   if (active) {
     const remaining=active[1]-minute;
-    return {kind:"open",label:remaining<=180?`Aperto ora · chiude tra ${formatDuration(remaining)}`:"Aperto ora",note:unknown.note};
+    return {kind:remaining<=60 ? "closing" : "open",label:remaining<=60?`Aperto ora · chiude alle ${String(Math.floor(active[1]/60)).padStart(2,"0")}:${String(active[1]%60).padStart(2,"0")}`:"Aperto ora",note:unknown.note};
   }
   const upcoming=merged.find(([a])=>a>minute);
-  if (upcoming) return {kind:"upcoming",label:`Apre tra ${formatDuration(upcoming[0]-minute)}`,note:unknown.note};
+  if (upcoming) return {kind:"closed",label:`Chiuso ora · apre oggi alle ${String(Math.floor(upcoming[0]/60)).padStart(2,"0")}:${String(upcoming[0]%60).padStart(2,"0")}`,note:unknown.note};
   // Empty days do not prove closure; later declarations are labelled as such.
   for (let offset=1;offset<=7;offset++) {
     const candidate=display.days.find(d=>d.day===keys[(dayIndex+offset)%7]);
     if (candidate?.issues?.length) continue;
     const next=(candidate?.intervals || []).filter(i=>!i.review_note && parseClockMinutes(i.opens_raw)!==null && parseClockMinutes(i.closes_raw)>parseClockMinutes(i.opens_raw)).sort((a,b)=>a.opens_raw.localeCompare(b.opens_raw))[0];
-    if (next) return {kind:"unknown",label:`Prossimo orario indicato: ${candidate.label} ${next.opens_raw}`,note:`${unknown.note} · nessuna chiusura dedotta nei giorni mancanti`};
+    if (next) return {kind:ranges.length ? "closed" : "unknown",label:ranges.length ? `Chiuso ora · apre ${candidate.label} alle ${next.opens_raw}` : `Orario da verificare · prossima apertura indicata: ${candidate.label} ${next.opens_raw}`,note:`${unknown.note} · nessuna chiusura dedotta nei giorni mancanti`};
   }
   return unknown;
 }

@@ -114,9 +114,10 @@ class PreviewHttpTests(unittest.TestCase):
             any(f["geometry"]["type"] == "Point" for f in metro["features"])
         )
         bus = self.payload(
-            "/api/preview/transport?modes=bus&zoom=14&west=12.48&south=41.89&east=12.51&north=41.92"
+            "/api/preview/transport?modes=bus&zoom=16&west=12.48&south=41.89&east=12.51&north=41.92"
         )
         self.assertTrue(bus["features"])
+        self.assertTrue(all(f["geometry"]["type"] == "Point" for f in bus["features"]))
         self.assertTrue(
             all(f["properties"]["transport_type"] == "bus" for f in bus["features"])
         )

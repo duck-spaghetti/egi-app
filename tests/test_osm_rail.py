@@ -95,10 +95,10 @@ class EndpointTests(unittest.TestCase):
         self.assertTrue(badge["rail"]["untimed"])
         with patch.object(main, "next_departures_all", wraps=main.next_departures_all) as departures:
             detail = self.client.get(f"/api/preview/transit/places/{place}").json()
-            self.assertEqual(departures.call_args.args[:2], ([], set()))
+            departures.assert_not_called()
         self.assertEqual(len(detail["lines"]), 2)
         self.assertEqual(len(detail["stops"]), 1)
-        self.assertTrue(all(row["next"] == [] and row["untimed"] for row in detail["lines"]))
+        self.assertTrue(all(not row.get("next") and row["untimed"] for row in detail["lines"]))
 
     def test_timed_and_untimed_sources_remain_distinct(self):
         """An active GTFS fixture and OSM routes coexist without replacing source ids."""

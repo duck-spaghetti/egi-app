@@ -115,16 +115,16 @@ class RankingTests(unittest.TestCase):
         self.assertEqual(rows[0]["stop_ids"], ["a", "b"])
 
     def test_rows_grouped_by_physical_stop(self):
-        """Lines sharing a stop name nearby form one group; metro groups come first."""
+        """Physical stops are grouped and ordered by distance across modes."""
         a = stop("a", 300, {"49": ["svc"], "n92": ["svc"]})
         a["properties"]["name"] = "Piazza"
         m = stop("m", 600, {"MEA": ["svc"]})
         index = StopIndex(network(a, m))
         groups = group_by_stop(nearby_lines(index, {"svc"}, LON, LAT))
-        self.assertEqual([g["stop_name"] for g in groups], ["Stop m", "Piazza"])
-        self.assertEqual([r["code"] for r in groups[1]["lines"]], ["49", "n92"])
-        self.assertEqual(groups[1]["stop_ids"], ["a"])
-        self.assertEqual(groups[0]["modes"], ["metro"])
+        self.assertEqual([g["stop_name"] for g in groups], ["Piazza", "Stop m"])
+        self.assertEqual([r["code"] for r in groups[0]["lines"]], ["49", "n92"])
+        self.assertEqual(groups[0]["stop_ids"], ["a"])
+        self.assertEqual(groups[1]["modes"], ["metro"])
 
     def test_lines_not_running_today_are_omitted(self):
         """Only services active on the day count."""

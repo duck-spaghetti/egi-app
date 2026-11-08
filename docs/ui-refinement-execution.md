@@ -18,3 +18,7 @@ Self-review completed. JavaScript syntax and Node checks passed, covering existi
 Browser: an Abbigliamento-only search for Social Market Ferraioli showed a point with Cibo, Ascolto and Abiti E Coperte; the chooser retained all three independent services and identified the two outside the filter. Category icons/captions rendered in badges. All 315 list entries had a source-schedule status; live open/upcoming results were present. A Casa di Amore detail displayed “Aperto ora” and phone values 067001668 / 0677260230. No errors or warnings were observed in the checked tab. Responsive layout and icon contrast were inspected and corrected. An actual browser location permission flow was not exercised.
 
 Reload the existing local map to receive updated JS/CSS/template. Database, importer and original files were not changed by this refinement. Previous v0.2 archived evidence remains historical; the new archive contains the refined app.
+
+Current behavior was subsequently revised under approved discovery UX r1 on
+2026-11-09; see [the maintained contract](discovery-ux.md). This record describes
+its historical acceptance, including older opening/countdown wording.

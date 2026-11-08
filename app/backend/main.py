@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import urllib.error
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
+
+from pydantic import BaseModel, Field
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
@@ -13,6 +16,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from .geocoding import search_address
 from .preview import AREA, LANGUAGES, categories, services
 from .presentation import coverage
 from .subjects import PostgresSubjectSource, SubjectSource, SubjectSourceUnavailable
@@ -203,12 +207,24 @@ def upcoming_directions(directions: list[dict]) -> list[dict]:
 
 @app.get("/api/preview/transit/places/{place_id}")
 def transit_place(place_id: str, rows: list[dict[str, Any]] = Depends(subjects)):
-    """Nearby scheduled lines and untimed OSM rail with nearest stops and walking estimates."""
+    """Destination access: distance-ordered stops/lines, without origin countdowns."""
     points = place_points(rows)
     if place_id not in points:
         raise HTTPException(404, "Luogo senza coordinate nella preview")
     result = nearby_transit({place_id: points[place_id]})
-    result["lines"] = lines = result.pop("places").get(place_id, [])
+    result["lines"] = result.pop("places").get(place_id, [])
+    result["stops"] = group_by_stop(result["lines"])
+    return result
+
+
+@app.get("/api/preview/transit/origin")
+def transit_origin(
+    lat: float = Query(ge=41.0, le=42.7),
+    lon: float = Query(ge=11.5, le=13.7),
+):
+    """Departures near an explicitly selected Rome-area origin, without DB access."""
+    result = nearby_transit({"origin": (lon, lat)})
+    result["lines"] = lines = result.pop("places").get("origin", [])
     # Next scheduled departures of each row's line at its nearest stop.
     timed = [row for row in lines if not row.get("untimed")]
     schedule = next_departures_all(
@@ -320,3 +336,20 @@ def benchmark_page(request: Request, rows: list[dict[str, Any]] = Depends(subjec
     return templates.TemplateResponse(
         request=request, name="benchmark.html", context={"report": coverage(rows)}
     )
+
+
+class AddressSearch(BaseModel):
+    """Explicit search text; POST keeps the address out of ordinary URL access logs."""
+
+    query: str = Field(min_length=3, max_length=200)
+
+
+@app.post("/api/preview/address-search")
+def address_search(body: AddressSearch):
+    """Resolve a submitted public address; never expose upstream error/query details."""
+    if len(body.query.strip()) < 3:
+        raise HTTPException(422, "Inserisci almeno tre caratteri")
+    try:
+        return {"results": search_address(body.query), "attribution": "© OpenStreetMap contributors"}
+    except (OSError, ValueError, KeyError, TypeError, urllib.error.URLError):
+        raise HTTPException(503, "Ricerca indirizzo non disponibile. Scegli un punto sulla mappa.") from None
