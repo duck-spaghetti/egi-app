@@ -11,6 +11,7 @@ const fakeElement = () => ({classList:{add(){},remove(){},toggle(){}}, setAttrib
 const sandbox = {document:{getElementById:()=>fakeElement(), querySelector:()=>fakeElement(), querySelectorAll:()=>[]}, window:{EGI_MAP_CONTEXT:{languageCode:'it'},EGI_I18N:{t:(_key,_args,fallback)=>fallback||''}}, console, URLSearchParams};
 vm.createContext(sandbox);
 vm.runInContext(transportSource + '\nthis.TransportLayer = TransportLayer;',sandbox);
+vm.runInContext(fs.readFileSync(path.join(__dirname, '../app/frontend/static/js/cycle-layer.js'), 'utf8') + '\nthis.CycleLayer = CycleLayer;',sandbox);
 vm.runInContext(source,sandbox);
 vm.runInContext(`
   const originalId='c5cbfdcd-30e3-5e37-a40e-efb488e4a884';
@@ -150,8 +151,11 @@ vm.runInContext(`
   const gr={stop_name:'P',modes:['bus'],walk_min:1,distance_m:30,wheelchair:'unknown',stop_ids:['s9'],lines:[row('89','bus',1,{route_id:'89'})]};
   const withAlert=renderTransitRows({availability:'available',lines:gr.lines,stops:[gr],alerts:[{header:'Deviazione 89',routes:['89'],stops:[]},{header:'Altro',routes:['64'],stops:[]}],realtime:{status:'live'}});
   if(!withAlert.includes('Deviazione 89') || withAlert.includes('Altro') || !withAlert.includes('tempo reale')) throw Error('stop alerts filtering or live note wrong');
+  if(CycleLayer.style('separated').dashArray || !CycleLayer.style('lane').dashArray || CycleLayer.style('unknown')!==CycleLayer.style('path')) throw Error('cycle styles wrong');
+  if(CycleLayer.popupHtml({label:'Corsia ciclabile',name:'<x>',surface:'asphalt',oneway:true}).includes('<x>') || !CycleLayer.popupHtml({label:'Corsia',name:''}).includes('OpenStreetMap')) throw Error('cycle popup escaping/attribution');
+  if(!CycleLayer.statusText({availability:'available',min_zoom:12,features:[]},11).includes('zoom 12')) throw Error('cycle zoom hint missing');
   // Regression: a multi-service map pin must open the service chooser (broke in F1).
   const twoAtSite=twoSiteFixture();
   openServiceChooser(twoAtSite);
 `,sandbox);
-console.log('PASS: source filters, cross-category sites, contacts, Rome hours and open-now membership/closing boundaries, transit badge and rows, transport layer, focus view, departures, realtime');
+console.log('PASS: source filters, cross-category sites, contacts, Rome hours and open-now membership/closing boundaries, transit badge and rows, transport layer, focus view, departures, realtime, cycleways');

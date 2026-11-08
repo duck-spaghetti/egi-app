@@ -140,6 +140,9 @@ class PreviewHttpTests(unittest.TestCase):
         self.assertEqual(termini["availability"], "available")
         self.assertTrue(all(d["route_id"] == "MEA" and d["code"] == "A" for d in termini["departures"]))
         self.assertTrue(all(len(d["times"]) <= 3 for d in termini["departures"]))
+        cycle = self.payload("/api/preview/cycleways?west=12.44&south=41.87&east=12.52&north=41.92&zoom=14")
+        self.assertEqual(cycle["availability"], "available")
+        self.assertTrue(cycle["features"] and "OpenStreetMap" in cycle["attribution"])
         too_many = ",".join(str(i) for i in range(81))
         for query in ["modes=ferry", "west=13&east=12", "zoom=30", "west=nan", "routes=", "routes=" + too_many]:
             with self.assertRaises(HTTPError) as error:

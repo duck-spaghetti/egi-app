@@ -133,6 +133,18 @@
         <li><span class="tl-stop tl-bus"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M4 1.5h8a2 2 0 0 1 2 2V12a1 1 0 0 1-1 1v1.25a.75.75 0 0 1-1.5 0V13h-7v1.25a.75.75 0 0 1-1.5 0V13a1 1 0 0 1-1-1V3.5a2 2 0 0 1 2-2Zm0 2v4h8v-4Zm.75 6.25a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm6.5 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/></svg></span> Fermata autobus (da zoom 14; percorsi sottili da zoom 13)</li>
       </ul>
       <p id="transport-status" class="source-note" role="status">Verifica dati trasporti…</p>
+      <button class="layer-toggle" id="cycle-toggle" type="button" aria-pressed="false">
+        <span class="dot"></span>
+        <span>Piste ciclabili</span>
+      </button>
+      <ul class="transport-legend cycle-legend" aria-label="Legenda piste ciclabili">
+        <li><span class="cycle-swatch separated"></span> Pista separata</li>
+        <li><span class="cycle-swatch track"></span> Pista su carreggiata</li>
+        <li><span class="cycle-swatch lane"></span> Corsia ciclabile</li>
+        <li><span class="cycle-swatch path"></span> Percorso pedonale e ciclabile</li>
+      </ul>
+      <p id="cycle-status" class="source-note" role="status" hidden></p>
+      <p class="source-note">Piste ciclabili da OpenStreetMap (© OpenStreetMap contributors, ODbL), non verificate da EGI; visibili da zoom 12.</p>
       <p class="source-note">Rete programmata, senza arrivi in tempo reale. Ingrandisci per vedere i percorsi bus e le fermate.
         Fonte: <a href="https://romamobilita.it/sistemi-e-tecnologie/open-data/" target="_blank" rel="noopener">Roma Servizi per la Mobilità</a>.
         Licenza del feed da chiarire: i cataloghi riportano CC BY-SA e CC BY 4.0. Preview locale non revisionata.</p>
@@ -289,5 +301,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
 <script src="/static/js/transport-layer.js" defer></script>
+<script src="/static/js/cycle-layer.js" defer></script>
 <script src="/static/js/map.js" defer></script>
 {% endblock %}

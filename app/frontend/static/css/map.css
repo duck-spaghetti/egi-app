@@ -1369,3 +1369,10 @@ html[dir="rtl"] .sheet-back-head .arrow,
 .tl-alerts-group > summary { cursor:pointer;color:#8a4b00;font-weight:600; }
 .transit-stop-group .tl-alerts-group { margin-left:32px; }
 .transit-stop-group .tl-alerts-group .tl-alerts { margin-left:0; }
+
+/* Cycle layer legend (F6) */
+.cycle-swatch { flex:none;display:inline-block;width:28px;height:0;border-top:4px solid #1b7837; }
+.cycle-swatch.track { border-top-style:dashed; }
+.cycle-swatch.lane { border-top:3px dashed #5aae61; }
+.cycle-swatch.path { border-top:3px dotted #2a9d8f; }
+#cycle-toggle { margin-top:12px; }

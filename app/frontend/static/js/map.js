@@ -99,6 +99,10 @@ function initMap() {
   map.setMinZoom(Math.max(6, minCityZoom - 2));
   map.setMaxBounds(cityBounds);
   map.panInsideBounds(cityBounds, { animate: false });
+  CycleLayer.create(map, {
+    toggle: document.getElementById("cycle-toggle"),
+    status: document.getElementById("cycle-status"),
+  });
   transport = TransportLayer.create(map, {
     toggle: document.getElementById("transport-toggle"),
     status: document.getElementById("transport-status"),

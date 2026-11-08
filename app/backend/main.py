@@ -19,6 +19,7 @@ from .subjects import PostgresSubjectSource, SubjectSource, SubjectSourceUnavail
 from .transport import ROOT as TRANSPORT_ROOT, transport_view
 from .transit_nearby import group_by_stop, lines_near_places, summary as transit_summary
 from .departures import next_departures
+from .cycleways import cycleways_view
 
 ROOT = Path(__file__).resolve().parents[2]
 app = FastAPI(title="EGI v0.2 — local source preview", version="0.2.0")
@@ -214,6 +215,20 @@ def transit_departures(
         raise HTTPException(422, "Elenco fermate non valido")
     route_ids = {r for r in routes.split(",") if r} if routes else None
     return next_departures(stop_ids, route_ids, limit, TRANSPORT_ROOT)
+
+
+@app.get("/api/preview/cycleways")
+def preview_cycleways(
+    west: float = Query(ge=-180, le=180),
+    south: float = Query(ge=-90, le=90),
+    east: float = Query(ge=-180, le=180),
+    north: float = Query(ge=-90, le=90),
+    zoom: int = Query(ge=0, le=19),
+):
+    """OpenStreetMap cycle infrastructure in the viewport (from zoom 12)."""
+    if west >= east or south >= north:
+        raise HTTPException(422, "Viewport non valido")
+    return cycleways_view([west, south, east, north], zoom)
 
 
 @app.get("/api/preview/languages")

@@ -202,3 +202,12 @@ Use `python3 scripts/load_preview.py --input runs/helpinet-02/normalized/bundle.
 The subsequent UI refinement integrates the discovery controls, shows every colocated service category on source-site markers, puts icons inside category badges and exposes source-derived opening/countdown status in detail and list. Phone/email labels use explicit labels or original contact values. The status is an ephemeral Europe/Rome calculation with source uncertainty; missing days never imply closure. See [refinement execution](docs/ui-refinement-execution.md) for rules and current verification.
 
 The discovery panel also offers **Aperti ora**, combining with existing filters in map/list and refreshing membership with the source opening status. Unknown or ambiguous hours are excluded while active. See [open-now checks](docs/open-now-execution.md).
+
+### Cycle lanes
+
+`GET /api/preview/cycleways?west&south&east&north&zoom` returns OpenStreetMap cycle
+infrastructure in the viewport from zoom 12 (`app/backend/cycleways.py`, format
+`../egi-importer/docs/cycleways-format.md`), drawn by `cycle-layer.js` under its own
+"Piste ciclabili" toggle: separated paths solid dark green, tracks dashed, lanes
+light dashed, shared paths dotted, with a legend and ODbL attribution. No official
+Rome dataset was found; the data is not verified by EGI.
