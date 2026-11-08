@@ -17,7 +17,7 @@ from .preview import AREA, LANGUAGES, categories, services
 from .presentation import coverage
 from .subjects import PostgresSubjectSource, SubjectSource, SubjectSourceUnavailable
 from .transport import ROOT as TRANSPORT_ROOT, transport_view
-from .transit_nearby import lines_near_places, summary as transit_summary
+from .transit_nearby import group_by_stop, lines_near_places, summary as transit_summary
 from .departures import next_departures
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -187,6 +187,7 @@ def transit_place(place_id: str, rows: list[dict[str, Any]] = Depends(subjects))
                 ):
                     directions[key] = {"headsign": departure["headsign"], "direction_id": departure["direction_id"], "times": departure["times"]}
         row["next"] = sorted(directions.values(), key=lambda d: (d["direction_id"], d["headsign"]))
+    result["stops"] = group_by_stop(lines)
     result["schedule_availability"] = schedule["availability"]
     result["now"] = schedule["now"]
     return result

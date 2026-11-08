@@ -92,8 +92,9 @@ vm.runInContext(`
   const itinerant=make('it','Unità di strada',[12.5,41.9],1,'Mensa',7,false); itinerant.raw.itinerant_source=true; itinerant.place_id='place-1';
   if(transitBadge(itinerant)!=='') throw Error('badge shown for itinerant service');
   const many=Array.from({length:8},(_,i)=>row(String(10+i),'bus',i+1)); many[7].night=true;
-  const html=renderTransitRows({availability:'available',lines:many});
-  if((html.match(/class="transit-row"/g)||[]).length!==8 || !html.includes('Altre 3 linee') || !html.includes('notturna')) throw Error('detail rows, overflow or night tag wrong');
+  const groups=many.map((r,i)=>({stop_name:'Stop '+i,modes:['bus'],walk_min:r.walk_min,distance_m:r.distance_m,wheelchair:'unknown',lines:[r]}));
+  const html=renderTransitRows({availability:'available',lines:many,stops:groups});
+  if((html.match(/class="transit-stop-group"/g)||[]).length!==8 || !html.includes('Altre 4 fermate') || !html.includes('notturna') || (html.match(/data-focus-stop=/g)||[]).length!==8) throw Error('stop groups, overflow or night tag wrong');
   if(!html.includes('linea d’aria') || !html.includes('non sono dati in tempo reale')) throw Error('estimate not qualified');
   if(!renderTransitRows({availability:'outside_calendar'}).includes('non disponibile per oggi')) throw Error('outside calendar not explained');
   if(!renderTransitRows({availability:'available',lines:[]}).includes('Nessuna linea')) throw Error('empty result not explained');
@@ -108,8 +109,9 @@ vm.runInContext(`
   if(!station.includes('tl-roundel') || !station.includes('>A<') || !station.includes('>B<')) throw Error('station icon lacks lines');
   if(!TransportLayer.stopIconHtml({kind:'stop',transport_type:'bus',routes:[]}).includes('tl-bus') || !TransportLayer.stopIconHtml({kind:'stop',transport_type:'tram',routes:[]}).includes('tl-tram')) throw Error('stop icons by mode missing');
   if(TransportLayer.popupHtml({kind:'stop',transport_type:'bus',name:'<b>x',routes:[]}).includes('<b>x')) throw Error('stop name not escaped in popup');
-  const focusHtml=renderTransitRows({availability:'available',lines:[row('49','bus',2,{route_id:'49"x'}),row('A','metro',4)]});
-  if(!focusHtml.includes('Mostra queste 2 linee') || !focusHtml.includes('data-focus-route="*"') || focusHtml.includes('49"x"')) throw Error('focus buttons missing or route id not escaped');
+  const twoLines=[row('49','bus',2,{route_id:'49"x'}),row('64','bus',2)];
+  const focusHtml=renderTransitRows({availability:'available',lines:twoLines,stops:[{stop_name:'Piazza',modes:['bus'],walk_min:2,distance_m:80,wheelchair:'unknown',lines:twoLines}]});
+  if(!focusHtml.includes('Mostra tutte le 2 linee') || !focusHtml.includes('data-focus-route="*"') || focusHtml.includes('49"x"') || (focusHtml.match(/class="line-chip-button"/g)||[]).length!==2 || !focusHtml.includes('Fermata Piazza') || !focusHtml.includes('2 linee')) throw Error('stop group with clickable lines wrong or route id not escaped');
   if(TransportLayer.focusLineStyle('bus',null,'49').color!==TransportLayer.colorForLine('49') || TransportLayer.focusLineStyle('bus',null,'49').weight<=TransportLayer.lineStyle('bus').weight) throw Error('focused bus lines not distinct and strong');
   if(TransportLayer.focusLineStyle('metro','#E27439','A').color!=='#E27439') throw Error('focused metro lost official colour');
   const mid=TransportLayer.lineLabelPoint({type:'LineString',coordinates:[[12.4,41.8],[12.5,41.9],[12.6,42]]});
@@ -133,7 +135,8 @@ vm.runInContext(`
   if(filled.includes('Carico') || !filled.includes('tl-departures') || !TransportLayer.popupHtml({kind:'station',name:'T',routes:[]}).includes('Carico')) throw Error('popup departures slot wrong');
   if(!TransportLayer.departuresHtml({availability:'unavailable'}).includes('non disponibili')) throw Error('unavailable schedule not explained');
   if(!TransportLayer.wheelchairText('unknown').includes('non indicata') || !TransportLayer.wheelchairText('yes').includes('Accessibile')) throw Error('wheelchair text wrong');
-  const rowHtml=renderTransitRows({availability:'available',lines:[row('49','bus',2,{wheelchair:'yes',next:[{headsign:'Termini',times:[{time:'08:00',in_min:10}]},{headsign:'Ostia',times:[]}]})]});
+  const r49=row('49','bus',2,{next:[{headsign:'Termini',times:[{time:'08:00',in_min:10}]},{headsign:'Ostia',times:[]}]});
+  const rowHtml=renderTransitRows({availability:'available',lines:[r49],stops:[{stop_name:'X',modes:['bus'],walk_min:2,distance_m:80,wheelchair:'yes',lines:[r49]}]});
   if(!rowHtml.includes('→ Termini: 08:00 (tra 10 min)') || !rowHtml.includes('→ Ostia: nessun’altra corsa oggi') || !rowHtml.includes('accessibile in sedia a rotelle')) throw Error('row departures or accessibility missing');
   // Regression: a multi-service map pin must open the service chooser (broke in F1).
   const twoAtSite=twoSiteFixture();

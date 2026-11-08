@@ -137,8 +137,10 @@ remote/directory services or services without coordinates. Logic and constants a
 in `app/backend/transit_nearby.py`; transport unavailable or outside its calendar
 hides the rows and leaves services untouched.
 
-The "Vicino a" section has "Mostra queste N linee sulla mappa" and a "Mappa" button
-per row. Both close the sheet, switch to the map and call `transport.focus()`: the
+The "Vicino a" section lists stops (same-named stops within 150 m form one stop;
+metro stations first, then by walking time), each with its lines and their next
+departures. "Mostra tutte le N linee sulla mappa" sits on top, "Mostra linee" next
+to each stop name, and each line chip is itself a button for that line alone. Both close the sheet, switch to the map and call `transport.focus()`: the
 layer then requests `/api/preview/transport?routes=<route_id,...>` (at most 80; the
 whole lines with all their stops, regardless of viewport, zoom and mode boxes),
 draws each bus line in its own palette colour with its code label next to the

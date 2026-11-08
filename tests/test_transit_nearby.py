@@ -17,6 +17,7 @@ from app.backend.main import app, subject_source
 from app.backend.subjects import StaticSubjectSource
 from app.backend.transit_nearby import (
     StopIndex,
+    group_by_stop,
     display_code,
     lines_near_places,
     nearby_lines,
@@ -111,6 +112,18 @@ class RankingTests(unittest.TestCase):
         index = StopIndex(network(stop("a", 60, {"49": ["svc"]}), near_same, far_same))
         rows = nearby_lines(index, {"svc"}, LON, LAT)
         self.assertEqual(rows[0]["stop_ids"], ["a", "b"])
+
+    def test_rows_grouped_by_physical_stop(self):
+        """Lines sharing a stop name nearby form one group; metro groups come first."""
+        a = stop("a", 300, {"49": ["svc"], "n92": ["svc"]})
+        a["properties"]["name"] = "Piazza"
+        m = stop("m", 600, {"MEA": ["svc"]})
+        index = StopIndex(network(a, m))
+        groups = group_by_stop(nearby_lines(index, {"svc"}, LON, LAT))
+        self.assertEqual([g["stop_name"] for g in groups], ["Stop m", "Piazza"])
+        self.assertEqual([r["code"] for r in groups[1]["lines"]], ["49", "n92"])
+        self.assertEqual(groups[1]["stop_ids"], ["a"])
+        self.assertEqual(groups[0]["modes"], ["metro"])
 
     def test_lines_not_running_today_are_omitted(self):
         """Only services active on the day count."""

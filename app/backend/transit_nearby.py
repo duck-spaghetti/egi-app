@@ -144,6 +144,44 @@ def sibling_stops(stop: dict, point: list, candidates: list[tuple[dict, list]]) 
     return ids
 
 
+def group_by_stop(rows: list[dict]) -> list[dict]:
+    """Group line rows by physical stop: same stop name within SIBLING_M.
+
+    Each group has the stop name, the union of stop_ids, the nearest distance and
+    walking time, its modes and its lines (rows) in line order. Groups with a metro
+    line come first, then by walking time, so the card reads "stop → its lines".
+    """
+    groups: list[dict] = []
+    for row in rows:
+        lon, lat = row["stop_point"]
+        kx = 111_320 * math.cos(math.radians(lat))
+        for group in groups:
+            glon, glat = group["stop_point"]
+            if group["stop_name"].casefold() == row["stop_name"].casefold() and math.hypot(
+                (lon - glon) * kx, (lat - glat) * 110_540
+            ) <= SIBLING_M:
+                break
+        else:
+            group = {
+                "stop_name": row["stop_name"],
+                "stop_point": row["stop_point"],
+                "stop_ids": [],
+                "distance_m": row["distance_m"],
+                "walk_min": row["walk_min"],
+                "wheelchair": row.get("wheelchair", "unknown"),
+                "lines": [],
+            }
+            groups.append(group)
+        group["lines"].append(row)
+        group["stop_ids"] += [s for s in row.get("stop_ids", [row["stop_id"]]) if s not in group["stop_ids"]]
+        if row["distance_m"] < group["distance_m"]:
+            group.update(distance_m=row["distance_m"], walk_min=row["walk_min"], stop_point=row["stop_point"])
+    for group in groups:
+        group["lines"].sort(key=line_sort_key)
+        group["modes"] = sorted({r["mode"] for r in group["lines"]}, key=["metro", "tram", "bus"].index)
+    return sorted(groups, key=lambda g: (g["modes"][0] != "metro", g["walk_min"], g["distance_m"]))
+
+
 def summary(rows: list[dict]) -> dict:
     """Compact list badge: nearest metro, nearest daytime tram/bus line, total lines."""
     return {
