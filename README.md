@@ -103,6 +103,10 @@ Popup route membership follows the selected modes and today's service calendar.
 
 `/api/preview/transport` reads the sibling workspace `.local/transport` files;
 `EGI_TRANSPORT_ROOT` can explicitly select another runtime directory at startup.
+Only `load_active` in `app/backend/transport.py` knows that layout; it follows
+`../egi-importer/docs/transport-format.md`. Tests use the vendored example in
+`tests/fixtures/transport-root` and, when the importer sits alongside, check that
+the copy still matches the producer's.
 Parameters: west/south/east/north (WGS84 bbox), zoom (0–19), modes (`metro,bus`,
 `metro` or `bus`). It returns GeoJSON plus active-version and refresh metadata.
 Bounding boxes select intersecting route shapes; full source shapes are retained.

@@ -1,7 +1,9 @@
 """Read versioned GTFS files without network, importer execution or database access.
 
-transport_view selects today's scheduled shapes/points by modes, viewport and
-zoom. Atomic importer manifests isolate readers from in-progress refreshes.
+load_active is the only code that knows the importer's runtime layout and format
+(egi-importer/docs/transport-format.md). transport_view selects today's scheduled
+shapes/points by modes, viewport and zoom. Atomic importer manifests isolate readers
+from in-progress refreshes.
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ import re
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
+from typing import NamedTuple
 from zoneinfo import ZoneInfo
 
 ROOT = Path(
@@ -21,15 +24,41 @@ ROOT = Path(
 )
 
 
+FORMAT = "egi-transport/1"
+VERSION = re.compile(r"[a-f0-9]{64}-" + re.escape(FORMAT.split("/")[1]))
+
+
+class ActiveNetwork(NamedTuple):
+    """The activated manifest, the poller status and the immutable network it names."""
+
+    manifest: dict
+    status: dict
+    network: dict
+
+
 @lru_cache(maxsize=1)
 def read_network(root: str, version: str) -> dict:
     """Cache the active immutable network; a changed version invalidates the key."""
-    if not re.fullmatch(r"[a-f0-9]{64}-1", version):
+    if not VERSION.fullmatch(version):
         raise ValueError("Unsupported transport version")
     data = json.loads((Path(root) / "versions" / version / "network.json").read_text())
-    if data.get("format") != "egi-transport/1":
+    if data.get("format") != FORMAT:
         raise ValueError("Unsupported transport format")
     return data
+
+
+def load_active(root: Path) -> ActiveNetwork:
+    """Read the activated version of a transport runtime root.
+
+    Raises OSError/ValueError/KeyError when nothing valid is active; a missing
+    status file is an empty status, since the poller may not have run yet.
+    """
+    manifest = json.loads((root / "active.json").read_text())
+    if manifest.get("format") != FORMAT:
+        raise ValueError("Unsupported transport format")
+    status_path = root / "status.json"
+    status = json.loads(status_path.read_text()) if status_path.exists() else {}
+    return ActiveNetwork(manifest, status, read_network(str(root), manifest["version"]))
 
 
 def intersects(a: list, b: list) -> bool:
@@ -58,10 +87,7 @@ def transport_view(
         "source_url": "https://romamobilita.it/sistemi-e-tecnologie/open-data/",
     }
     try:
-        manifest = json.loads((root / "active.json").read_text())
-        status_path = root / "status.json"
-        status = json.loads(status_path.read_text()) if status_path.exists() else {}
-        network = read_network(str(root), manifest["version"])
+        manifest, status, network = load_active(root)
         result.update(manifest=manifest, refresh=status, availability="available")
         active_services = set(network["service_dates"].get(today, []))
         if not active_services:
