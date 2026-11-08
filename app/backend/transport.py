@@ -177,11 +177,15 @@ def transport_view(
     modes: set[str],
     root: Path = ROOT,
     day: str | None = None,
+    routes: set[str] | None = None,
 ) -> dict:
     """Return bounded, date-aware GeoJSON; expose unavailable transport separately.
 
     An expired calendar yields no features and an explicit status rather than
     implying old scheduled service is operating today. No live availability claim.
+    With routes (focus view), only those route_ids are returned, whole and at any
+    zoom, with every stop they call at; bbox, modes and zoom thresholds are ignored
+    except for choosing the geometry detail level.
     """
     today = day or datetime.now(ZoneInfo("Europe/Rome")).date().isoformat()
     result = {
@@ -206,12 +210,15 @@ def transport_view(
         colors = stop_index(manifest["version"], network).colors
         stops = []
         for feature in network["features"]:
-            if not intersects(feature["bbox"], bbox):
+            if routes is None and not intersects(feature["bbox"], bbox):
                 continue
             props = feature["properties"]
             if props["kind"] == "route":
                 mode = props["transport_type"]
-                if mode not in modes or zoom < LINE_MIN_ZOOM.get(mode, 13):
+                if routes is not None:
+                    if props["route_id"] not in routes:
+                        continue
+                elif mode not in modes or zoom < LINE_MIN_ZOOM.get(mode, 13):
                     continue
                 if not active_services.intersection(props["service_ids"]):
                     continue
@@ -229,11 +236,13 @@ def transport_view(
             memberships = []
             for route_id, services in props["services_by_route"].items():
                 route = network["routes"][route_id]
-                if (
-                    route["mode"] in modes
-                    and zoom >= STOP_MIN_ZOOM.get(route["mode"], 14)
-                    and active_services.intersection(services)
-                ):
+                if routes is not None:
+                    wanted = route_id in routes
+                else:
+                    wanted = route["mode"] in modes and zoom >= STOP_MIN_ZOOM.get(
+                        route["mode"], 14
+                    )
+                if wanted and active_services.intersection(services):
                     memberships.append(
                         {
                             "route_id": route_id,

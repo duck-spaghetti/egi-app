@@ -332,10 +332,15 @@ function transitSectionShell(poi) {
   return `<section class="detail-section transit-near" data-transit-place="${escapeHtml(poi.place_id)}"><h3>Vicino a</h3><p class="source-note">Cerco fermate e linee vicine…</p></section>`;
 }
 
+function modeName(mode) {
+  return mode === "metro" ? "Metro" : mode === "tram" ? "Tram" : "Autobus";
+}
+
 function transitRow(row) {
   const place = row.mode === "metro" ? "Stazione" : row.mode === "tram" ? "Fermata tram" : "Fermata";
   const night = row.night ? ` · <span class="night-tag">notturna</span>` : "";
-  return `<li class="transit-row">${lineChip(row)}<span class="transit-text"><span class="transit-stop">${place} ${escapeHtml(row.stop_name)}</span><span class="transit-meta">circa ${row.walk_min} min a piedi · ${row.distance_m} m in linea d’aria${night}</span></span></li>`;
+  const focus = `<button type="button" class="transit-row-focus" data-focus-route="${escapeHtml(row.route_id)}" aria-label="Mostra ${escapeHtml(modeName(row.mode))} ${escapeHtml(row.code)} sulla mappa">Mappa</button>`;
+  return `<li class="transit-row">${lineChip(row)}<span class="transit-text"><span class="transit-stop">${place} ${escapeHtml(row.stop_name)}</span><span class="transit-meta">circa ${row.walk_min} min a piedi · ${row.distance_m} m in linea d’aria${night}</span></span>${focus}</li>`;
 }
 
 function renderTransitRows(data) {
@@ -349,7 +354,8 @@ function renderTransitRows(data) {
   const shown = lines.slice(0, TRANSIT_ROWS_SHOWN);
   const rest = lines.slice(TRANSIT_ROWS_SHOWN);
   const more = rest.length ? `<details class="transit-more-lines"><summary>Altre ${rest.length} linee</summary><ul class="transit-list">${rest.map(transitRow).join("")}</ul></details>` : "";
-  return `${head}<ul class="transit-list">${shown.map(transitRow).join("")}</ul>${more}<p class="source-note">${TRANSIT_NOTE}</p>`;
+  const all = `<button type="button" class="transit-focus-all" data-focus-route="*">Mostra queste ${lines.length} linee sulla mappa</button>`;
+  return `${head}${all}<ul class="transit-list">${shown.map(transitRow).join("")}</ul>${more}<p class="source-note">${TRANSIT_NOTE}</p>`;
 }
 
 async function loadTransitDetail(poi) {
@@ -366,6 +372,26 @@ async function loadTransitDetail(poi) {
   // The sheet may already show another service.
   if (!node.isConnected || node.dataset.transitPlace !== String(poi.place_id)) return;
   node.innerHTML = renderTransitRows(data);
+  node.querySelectorAll("[data-focus-route]").forEach(button => button.addEventListener("click", () => {
+    const id = button.dataset.focusRoute;
+    focusTransit(poi, id === "*" ? data.lines : data.lines.filter(row => row.route_id === id));
+  }));
+}
+
+/** Leave the sheet, show the map and only these lines, highlighting their nearby stops. */
+function focusTransit(poi, rows) {
+  if (!rows.length || !transport) return;
+  closeSheets();
+  if (state.view === "list") toggleView();
+  const label = rows.length === 1
+    ? `${modeName(rows[0].mode)} ${rows[0].code} vicino a ${poi.title}`
+    : `${rows.length} linee vicino a ${poi.title}`;
+  transport.focus({
+    routeIds: rows.map(row => row.route_id),
+    label,
+    stopIds: rows.map(row => row.stop_id),
+    points: [[poi.latitude, poi.longitude], ...rows.filter(row => row.stop_point).map(row => [row.stop_point[1], row.stop_point[0]])],
+  });
 }
 
 

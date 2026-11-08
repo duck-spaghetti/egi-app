@@ -67,7 +67,7 @@ class StopIndex:
             self.cells[key].append((lon, lat, props))
 
     def near(self, lon: float, lat: float, radius_m: float):
-        """Yield (distance_m, stop properties) for stops within radius_m."""
+        """Yield (distance_m, stop properties, [lon, lat]) for stops within radius_m."""
         kx = 111_320 * math.cos(math.radians(lat))
         ky = 110_540
         span_x = math.ceil(radius_m / (kx * CELL_DEG))
@@ -78,7 +78,7 @@ class StopIndex:
                 for slon, slat, props in self.cells.get((ix, iy), ()):
                     distance = math.hypot((slon - lon) * kx, (slat - lat) * ky)
                     if distance <= radius_m:
-                        yield distance, props
+                        yield distance, props, [slon, slat]
 
 
 def stop_index(version: str, network: dict) -> StopIndex:
@@ -96,16 +96,16 @@ def nearby_lines(
 
     One row per route_id; rows are ordered metro first, then by walking time.
     """
-    best: dict[str, tuple[float, dict]] = {}
-    for distance, stop in index.near(lon, lat, max(RADIUS_M.values())):
+    best: dict[str, tuple[float, dict, list]] = {}
+    for distance, stop, point in index.near(lon, lat, max(RADIUS_M.values())):
         for route_id, services in stop["services_by_route"].items():
             mode = index.routes[route_id]["mode"]
             if distance > RADIUS_M[mode] or not active_services.intersection(services):
                 continue
             if route_id not in best or distance < best[route_id][0]:
-                best[route_id] = (distance, stop)
+                best[route_id] = (distance, stop, point)
     rows = []
-    for route_id, (distance, stop) in best.items():
+    for route_id, (distance, stop, point) in best.items():
         route = index.routes[route_id]
         rows.append(
             {
@@ -117,6 +117,7 @@ def nearby_lines(
                 "stop_id": stop["stop_id"],
                 "stop_name": stop["name"],
                 "stop_code": stop.get("code", ""),
+                "stop_point": point,
                 "distance_m": round(distance),
                 "walk_min": walk_minutes(distance),
             }

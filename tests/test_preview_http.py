@@ -124,7 +124,20 @@ class PreviewHttpTests(unittest.TestCase):
             self.payload("/api/preview/transport?modes=bus&zoom=11")["features"], []
         )
         self.assertEqual(len(self.payload("/api/preview/services")), 315)
-        for query in ["modes=tram", "west=13&east=12", "zoom=30", "west=nan"]:
+        tram = self.payload(
+            "/api/preview/transport?modes=tram&zoom=12&west=12.44&south=41.86&east=12.52&north=41.92"
+        )
+        self.assertTrue(
+            tram["features"]
+            and all(f["properties"]["transport_type"] == "tram" for f in tram["features"])
+        )
+        focus = self.payload("/api/preview/transport?routes=MEA&zoom=11&west=0&south=0&east=1&north=1")
+        self.assertEqual(
+            {f["properties"]["route_id"] for f in focus["features"] if f["properties"]["kind"] == "route"},
+            {"MEA"},
+        )
+        too_many = ",".join(str(i) for i in range(81))
+        for query in ["modes=ferry", "west=13&east=12", "zoom=30", "west=nan", "routes=", "routes=" + too_many]:
             with self.assertRaises(HTTPError) as error:
                 self.get("/api/preview/transport?" + query)
             self.assertEqual(error.exception.code, 422)

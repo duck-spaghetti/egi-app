@@ -4,7 +4,9 @@
  * fetching /api/preview/transport for the viewport (debounced, stale requests
  * aborted, no request while the map has no size), drawing stations/stops above
  * lines, the on/off toggle, mode checkboxes and the status line. The rest of the
- * page only creates it. Pure helpers are exposed for tests.
+ * page only creates it, and may call focus() to show only some lines (the
+ * "Mostra linee" button of a service) until the user closes the focus chip.
+ * Pure helpers are exposed for tests.
  */
 const TransportLayer = (() => {
   const MODES = ["metro", "tram", "bus"];
@@ -39,6 +41,28 @@ const TransportLayer = (() => {
     return {color: BUS_COLOR, weight: 2, opacity: 0.4};
   }
 
+  /** Focus view: every line strong; bus lines get distinct palette colours. */
+  function focusLineStyle(mode, color, code) {
+    if (mode === "bus") return {color: colorForLine(code), weight: 4.5, opacity: 0.95};
+    return {color: lineColor(mode, color), weight: 6, opacity: 0.95};
+  }
+
+  /** Vertex for a line's code label, as [lat, lng]: closest to near ([lat, lng]) or the middle one. */
+  function lineLabelPoint(geometry, near = null) {
+    const coords = geometry.type === "MultiLineString" ? geometry.coordinates.flat() : geometry.coordinates;
+    if (!coords?.length) return null;
+    let best = coords[Math.floor(coords.length / 2)];
+    if (near) {
+      const kx = Math.cos(near[0] * Math.PI / 180);
+      let bestDistance = Infinity;
+      for (const point of coords) {
+        const d = ((point[0] - near[1]) * kx) ** 2 + (point[1] - near[0]) ** 2;
+        if (d < bestDistance) [bestDistance, best] = [d, point];
+      }
+    }
+    return [best[1], best[0]];
+  }
+
   function lineChips(routes) {
     return (routes || []).map(route => {
       const code = route.display_code || route.code;
@@ -47,12 +71,13 @@ const TransportLayer = (() => {
   }
 
   /** Marker HTML: M roundel with line letters for stations, glyph squares for stops. */
-  function stopIconHtml(props) {
+  function stopIconHtml(props, highlighted = false) {
+    const near = highlighted ? " tl-near" : "";
     if (props.kind === "station" || props.transport_type === "metro") {
-      return `<span class="tl-station"><span class="tl-roundel">M</span>${lineChips(props.routes)}</span>`;
+      return `<span class="tl-station${near}"><span class="tl-roundel">M</span>${lineChips(props.routes)}</span>`;
     }
-    if (props.transport_type === "tram") return '<span class="tl-stop tl-tram">T</span>';
-    return `<span class="tl-stop tl-bus">${BUS_GLYPH}</span>`;
+    if (props.transport_type === "tram") return `<span class="tl-stop tl-tram${near}">T</span>`;
+    return `<span class="tl-stop tl-bus${near}">${BUS_GLYPH}</span>`;
   }
 
   function popupHtml(props) {
@@ -86,6 +111,12 @@ const TransportLayer = (() => {
     let features = [];
     let request = null;
     let timer = null;
+    let focused = null; // {routeIds, label, stopIds:Set}
+    const chip = document.createElement("div");
+    chip.className = "tl-focus-chip";
+    chip.hidden = true;
+    map.getContainer().appendChild(chip);
+    L.DomEvent.disableClickPropagation(chip);
 
     function setStatus(text) {
       if (elements.status) elements.status.textContent = text;
@@ -94,20 +125,30 @@ const TransportLayer = (() => {
     function render() {
       layer.clearLayers();
       if (!visible) return;
+      const labelled = new Set();
       for (const feature of features) {
         const props = feature.properties;
         const geometry = feature.geometry;
         if (geometry.type === "Point") {
           const [lng, lat] = geometry.coordinates;
           const station = props.kind === "station" || props.transport_type === "metro";
+          const ids = props.stop_ids || [props.stop_id];
+          const near = Boolean(focused && ids.some(id => focused.stopIds.has(id)));
           L.marker([lat, lng], {
-            icon: L.divIcon({className: "tl-icon", html: stopIconHtml(props), iconSize: null}),
+            icon: L.divIcon({className: "tl-icon", html: stopIconHtml(props, near), iconSize: null}),
             keyboard: true,
             title: props.name,
-            zIndexOffset: station ? 500 : 0,
+            zIndexOffset: near ? 1000 : station ? 500 : 0,
           }).bindPopup(popupHtml(props)).addTo(layer);
         } else {
-          L.geoJSON(geometry, {style: lineStyle(props.transport_type, props.color), interactive: true})
+          const style = focused ? focusLineStyle(props.transport_type, props.color, props.code) : lineStyle(props.transport_type, props.color);
+          if (focused && !labelled.has(props.route_id)) {
+            labelled.add(props.route_id);
+            const at = lineLabelPoint(geometry, focused.center);
+            if (at) L.marker(at, {interactive: false, keyboard: false, icon: L.divIcon({className: "tl-icon", iconSize: null,
+              html: `<span class="tl-line-label" style="--line-color:${escapeHtml(style.color)}">${escapeHtml(props.code || props.name)}</span>`})}).addTo(layer);
+          }
+          L.geoJSON(geometry, {style, interactive: true})
             .bindPopup(`<strong>${escapeHtml(props.transport_type === "metro" ? "Metro" : props.transport_type === "tram" ? "Tram" : "Autobus")} ${escapeHtml(props.code || props.name)}</strong><br><small>Percorso programmato · Roma Servizi per la Mobilità</small>`)
             .addTo(layer);
         }
@@ -116,17 +157,18 @@ const TransportLayer = (() => {
 
     async function load() {
       request?.abort();
-      if (!modes.size) {
+      if (!modes.size && !focused) {
         features = [];
         render();
         return setStatus("Seleziona almeno una modalità di trasporto.");
       }
-      const query = viewportQuery(map.getSize(), map.getBounds(), map.getZoom(), modes);
+      const query = viewportQuery(map.getSize(), map.getBounds(), map.getZoom(), modes.size ? modes : new Set(MODES));
       if (!query) {
         // The map container has no size yet (first paint, hidden view): retry on resize.
         map.once("resize", schedule);
         return;
       }
+      if (focused) query.set("routes", focused.routeIds.join(","));
       const current = new AbortController();
       request = current;
       try {
@@ -150,6 +192,7 @@ const TransportLayer = (() => {
 
     function setVisible(value) {
       visible = value;
+      if (!visible && focused) clearFocus(false);
       if (elements.toggle) {
         elements.toggle.hidden = false;
         elements.toggle.classList.toggle("active", visible);
@@ -157,6 +200,25 @@ const TransportLayer = (() => {
       }
       render();
       schedule();
+    }
+
+    /** Show only routeIds; highlight stopIds; fit the map to points ([lat, lng]). */
+    function focus({routeIds, label, stopIds = [], points = []}) {
+      focused = {routeIds: [...new Set(routeIds)].slice(0, 80), label, stopIds: new Set(stopIds), center: points[0] || null};
+      chip.innerHTML = `<span>${escapeHtml(label)}</span><button type="button" aria-label="Chiudi vista linee e mostra tutta la rete">✕</button>`;
+      chip.querySelector("button").addEventListener("click", () => clearFocus());
+      chip.hidden = false;
+      features = [];
+      if (points.length) map.fitBounds(L.latLngBounds(points).pad(0.25), {maxZoom: 16});
+      setVisible(true); // schedules the focused request
+    }
+
+    function clearFocus(reload = true) {
+      focused = null;
+      chip.hidden = true;
+      features = [];
+      render();
+      if (reload) schedule();
     }
 
     elements.toggle?.addEventListener("click", () => setVisible(!visible));
@@ -171,8 +233,8 @@ const TransportLayer = (() => {
     map.on("moveend", schedule);
     setInterval(load, 60000);
     setVisible(false);
-    return {setVisible, isVisible: () => visible, reload: load};
+    return {setVisible, isVisible: () => visible, reload: load, focus, clearFocus, focusedRoutes: () => focused?.routeIds || null};
   }
 
-  return {create, statusText, viewportQuery, lineStyle, colorForLine, stopIconHtml, popupHtml, lineColor};
+  return {create, statusText, viewportQuery, lineStyle, focusLineStyle, lineLabelPoint, colorForLine, stopIconHtml, popupHtml, lineColor};
 })();

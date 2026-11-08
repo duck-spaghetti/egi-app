@@ -121,12 +121,20 @@ def preview_transport(
     north: float = Query(default=42.1, ge=-90, le=90),
     zoom: int = Query(default=11, ge=0, le=19),
     modes: str = "metro,tram,bus",
+    routes: str | None = Query(default=None, max_length=2000),
 ):
-    """Return source-scheduled metro/tram/bus features independently of service data."""
+    """Return source-scheduled metro/tram/bus features independently of service data.
+
+    routes (comma-separated route_ids, at most 80) switches to the focus view:
+    only those lines, whole, with their stops.
+    """
     selected = set(modes.split(","))
     if west >= east or south >= north or not selected <= {"metro", "tram", "bus"}:
         raise HTTPException(422, "Viewport o modalità TPL non validi")
-    return transport_view([west, south, east, north], zoom, selected)
+    focus = {r for r in routes.split(",") if r} if routes is not None else None
+    if focus is not None and not 0 < len(focus) <= 80:
+        raise HTTPException(422, "Elenco linee non valido")
+    return transport_view([west, south, east, north], zoom, selected, routes=focus)
 
 
 def place_points(rows: list[dict[str, Any]]) -> dict[str, tuple[float, float]]:

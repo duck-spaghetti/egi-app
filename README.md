@@ -137,6 +137,15 @@ remote/directory services or services without coordinates. Logic and constants a
 in `app/backend/transit_nearby.py`; transport unavailable or outside its calendar
 hides the rows and leaves services untouched.
 
+The "Vicino a" section has "Mostra queste N linee sulla mappa" and a "Mappa" button
+per row. Both close the sheet, switch to the map and call `transport.focus()`: the
+layer then requests `/api/preview/transport?routes=<route_id,...>` (at most 80; the
+whole lines with all their stops, regardless of viewport, zoom and mode boxes),
+draws each bus line in its own palette colour with its code label next to the
+service, highlights the nearby stops in yellow and fits the map to the service and
+those stops (zoom ≤ 16). A chip at the top names the view; ✕ returns to the normal
+layer.
+
 This is scheduled service with source attribution and a visible licensing
 discrepancy, not realtime arrivals or approved public data. No DB grant or schema
 change. See sibling [importer instructions](../egi-importer/README.md) and

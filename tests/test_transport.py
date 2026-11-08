@@ -186,6 +186,34 @@ class StationAndTramTests(unittest.TestCase):
         self.assertEqual(metro[0]["properties"]["code"], "MA")
 
 
+class FocusTests(unittest.TestCase):
+    """routes= returns only the named lines, whole, at any zoom and viewport."""
+
+    def setUp(self):
+        """Copy the fixture (metro MA, tram 8, bus routes; two shared stops)."""
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name) / "transport"
+        shutil.copytree(FIXTURE, self.root)
+        self.addCleanup(read_network.cache_clear)
+
+    def test_focus_ignores_viewport_zoom_and_modes(self):
+        """A far viewport at zoom 11 still returns the bus line and its stops only."""
+        data = transport_view([0, 0, 1, 1], 11, {"metro"}, self.root, SERVICE_DAY, routes={"bus"})
+        lines = [f for f in data["features"] if f["properties"]["kind"] == "route"]
+        stops = [f for f in data["features"] if f["properties"]["kind"] != "route"]
+        self.assertEqual([f["properties"]["route_id"] for f in lines], ["bus"])
+        self.assertEqual(len(stops), 2)
+        self.assertTrue(
+            all([r["route_id"] for r in f["properties"]["routes"]] == ["bus"] for f in stops)
+        )
+
+    def test_unknown_route_returns_nothing(self):
+        """Unknown route_ids are not an error, just empty."""
+        data = transport_view([0, 0, 1, 1], 11, {"metro"}, self.root, SERVICE_DAY, routes={"nope"})
+        self.assertEqual((data["availability"], data["features"]), ("available", []))
+
+
 class PendingVersionTests(unittest.TestCase):
     """A staged version is served from its first service day, before promotion."""
 

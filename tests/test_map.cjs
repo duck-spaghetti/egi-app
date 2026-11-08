@@ -108,8 +108,17 @@ vm.runInContext(`
   if(!station.includes('tl-roundel') || !station.includes('>A<') || !station.includes('>B<')) throw Error('station icon lacks lines');
   if(!TransportLayer.stopIconHtml({kind:'stop',transport_type:'bus',routes:[]}).includes('tl-bus') || !TransportLayer.stopIconHtml({kind:'stop',transport_type:'tram',routes:[]}).includes('tl-tram')) throw Error('stop icons by mode missing');
   if(TransportLayer.popupHtml({kind:'stop',transport_type:'bus',name:'<b>x',routes:[]}).includes('<b>x')) throw Error('stop name not escaped in popup');
+  const focusHtml=renderTransitRows({availability:'available',lines:[row('49','bus',2,{route_id:'49"x'}),row('A','metro',4)]});
+  if(!focusHtml.includes('Mostra queste 2 linee') || !focusHtml.includes('data-focus-route="*"') || focusHtml.includes('49"x"')) throw Error('focus buttons missing or route id not escaped');
+  if(TransportLayer.focusLineStyle('bus',null,'49').color!==TransportLayer.colorForLine('49') || TransportLayer.focusLineStyle('bus',null,'49').weight<=TransportLayer.lineStyle('bus').weight) throw Error('focused bus lines not distinct and strong');
+  if(TransportLayer.focusLineStyle('metro','#E27439','A').color!=='#E27439') throw Error('focused metro lost official colour');
+  const mid=TransportLayer.lineLabelPoint({type:'LineString',coordinates:[[12.4,41.8],[12.5,41.9],[12.6,42]]});
+  if(mid[0]!==41.9 || mid[1]!==12.5) throw Error('line label not at middle vertex as [lat,lng]');
+  const closest=TransportLayer.lineLabelPoint({type:'LineString',coordinates:[[12.4,41.8],[12.5,41.9],[12.6,42]]},[42,12.6]);
+  if(closest[0]!==42 || closest[1]!==12.6) throw Error('line label not at vertex nearest the service');
+  if(!TransportLayer.stopIconHtml({kind:'stop',transport_type:'bus',routes:[]},true).includes('tl-near')) throw Error('nearby stop not highlighted');
   // Regression: a multi-service map pin must open the service chooser (broke in F1).
   const twoAtSite=[make('site-a','Mensa',[12.5,41.9],1,'Mensa',7,false), make('site-b','Docce',[12.5,41.9],1,'Mensa',7,false)];
   openServiceChooser(twoAtSite);
 `,sandbox);
-console.log('PASS: source filters, cross-category sites, contacts, Rome hours and open-now membership/closing boundaries, transit badge and rows, transport layer');
+console.log('PASS: source filters, cross-category sites, contacts, Rome hours and open-now membership/closing boundaries, transit badge and rows, transport layer, focus view');
