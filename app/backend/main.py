@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
-import json
-import subprocess
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from .preview import AREA, LANGUAGES, categories, read_subjects, services
+from .preview import AREA, LANGUAGES, categories, services
 from .presentation import coverage
+from .subjects import PostgresSubjectSource, SubjectSource, SubjectSourceUnavailable
 from .transport import transport_view
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -39,11 +39,19 @@ async def preview_headers(request: Request, call_next):
     return response
 
 
-def subjects() -> list[dict]:
+SUBJECT_SOURCE = PostgresSubjectSource()
+
+
+def subject_source() -> SubjectSource:
+    """Return the process-wide subject source; tests override this dependency."""
+    return SUBJECT_SOURCE
+
+
+def subjects(source: SubjectSource = Depends(subject_source)) -> list[dict[str, Any]]:
     """Translate unavailable DB state into an explicit service error instead of an empty map."""
     try:
-        return read_subjects()
-    except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
+        return source.latest()
+    except SubjectSourceUnavailable as exc:
         raise HTTPException(503, "Database preview non disponibile") from exc
 
 
@@ -87,17 +95,18 @@ def preview_services(
     area_id: int = 1,
     language: str = "it",
     limit: int = Query(default=2000, ge=1, le=5000),
+    rows: list[dict[str, Any]] = Depends(subjects),
 ):
     """Return imported subjects only, never claim canonical approval or live availability."""
     if area_id != 1:
         raise HTTPException(404, "Area non disponibile nella preview")
-    return services(subjects())[:limit]
+    return services(rows)[:limit]
 
 
 @app.get("/api/preview/categories")
-def preview_categories():
+def preview_categories(rows: list[dict[str, Any]] = Depends(subjects)):
     """Return native source-need presentation groups for the recovered filters."""
-    return categories(subjects())
+    return categories(rows)
 
 
 @app.get("/api/preview/transport")
@@ -135,12 +144,12 @@ def category_translations():
 
 
 @app.get("/health")
-def health():
-    """Confirm the app can query its actual database and report imported subject count."""
+def health(rows: list[dict[str, Any]] = Depends(subjects)):
+    """Report the imported subject count; the database is checked at most once per cache TTL."""
     return {
         "status": "ok",
         "mode": "local-unreviewed-preview",
-        "services": len(subjects()),
+        "services": len(rows),
     }
 
 
@@ -151,14 +160,14 @@ def contribute():
 
 
 @app.get("/api/preview/coverage")
-def source_coverage():
+def source_coverage(rows: list[dict[str, Any]] = Depends(subjects)):
     """Report native field conservation and use without confusing completeness with accuracy."""
-    return coverage(subjects())
+    return coverage(rows)
 
 
 @app.get("/benchmark", response_class=HTMLResponse)
-def benchmark_page(request: Request):
+def benchmark_page(request: Request, rows: list[dict[str, Any]] = Depends(subjects)):
     """Render the inspectable Helpinet field coverage and unresolved source gaps."""
     return templates.TemplateResponse(
-        request=request, name="benchmark.html", context={"report": coverage(subjects())}
+        request=request, name="benchmark.html", context={"report": coverage(rows)}
     )

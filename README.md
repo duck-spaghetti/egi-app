@@ -20,6 +20,8 @@ To reproduce the approved environment, from this directory:
 ```sh
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.lock.txt
+# test-only: httpx for FastAPI's in-process TestClient
+.venv/bin/python -m pip install -r requirements-dev.lock.txt
 ```
 
 Then start the preview:
@@ -65,16 +67,26 @@ history. The loader commits its complete import unit or rolls back. Imported sou
 subjects remain separate from canonical publication.
 
 The app reads the latest succeeded normalization for the selected Helpinet dataset
-on each request, so an accepted new load is visible on reload without rebuilding
-static JSON. No dataset content is hardcoded into the app.
+through `app/backend/subjects.py`. The snapshot is cached in-process: for 60 seconds
+no query is made, then a cheap `run_id` probe decides whether to reload. An accepted
+new load is therefore visible within about a minute, without restarting the app or
+rebuilding static JSON. Database availability is likewise observed at most once a
+minute. No dataset content is hardcoded into the app.
 
 ## Verify
 
-With the app running:
+Without a running app or database, the in-process tests (fixture subjects,
+cache behaviour, transport projection) run with:
+
+```sh
+.venv/bin/python -m unittest discover -s tests -v
+node tests/test_map.cjs
+```
+
+With the app running, the live HTTP tests against the real preview database run too:
 
 ```sh
 EGI_APP_BASE_URL=http://127.0.0.1:8000 .venv/bin/python -m unittest discover -s tests -v
-node tests/test_map.cjs
 ```
 
 Database-backed loader tests run separately under egi-importer with EGI_TEST_DSN

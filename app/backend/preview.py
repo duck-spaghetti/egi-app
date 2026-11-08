@@ -1,23 +1,17 @@
-"""Read imported source subjects for the explicitly local, unreviewed preview.
+"""Present imported source subjects in the legacy frontend shape for the local preview.
 
-The adapter returns the legacy frontend shape from PostgreSQL source evidence;
-it creates no canonical entities or publication decisions. Native classification
+Rows come from app.backend.subjects (PostgreSQL source evidence); this module
+only adapts them and creates no canonical entities or publication decisions. Native classification
 keys are presentation groups, not an adopted EGI taxonomy.
 """
 
 from __future__ import annotations
 
-import json
 import math
-import os
-import subprocess
-from pathlib import Path
 from typing import Any
 
 from .presentation import access_sections, weekly_hours, placement
 
-PSQL = os.environ.get("EGI_PSQL", "/Library/PostgreSQL/18/bin/psql")
-PROJECT = Path(__file__).resolve().parents[3]
 LANGUAGES = [
     {
         "id": 1,
@@ -82,43 +76,6 @@ PRESENTATION = {
     "istruzione": ("#526f33", "building"),
     "abiti_e_coperte": ("#8b587b", "shirt"),
 }
-
-
-def connection_string() -> str:
-    """Use the restricted preview reader, with runtime state outside repository history."""
-    if os.environ.get("EGI_PREVIEW_DSN"):
-        return os.environ["EGI_PREVIEW_DSN"]
-    config = json.loads((PROJECT / ".local/preview-db/runtime.json").read_text())
-    return f"host={config['socket']} port={config['port']} dbname={config['database']} user=egi_preview_reader"
-
-
-def read_subjects() -> list[dict[str, Any]]:
-    """Read one consistent latest succeeded Helpinet interpretation from PostgreSQL."""
-    sql = """BEGIN READ ONLY;
-WITH latest AS (
- SELECT p.run_id,c.retrieved_at,c.retrieval_status,c.source_metadata_snapshot
- FROM sources.processing_runs p JOIN sources.captures c USING(capture_id)
- JOIN sources.datasets d USING(dataset_id) JOIN sources.registry r USING(source_id)
- WHERE r.code='helpinet' AND d.external_key='helpinet-preserved-api-extract'
- AND p.run_kind='normalize' AND p.status='succeeded'
- ORDER BY p.started_at DESC,p.finished_at DESC,p.run_id LIMIT 1
-)
-SELECT COALESCE(json_agg(json_build_object('id',s.subject_id,'payload',s.normalized_payload,
- 'run_id',s.run_id,'source_locator',s.subject_locator,'observed_at',l.retrieved_at,
- 'retrieval_status',l.retrieval_status,'metadata',l.source_metadata_snapshot) ORDER BY s.subject_locator),'[]'::json)
-FROM sources.normalized_subjects s JOIN latest l USING(run_id) WHERE s.subject_kind='service';
-COMMIT;"""
-    result = subprocess.run(
-        [PSQL, "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "--dbname", connection_string()],
-        input=sql,
-        text=True,
-        capture_output=True,
-        env={**os.environ, "PGCONNECT_TIMEOUT": "3"},
-        timeout=10,
-    )
-    if result.returncode:
-        raise RuntimeError("Preview database unavailable")
-    return json.loads(result.stdout.strip())
 
 
 def categories(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
