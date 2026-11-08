@@ -288,7 +288,7 @@ function renderFilters() {
 
 /* "Vicino a": lines near a service's place (see app/backend/transit_nearby.py). */
 const TRANSIT_ROWS_SHOWN = 5;
-const TRANSIT_NOTE = "Tempi stimati in linea d’aria (+30%, 4 km/h). Linee in servizio oggi secondo l’orario programmato di Roma Servizi per la Mobilità; nessun dato in tempo reale.";
+const TRANSIT_NOTE = "Tempi a piedi stimati in linea d’aria (+30%, 4 km/h). Linee e prossimi passaggi secondo l’orario programmato di Roma Servizi per la Mobilità: non sono dati in tempo reale, ritardi e soppressioni non sono inclusi. Accessibilità indicata solo dove la fonte la dichiara.";
 
 async function loadTransitSummaries() {
   try {
@@ -341,7 +341,12 @@ function transitRow(row) {
   const place = row.mode === "metro" ? "Stazione" : row.mode === "tram" ? "Fermata tram" : "Fermata";
   const night = row.night ? ` · <span class="night-tag">notturna</span>` : "";
   const focus = `<button type="button" class="transit-row-focus" data-focus-route="${escapeHtml(row.route_id)}" aria-label="Mostra ${escapeHtml(modeName(row.mode))} ${escapeHtml(row.code)} sulla mappa">Mappa</button>`;
-  return `<li class="transit-row">${lineChip(row)}<span class="transit-text"><span class="transit-stop">${place} ${escapeHtml(row.stop_name)}</span><span class="transit-meta">circa ${row.walk_min} min a piedi · ${row.distance_m} m in linea d’aria${night}</span></span>${focus}</li>`;
+  const wheelchair = row.wheelchair === "yes" ? ` · <span class="wheelchair-tag">accessibile in sedia a rotelle</span>` : row.wheelchair === "no" ? " · non accessibile in sedia a rotelle" : "";
+  const next = (row.next || []).map(direction => {
+    const times = direction.times.length ? direction.times.map(TransportLayer.timeText).join(" · ") : "nessun’altra corsa oggi";
+    return `<span class="transit-next">${direction.headsign ? `→ ${escapeHtml(direction.headsign)}: ` : ""}${escapeHtml(times)}</span>`;
+  }).join("");
+  return `<li class="transit-row">${lineChip(row)}<span class="transit-text"><span class="transit-stop">${place} ${escapeHtml(row.stop_name)}</span><span class="transit-meta">circa ${row.walk_min} min a piedi · ${row.distance_m} m in linea d’aria${night}${wheelchair}</span>${next}</span>${focus}</li>`;
 }
 
 function renderTransitRows(data) {

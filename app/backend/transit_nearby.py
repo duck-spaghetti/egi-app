@@ -15,6 +15,7 @@ from collections import defaultdict
 WALK_M_PER_MIN = 4000 / 60  # 4 km/h, slower than the usual 5 km/h on purpose
 DETOUR_FACTOR = 1.3  # straight line → street distance
 RADIUS_M = {"metro": 800, "tram": 500, "bus": 500}
+SIBLING_M = 150  # same-named stops this close count as one stop for departures
 CELL_DEG = 0.01  # ~830 m east-west, ~1.1 km north-south at Rome
 METHOD = {
     "estimate": "straight_line",
@@ -97,11 +98,13 @@ def nearby_lines(
     One row per route_id; rows are ordered metro first, then by walking time.
     """
     best: dict[str, tuple[float, dict, list]] = {}
+    calls: dict[str, list[tuple[dict, list]]] = defaultdict(list)
     for distance, stop, point in index.near(lon, lat, max(RADIUS_M.values())):
         for route_id, services in stop["services_by_route"].items():
             mode = index.routes[route_id]["mode"]
             if distance > RADIUS_M[mode] or not active_services.intersection(services):
                 continue
+            calls[route_id].append((stop, point))
             if route_id not in best or distance < best[route_id][0]:
                 best[route_id] = (distance, stop, point)
     rows = []
@@ -118,11 +121,27 @@ def nearby_lines(
                 "stop_name": stop["name"],
                 "stop_code": stop.get("code", ""),
                 "stop_point": point,
+                # Same-named stops of this line nearby: platforms or the other side of
+                # the street, so both directions' departures can be shown.
+                "stop_ids": sibling_stops(stop, point, calls[route_id]),
+                "wheelchair": stop.get("wheelchair_boarding", "unknown"),
                 "distance_m": round(distance),
                 "walk_min": walk_minutes(distance),
             }
         )
     return sorted(rows, key=line_sort_key)
+
+
+def sibling_stops(stop: dict, point: list, candidates: list[tuple[dict, list]]) -> list[str]:
+    """IDs of stops named like stop within SIBLING_M of it (stop itself first)."""
+    kx = 111_320 * math.cos(math.radians(point[1]))
+    ids = [stop["stop_id"]]
+    for other, where in candidates:
+        if other["stop_id"] in ids or other["name"].casefold() != stop["name"].casefold():
+            continue
+        if math.hypot((where[0] - point[0]) * kx, (where[1] - point[1]) * 110_540) <= SIBLING_M:
+            ids.append(other["stop_id"])
+    return ids
 
 
 def summary(rows: list[dict]) -> dict:

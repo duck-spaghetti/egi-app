@@ -102,6 +102,16 @@ class RankingTests(unittest.TestCase):
         index_far_metro = StopIndex(network(stop("metro900", 900, {"MEA": ["svc"]})))
         self.assertEqual(nearby_lines(index_far_metro, {"svc"}, LON, LAT), [])
 
+    def test_same_named_stops_of_a_line_are_siblings(self):
+        """The opposite-side stop with the same name joins the row; a far namesake does not."""
+        far_same = stop("x", 460, {"49": ["svc"]})
+        far_same["properties"]["name"] = "Stop a"
+        near_same = stop("b", 140, {"49": ["svc"]})
+        near_same["properties"]["name"] = "Stop a"
+        index = StopIndex(network(stop("a", 60, {"49": ["svc"]}), near_same, far_same))
+        rows = nearby_lines(index, {"svc"}, LON, LAT)
+        self.assertEqual(rows[0]["stop_ids"], ["a", "b"])
+
     def test_lines_not_running_today_are_omitted(self):
         """Only services active on the day count."""
         index = StopIndex(network(stop("s", 50, {"49": ["weekday"]})))

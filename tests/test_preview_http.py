@@ -136,6 +136,10 @@ class PreviewHttpTests(unittest.TestCase):
             {f["properties"]["route_id"] for f in focus["features"] if f["properties"]["kind"] == "route"},
             {"MEA"},
         )
+        termini = self.payload("/api/preview/transit/departures?stops=AP16,AD12&routes=MEA&limit=3")
+        self.assertEqual(termini["availability"], "available")
+        self.assertTrue(all(d["route_id"] == "MEA" and d["code"] == "A" for d in termini["departures"]))
+        self.assertTrue(all(len(d["times"]) <= 3 for d in termini["departures"]))
         too_many = ",".join(str(i) for i in range(81))
         for query in ["modes=ferry", "west=13&east=12", "zoom=30", "west=nan", "routes=", "routes=" + too_many]:
             with self.assertRaises(HTTPError) as error:

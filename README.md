@@ -143,8 +143,21 @@ layer then requests `/api/preview/transport?routes=<route_id,...>` (at most 80; 
 whole lines with all their stops, regardless of viewport, zoom and mode boxes),
 draws each bus line in its own palette colour with its code label next to the
 service, highlights the nearby stops in yellow and fits the map to the service and
-those stops (zoom ≤ 16). A chip at the top names the view; ✕ returns to the normal
-layer.
+those stops (zoom ≤ 16). Only the focused service's own map pin stays visible. A
+chip at the top names the view; ✕ returns to the normal layer and all pins.
+
+### Scheduled departures
+
+`app/backend/departures.py` reads the active version's `departures.sqlite`
+(read-only) and returns the next scheduled times per stop, line and direction
+from the current Rome time, including after-midnight trips of yesterday's service
+day; a direction with no further trip says so. `GET /api/preview/transit/departures
+?stops=<ids>&routes=<ids>&limit=3` (at most 40 stops) feeds the stop popups, which
+load when opened and stay open across layer refreshes. Each "Vicino a" row shows
+the next two times per direction, gathered from the nearest stop and same-named
+stops of that line within 150 m (other platform, other side of the street).
+Everything is labelled scheduled, not realtime. Wheelchair access is shown only
+when the source states it; the current Rome feed leaves it empty for every stop.
 
 This is scheduled service with source attribution and a visible licensing
 discrepancy, not realtime arrivals or approved public data. No DB grant or schema

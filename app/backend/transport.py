@@ -27,7 +27,7 @@ ROOT = Path(
 )
 
 
-FORMAT = "egi-transport/3"
+FORMAT = "egi-transport/4"
 FULL_DETAIL_ZOOM = 17
 # Twice the 6 h schedule plus slack: older means the poller stopped running.
 STALE_AFTER = timedelta(hours=24)
@@ -163,6 +163,9 @@ def group_stations(stops: list[dict]) -> list[dict]:
                     "kind": "station",
                     "name": first["name"],
                     "stop_ids": [s["properties"]["stop_id"] for s in cluster],
+                    "wheelchair_boarding": (
+                        lambda values: values.pop() if len(values) == 1 else "unknown"
+                    )({s["properties"].get("wheelchair_boarding", "unknown") for s in cluster}),
                     "routes": sorted(routes.values(), key=route_order),
                     "transport_type": "metro",
                 },

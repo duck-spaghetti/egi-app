@@ -18,6 +18,7 @@ from .presentation import coverage
 from .subjects import PostgresSubjectSource, SubjectSource, SubjectSourceUnavailable
 from .transport import ROOT as TRANSPORT_ROOT, transport_view
 from .transit_nearby import lines_near_places, summary as transit_summary
+from .departures import next_departures
 
 ROOT = Path(__file__).resolve().parents[2]
 app = FastAPI(title="EGI v0.2 — local source preview", version="0.2.0")
@@ -164,8 +165,45 @@ def transit_place(place_id: str, rows: list[dict[str, Any]] = Depends(subjects))
     if place_id not in points:
         raise HTTPException(404, "Luogo senza coordinate nella preview")
     result = lines_near_places({place_id: points[place_id]}, TRANSPORT_ROOT)
-    result["lines"] = result.pop("places").get(place_id, [])
+    result["lines"] = lines = result.pop("places").get(place_id, [])
+    # Next scheduled departures of each row's line at its nearest stop.
+    schedule = next_departures(
+        sorted({stop for row in lines for stop in row["stop_ids"]}),
+        {row["route_id"] for row in lines},
+        limit=2,
+        root=TRANSPORT_ROOT,
+    )
+    by_stop_route: dict[tuple, list] = {}
+    for departure in schedule["departures"]:
+        by_stop_route.setdefault((departure["stop_id"], departure["route_id"]), []).append(departure)
+    for row in lines:
+        directions: dict[tuple, dict] = {}
+        for stop in row["stop_ids"]:
+            for departure in by_stop_route.get((stop, row["route_id"]), []):
+                key = (departure["direction_id"], departure["headsign"])
+                if key not in directions or (
+                    departure["times"]
+                    and (not directions[key]["times"] or departure["times"][0]["in_min"] < directions[key]["times"][0]["in_min"])
+                ):
+                    directions[key] = {"headsign": departure["headsign"], "direction_id": departure["direction_id"], "times": departure["times"]}
+        row["next"] = sorted(directions.values(), key=lambda d: (d["direction_id"], d["headsign"]))
+    result["schedule_availability"] = schedule["availability"]
+    result["now"] = schedule["now"]
     return result
+
+
+@app.get("/api/preview/transit/departures")
+def transit_departures(
+    stops: str = Query(min_length=1, max_length=2000),
+    routes: str | None = Query(default=None, max_length=2000),
+    limit: int = Query(default=3, ge=1, le=10),
+):
+    """Next scheduled departures at stops (comma-separated stop_ids, at most 40)."""
+    stop_ids = [s for s in stops.split(",") if s]
+    if not 0 < len(stop_ids) <= 40:
+        raise HTTPException(422, "Elenco fermate non valido")
+    route_ids = {r for r in routes.split(",") if r} if routes else None
+    return next_departures(stop_ids, route_ids, limit, TRANSPORT_ROOT)
 
 
 @app.get("/api/preview/languages")

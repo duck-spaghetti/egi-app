@@ -80,10 +80,34 @@ const TransportLayer = (() => {
     return `<span class="tl-stop tl-bus${near}">${BUS_GLYPH}</span>`;
   }
 
-  function popupHtml(props) {
+  function wheelchairText(value) {
+    if (value === "yes") return "Accessibile in sedia a rotelle (secondo la fonte)";
+    if (value === "no") return "Non accessibile in sedia a rotelle (secondo la fonte)";
+    return "Accessibilità in sedia a rotelle: non indicata";
+  }
+
+  /** "08:00 (tra 10 min)" for the next hour, "(in partenza)" now, plain time later. */
+  function timeText(t) {
+    if (t.in_min <= 0) return `${t.time} (in partenza)`;
+    return t.in_min < 60 ? `${t.time} (tra ${t.in_min} min)` : t.time;
+  }
+
+  /** Next scheduled departures per line and direction, for a stop popup. */
+  function departuresHtml(data) {
+    if (!data || data.availability !== "available") return '<p class="tl-dep-note">Orari non disponibili.</p>';
+    if (!data.departures.length) return '<p class="tl-dep-note">Nessuna corsa programmata qui.</p>';
+    const rows = data.departures.map(d => {
+      const times = d.times.length ? d.times.map(timeText).join(" · ") : "nessun’altra corsa oggi";
+      const towards = d.headsign ? ` → ${escapeHtml(d.headsign)}` : "";
+      return `<li><span class="tl-chip" style="--line-color:${escapeHtml(lineColor(d.mode, d.color))}">${escapeHtml(d.code)}</span>${towards}<br><span class="tl-dep-times">${escapeHtml(times)}</span></li>`;
+    }).join("");
+    return `<ul class="tl-departures">${rows}</ul><p class="tl-dep-note">Orari programmati alle ${escapeHtml(data.now)}, non in tempo reale.</p>`;
+  }
+
+  function popupHtml(props, departures = null) {
     const kind = props.kind === "station" || props.transport_type === "metro" ? "Stazione metro" : props.transport_type === "tram" ? "Fermata tram" : "Fermata autobus";
     const code = props.code ? ` · ${escapeHtml(props.code)}` : "";
-    return `<strong>${escapeHtml(props.name)}</strong><br><span class="tl-popup-kind">${kind}${code}</span><div class="tl-popup-lines">${lineChips(props.routes)}</div><small>Linee in servizio oggi (orario programmato) · Roma Servizi per la Mobilità</small>`;
+    return `<strong>${escapeHtml(props.name)}</strong><br><span class="tl-popup-kind">${kind}${code}</span><div class="tl-popup-lines">${lineChips(props.routes)}</div><div class="tl-dep">${departures ?? "Carico i prossimi passaggi…"}</div><small>${escapeHtml(wheelchairText(props.wheelchair_boarding))}<br>Linee in servizio oggi · Roma Servizi per la Mobilità</small>`;
   }
 
   /** Status line for the transport panel. */
@@ -112,6 +136,10 @@ const TransportLayer = (() => {
     let request = null;
     let timer = null;
     let focused = null; // {routeIds, label, stopIds:Set}
+    // While a transport popup is open, new data waits: re-rendering would close it
+    // (opening a popup pans the map, which triggers a reload).
+    let popupOpen = false;
+    let held = null;
     const chip = document.createElement("div");
     chip.className = "tl-focus-chip";
     chip.hidden = true;
@@ -123,6 +151,8 @@ const TransportLayer = (() => {
     }
 
     function render() {
+      popupOpen = false;
+      held = null;
       layer.clearLayers();
       if (!visible) return;
       const labelled = new Set();
@@ -139,7 +169,13 @@ const TransportLayer = (() => {
             keyboard: true,
             title: props.name,
             zIndexOffset: near ? 1000 : station ? 500 : 0,
-          }).bindPopup(popupHtml(props)).addTo(layer);
+          }).bindPopup(popupHtml(props), {maxWidth: 280})
+            .on("popupopen", event => {
+              popupOpen = true;
+              loadDepartures(event.popup, ids, props);
+            })
+            .on("popupclose", releasePopup)
+            .addTo(layer);
         } else {
           const style = focused ? focusLineStyle(props.transport_type, props.color, props.code) : lineStyle(props.transport_type, props.color);
           if (focused && !labelled.has(props.route_id)) {
@@ -150,6 +186,8 @@ const TransportLayer = (() => {
           }
           L.geoJSON(geometry, {style, interactive: true})
             .bindPopup(`<strong>${escapeHtml(props.transport_type === "metro" ? "Metro" : props.transport_type === "tram" ? "Tram" : "Autobus")} ${escapeHtml(props.code || props.name)}</strong><br><small>Percorso programmato · Roma Servizi per la Mobilità</small>`)
+            .on("popupopen", () => { popupOpen = true; })
+            .on("popupclose", releasePopup)
             .addTo(layer);
         }
       }
@@ -176,13 +214,41 @@ const TransportLayer = (() => {
         if (!response.ok) throw Error(`HTTP ${response.status}`);
         const data = await response.json();
         if (current.signal.aborted) return;
-        features = data.features;
         setStatus(statusText(data));
+        if (popupOpen) {
+          held = data.features;
+          return;
+        }
+        features = data.features;
         render();
       } catch (error) {
         if (error.name === "AbortError" || current.signal.aborted) return;
         setStatus("Trasporti non raggiungibili. I dati già caricati restano visibili; nuovo tentativo automatico tra un minuto.");
       }
+    }
+
+    function releasePopup() {
+      popupOpen = false;
+      if (held) {
+        features = held;
+        held = null;
+        render();
+      }
+    }
+
+    /** Fill an open stop popup with the next departures of its (focused) lines. */
+    async function loadDepartures(popup, stopIds, props) {
+      const params = new URLSearchParams({stops: stopIds.join(","), limit: "3"});
+      const routeIds = focused ? focused.routeIds : (props.routes || []).map(r => r.route_id);
+      if (routeIds.length) params.set("routes", routeIds.join(","));
+      let data = null;
+      try {
+        const response = await fetch(`/api/preview/transit/departures?${params}`);
+        if (response.ok) data = await response.json();
+      } catch (_error) { /* shown as unavailable */ }
+      if (!popup.isOpen()) return;
+      // setContent, not DOM edits: Leaflet's popup.update() re-renders the bound HTML.
+      popup.setContent(popupHtml(props, departuresHtml(data)));
     }
 
     function schedule() {
@@ -238,5 +304,5 @@ const TransportLayer = (() => {
     return {setVisible, isVisible: () => visible, reload: load, focus, clearFocus, focusedRoutes: () => focused?.routeIds || null};
   }
 
-  return {create, statusText, viewportQuery, lineStyle, focusLineStyle, lineLabelPoint, colorForLine, stopIconHtml, popupHtml, lineColor};
+  return {create, statusText, viewportQuery, lineStyle, focusLineStyle, lineLabelPoint, colorForLine, stopIconHtml, popupHtml, lineColor, departuresHtml, timeText, wheelchairText};
 })();

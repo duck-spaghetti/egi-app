@@ -94,7 +94,7 @@ vm.runInContext(`
   const many=Array.from({length:8},(_,i)=>row(String(10+i),'bus',i+1)); many[7].night=true;
   const html=renderTransitRows({availability:'available',lines:many});
   if((html.match(/class="transit-row"/g)||[]).length!==8 || !html.includes('Altre 3 linee') || !html.includes('notturna')) throw Error('detail rows, overflow or night tag wrong');
-  if(!html.includes('linea d’aria') || !html.includes('nessun dato in tempo reale')) throw Error('estimate not qualified');
+  if(!html.includes('linea d’aria') || !html.includes('non sono dati in tempo reale')) throw Error('estimate not qualified');
   if(!renderTransitRows({availability:'outside_calendar'}).includes('non disponibile per oggi')) throw Error('outside calendar not explained');
   if(!renderTransitRows({availability:'available',lines:[]}).includes('Nessuna linea')) throw Error('empty result not explained');
   const bounds=(w,s,e,n)=>({getWest:()=>w,getSouth:()=>s,getEast:()=>e,getNorth:()=>n});
@@ -126,8 +126,17 @@ vm.runInContext(`
   state.focusSiteKey=null; refresh();
   if(rendered.at(-1).length<2) throw Error('clearing focus does not restore all sites');
   renderMarkers=realRender;
+  const dep=TransportLayer.departuresHtml({availability:'available',now:'07:50',departures:[{code:'49',mode:'bus',headsign:'<Termini>',times:[{time:'08:00',in_min:10},{time:'09:15',in_min:85}]},{code:'8',mode:'tram',headsign:'',times:[]}]});
+  if(!dep.includes('08:00 (tra 10 min)') || !dep.includes('09:15') || dep.includes('(tra 85') || !dep.includes('nessun’altra corsa oggi') || dep.includes('<Termini>') || !dep.includes('non in tempo reale')) throw Error('departures popup wrong');
+  if(TransportLayer.timeText({time:'21:57',in_min:0})!=='21:57 (in partenza)') throw Error('departing-now wording');
+  const filled=TransportLayer.popupHtml({kind:'station',name:'Termini',routes:[]},'<ul class="tl-departures"></ul>');
+  if(filled.includes('Carico') || !filled.includes('tl-departures') || !TransportLayer.popupHtml({kind:'station',name:'T',routes:[]}).includes('Carico')) throw Error('popup departures slot wrong');
+  if(!TransportLayer.departuresHtml({availability:'unavailable'}).includes('non disponibili')) throw Error('unavailable schedule not explained');
+  if(!TransportLayer.wheelchairText('unknown').includes('non indicata') || !TransportLayer.wheelchairText('yes').includes('Accessibile')) throw Error('wheelchair text wrong');
+  const rowHtml=renderTransitRows({availability:'available',lines:[row('49','bus',2,{wheelchair:'yes',next:[{headsign:'Termini',times:[{time:'08:00',in_min:10}]},{headsign:'Ostia',times:[]}]})]});
+  if(!rowHtml.includes('→ Termini: 08:00 (tra 10 min)') || !rowHtml.includes('→ Ostia: nessun’altra corsa oggi') || !rowHtml.includes('accessibile in sedia a rotelle')) throw Error('row departures or accessibility missing');
   // Regression: a multi-service map pin must open the service chooser (broke in F1).
   const twoAtSite=twoSiteFixture();
   openServiceChooser(twoAtSite);
 `,sandbox);
-console.log('PASS: source filters, cross-category sites, contacts, Rome hours and open-now membership/closing boundaries, transit badge and rows, transport layer, focus view');
+console.log('PASS: source filters, cross-category sites, contacts, Rome hours and open-now membership/closing boundaries, transit badge and rows, transport layer, focus view, departures');
