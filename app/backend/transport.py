@@ -36,9 +36,9 @@ class ActiveNetwork(NamedTuple):
     network: dict
 
 
-@lru_cache(maxsize=1)
+@lru_cache(maxsize=2)
 def read_network(root: str, version: str) -> dict:
-    """Cache the active immutable network; a changed version invalidates the key."""
+    """Cache immutable networks (active and pending); a new version is a new key."""
     if not VERSION.fullmatch(version):
         raise ValueError("Unsupported transport version")
     data = json.loads((Path(root) / "versions" / version / "network.json").read_text())
@@ -47,17 +47,31 @@ def read_network(root: str, version: str) -> dict:
     return data
 
 
-def load_active(root: Path) -> ActiveNetwork:
-    """Read the activated version of a transport runtime root.
-
-    Raises OSError/ValueError/KeyError when nothing valid is active; a missing
-    status file is an empty status, since the poller may not have run yet.
-    """
-    manifest = json.loads((root / "active.json").read_text())
+def read_manifest(path: Path) -> dict:
+    """Read an active or pending manifest and reject other formats."""
+    manifest = json.loads(path.read_text())
     if manifest.get("format") != FORMAT:
         raise ValueError("Unsupported transport format")
+    return manifest
+
+
+def load_active(root: Path, day: str | None = None) -> ActiveNetwork:
+    """Read the version to serve on day from a transport runtime root.
+
+    A staged pending version is served once it schedules service on day, so a new
+    timetable starts at midnight even before the poller promotes it. Otherwise the
+    activated version is served. Raises OSError/ValueError/KeyError when neither is
+    usable; a missing status file is an empty status.
+    """
     status_path = root / "status.json"
     status = json.loads(status_path.read_text()) if status_path.exists() else {}
+    pending_path = root / "pending.json"
+    if day and pending_path.exists():
+        pending = read_manifest(pending_path)
+        network = read_network(str(root), pending["version"])
+        if network["service_dates"].get(day):
+            return ActiveNetwork(pending, status, network)
+    manifest = read_manifest(root / "active.json")
     return ActiveNetwork(manifest, status, read_network(str(root), manifest["version"]))
 
 
@@ -87,7 +101,7 @@ def transport_view(
         "source_url": "https://romamobilita.it/sistemi-e-tecnologie/open-data/",
     }
     try:
-        manifest, status, network = load_active(root)
+        manifest, status, network = load_active(root, today)
         result.update(manifest=manifest, refresh=status, availability="available")
         active_services = set(network["service_dates"].get(today, []))
         if not active_services:

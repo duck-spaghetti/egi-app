@@ -96,6 +96,27 @@ class TransportViewTests(unittest.TestCase):
         self.assertEqual(data["availability"], "unavailable")
 
 
+class PendingVersionTests(unittest.TestCase):
+    """A staged version is served from its first service day, before promotion."""
+
+    def setUp(self):
+        """Turn the fixture's version into a pending one with nothing active yet."""
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name) / "transport"
+        shutil.copytree(FIXTURE, self.root)
+        (self.root / "active.json").rename(self.root / "pending.json")
+        self.addCleanup(read_network.cache_clear)
+
+    def test_pending_served_only_on_its_service_days(self):
+        """Before its first day nothing is active; on that day the pending network is used."""
+        before = transport_view([12, 41, 13, 43], 14, {"metro"}, self.root, "2026-01-04")
+        self.assertEqual(before["availability"], "unavailable")
+        on_day = transport_view([12, 41, 13, 43], 14, {"metro"}, self.root, SERVICE_DAY)
+        self.assertEqual(on_day["availability"], "available")
+        self.assertTrue(on_day["features"])
+
+
 @unittest.skipUnless(PRODUCER.is_dir(), "sibling egi-importer checkout not present")
 class ContractDriftTests(unittest.TestCase):
     """When the producer is checked out alongside, the vendored copy must match it."""
