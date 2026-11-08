@@ -83,6 +83,59 @@ class NextDepartureTests(unittest.TestCase):
         self.assertEqual(clock(1443), "00:03")
 
 
+class RealtimeTests(unittest.TestCase):
+    """Fresh predictions join their trip's direction; stale ones are ignored; alerts attach."""
+
+    def setUp(self):
+        """Fixture root plus a realtime snapshot: bus trip tb predicted at s1 08:04 (+4 min)."""
+        import json
+
+        from app.backend import departures as module
+
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name) / "transport"
+        shutil.copytree(FIXTURE, self.root)
+        self.addCleanup(read_network.cache_clear)
+        module._realtime_cache.update(mtime=None, data=None)
+        self.now = at("2026-01-05T07:50")
+        self.snapshot = {
+            "format": "egi-realtime/1",
+            "feeds": {"trip_updates": {"fetched_epoch": self.now.timestamp() - 30, "fetched_at": "x"}},
+            "predictions": {"s1": [["tb", at("2026-01-05T08:04").timestamp(), 240]]},
+            "alerts": [
+                {"id": "a1", "periods": [{"start": 0, "end": None}], "routes": ["bus"], "stops": [],
+                 "header": "Deviazione", "description": "", "url": ""},
+                {"id": "a2", "periods": [{"start": 0, "end": None}], "routes": ["other"], "stops": [],
+                 "header": "Altro", "description": "", "url": ""},
+            ],
+        }
+        (self.root / "realtime").mkdir()
+        (self.root / "realtime" / "latest.json").write_text(json.dumps(self.snapshot))
+
+    def test_live_prediction_and_alert(self):
+        """The bus direction gets 08:04 (+4) as realtime; only the matching alert is attached."""
+        result = next_departures(["s1"], {"bus"}, root=self.root, now=self.now)
+        self.assertEqual(result["realtime"]["status"], "live")
+        bus = result["departures"][0]
+        self.assertEqual(bus["realtime"], [{"time": "08:04", "in_min": 14, "delay_min": 4}])
+        self.assertEqual(bus["times"][0]["time"], "08:00")
+        self.assertEqual([a["id"] for a in result["alerts"]], ["a1"])
+
+    def test_stale_snapshot_is_not_realtime(self):
+        """Predictions fetched over 3 minutes ago are not shown."""
+        import json
+
+        from app.backend import departures as module
+
+        self.snapshot["feeds"]["trip_updates"]["fetched_epoch"] = self.now.timestamp() - 600
+        (self.root / "realtime" / "latest.json").write_text(json.dumps(self.snapshot))
+        module._realtime_cache.update(mtime=None, data=None)
+        result = next_departures(["s1"], {"bus"}, root=self.root, now=self.now)
+        self.assertEqual(result["realtime"]["status"], "stale")
+        self.assertEqual(result["departures"][0]["realtime"], [])
+
+
 class DepartureEndpointTests(unittest.TestCase):
     """Validation of the stop list."""
 

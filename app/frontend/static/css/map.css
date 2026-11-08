@@ -1356,3 +1356,16 @@ html[dir="rtl"] .sheet-back-head .arrow,
 .line-chip-button:focus-visible { outline:2px solid var(--accent);outline-offset:2px; }
 .line-chip-button:hover .line-chip { filter:brightness(1.15); }
 .transit-next-wrap { display:flex;flex-direction:column;min-width:0;flex:1 1 160px; }
+
+/* Realtime (F5) */
+.tl-live-dot { display:inline-block;width:8px;height:8px;margin-right:5px;border-radius:50%;background:#1a9e4b;box-shadow:0 0 0 3px rgba(26,158,75,.2);vertical-align:1px; }
+.transit-next.live,.tl-dep-times.live { color:#14532d;font-weight:600; }
+.tl-alerts { list-style:none;margin:4px 0;padding:0;display:grid;gap:4px;font-size:12px; }
+.tl-alerts summary { cursor:pointer;color:#8a4b00;font-weight:600; }
+.tl-alerts p { margin:4px 0 0 18px;color:var(--ink-soft);white-space:pre-line; }
+.transit-stop-group .tl-alerts { margin-left:32px; }
+.transit-scheduled,.tl-dep-scheduled { display:block;font-size:11px;color:var(--ink-soft);margin-left:13px; }
+.tl-alerts-group { margin:2px 0 4px;font-size:12px; }
+.tl-alerts-group > summary { cursor:pointer;color:#8a4b00;font-weight:600; }
+.transit-stop-group .tl-alerts-group { margin-left:32px; }
+.transit-stop-group .tl-alerts-group .tl-alerts { margin-left:0; }

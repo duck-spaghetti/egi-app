@@ -95,7 +95,7 @@ vm.runInContext(`
   const groups=many.map((r,i)=>({stop_name:'Stop '+i,modes:['bus'],walk_min:r.walk_min,distance_m:r.distance_m,wheelchair:'unknown',lines:[r]}));
   const html=renderTransitRows({availability:'available',lines:many,stops:groups});
   if((html.match(/class="transit-stop-group"/g)||[]).length!==8 || !html.includes('Altre 4 fermate') || !html.includes('notturna') || (html.match(/data-focus-stop=/g)||[]).length!==8) throw Error('stop groups, overflow or night tag wrong');
-  if(!html.includes('linea d’aria') || !html.includes('non sono dati in tempo reale')) throw Error('estimate not qualified');
+  if(!html.includes('linea d’aria') || !html.includes('Orari programmati, non in tempo reale')) throw Error('estimate not qualified');
   if(!renderTransitRows({availability:'outside_calendar'}).includes('non disponibile per oggi')) throw Error('outside calendar not explained');
   if(!renderTransitRows({availability:'available',lines:[]}).includes('Nessuna linea')) throw Error('empty result not explained');
   const bounds=(w,s,e,n)=>({getWest:()=>w,getSouth:()=>s,getEast:()=>e,getNorth:()=>n});
@@ -138,8 +138,20 @@ vm.runInContext(`
   const r49=row('49','bus',2,{next:[{headsign:'Termini',times:[{time:'08:00',in_min:10}]},{headsign:'Ostia',times:[]}]});
   const rowHtml=renderTransitRows({availability:'available',lines:[r49],stops:[{stop_name:'X',modes:['bus'],walk_min:2,distance_m:80,wheelchair:'yes',lines:[r49]}]});
   if(!rowHtml.includes('→ Termini: 08:00 (tra 10 min)') || !rowHtml.includes('→ Ostia: nessun’altra corsa oggi') || !rowHtml.includes('accessibile in sedia a rotelle')) throw Error('row departures or accessibility missing');
+  const live=TransportLayer.directionTimes({realtime:[{time:'22:07',in_min:6,delay_min:4}],times:[{time:'22:03',in_min:2}]});
+  if(!live.live || live.text!=='22:07 (tra 6 min · +4′)') throw Error('realtime text wrong: '+live.text);
+  if(live.scheduled!=='22:03 (tra 2 min)') throw Error('scheduled times hidden when realtime exists');
+  if(TransportLayer.directionTimes({realtime:[],times:[{time:'22:03',in_min:2}]}).live) throw Error('scheduled shown as live');
+  const al=TransportLayer.alertsHtml([{header:'<Deviazione>',description:'Via X chiusa',routes:['89']}]);
+  if(!al.includes('&lt;Deviazione&gt;') || !al.includes('(89)')) throw Error('alert not shown/escaped');
+  const three=TransportLayer.alertsHtml([{header:'a',routes:['89','64']},{header:'b',routes:['89']},{header:'c',routes:['89']}],new Set(['89']));
+  if(!three.includes('3 avvisi') || three.includes('64')) throw Error('alerts not collapsed or unrelated lines named');
+  if(!TransportLayer.realtimeNote({realtime:{status:'stale'}}).includes('non aggiornato')) throw Error('stale realtime not explained');
+  const gr={stop_name:'P',modes:['bus'],walk_min:1,distance_m:30,wheelchair:'unknown',stop_ids:['s9'],lines:[row('89','bus',1,{route_id:'89'})]};
+  const withAlert=renderTransitRows({availability:'available',lines:gr.lines,stops:[gr],alerts:[{header:'Deviazione 89',routes:['89'],stops:[]},{header:'Altro',routes:['64'],stops:[]}],realtime:{status:'live'}});
+  if(!withAlert.includes('Deviazione 89') || withAlert.includes('Altro') || !withAlert.includes('tempo reale')) throw Error('stop alerts filtering or live note wrong');
   // Regression: a multi-service map pin must open the service chooser (broke in F1).
   const twoAtSite=twoSiteFixture();
   openServiceChooser(twoAtSite);
 `,sandbox);
-console.log('PASS: source filters, cross-category sites, contacts, Rome hours and open-now membership/closing boundaries, transit badge and rows, transport layer, focus view, departures');
+console.log('PASS: source filters, cross-category sites, contacts, Rome hours and open-now membership/closing boundaries, transit badge and rows, transport layer, focus view, departures, realtime');

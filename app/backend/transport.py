@@ -27,7 +27,7 @@ ROOT = Path(
 )
 
 
-FORMAT = "egi-transport/4"
+FORMAT = "egi-transport/5"
 FULL_DETAIL_ZOOM = 17
 # Twice the 6 h schedule plus slack: older means the poller stopped running.
 STALE_AFTER = timedelta(hours=24)

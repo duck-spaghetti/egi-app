@@ -92,16 +92,54 @@ const TransportLayer = (() => {
     return t.in_min < 60 ? `${t.time} (tra ${t.in_min} min)` : t.time;
   }
 
-  /** Next scheduled departures per line and direction, for a stop popup. */
+  /** Predicted time: "22:07 (tra 6 min · +4′)". */
+  function realtimeText(t) {
+    const delay = t.delay_min ? ` · ${t.delay_min > 0 ? "+" : ""}${t.delay_min}′` : "";
+    if (t.in_min <= 0) return `${t.time} (in arrivo${delay})`;
+    return t.in_min < 60 ? `${t.time} (tra ${t.in_min} min${delay})` : `${t.time}${delay ? ` (${delay.slice(3)})` : ""}`;
+  }
+
+  /** Realtime times when available (marked live), plus the scheduled ones.
+   * Realtime only covers trips already tracked, so a nearer scheduled trip may
+   * have no prediction yet: scheduled times stay visible as a second line. */
+  function directionTimes(d) {
+    const scheduled = d.times.length ? d.times.map(timeText).join(" · ") : "nessun’altra corsa oggi";
+    if (d.realtime?.length) return {live: true, text: d.realtime.map(realtimeText).join(" · "), scheduled};
+    return {live: false, text: scheduled, scheduled: null};
+  }
+
+  /** Alerts ("⚠ header", description on demand); only lines in `relevant` are named.
+   * More than two alerts collapse under one "N avvisi" toggle. */
+  function alertsHtml(alerts, relevant = null) {
+    if (!alerts?.length) return "";
+    const items = alerts.map(a => {
+      const lines = (a.routes || []).filter(r => !relevant || relevant.has(r));
+      return `<li><details><summary><span aria-hidden="true">⚠</span> ${escapeHtml(a.header || "Avviso di servizio")}${lines.length ? ` <small>(${escapeHtml(lines.join(", "))})</small>` : ""}</summary>${a.description ? `<p>${escapeHtml(a.description)}</p>` : ""}</details></li>`;
+    }).join("");
+    if (alerts.length <= 2) return `<ul class="tl-alerts">${items}</ul>`;
+    return `<details class="tl-alerts-group"><summary><span aria-hidden="true">⚠</span> ${alerts.length} avvisi su queste linee</summary><ul class="tl-alerts">${items}</ul></details>`;
+  }
+
+  /** Footnote on what the times are. */
+  function realtimeNote(data) {
+    const status = data?.realtime?.status;
+    if (status === "live") return "<span class=\"tl-live-dot\" aria-hidden=\"true\"></span> = previsione in tempo reale (Atac, Roma TPL); gli altri orari sono programmati.";
+    if (status === "stale") return "Tempo reale non aggiornato: mostro solo orari programmati.";
+    return "Orari programmati, non in tempo reale.";
+  }
+
+  /** Next departures per line and direction, for a stop popup. */
   function departuresHtml(data) {
     if (!data || data.availability !== "available") return '<p class="tl-dep-note">Orari non disponibili.</p>';
-    if (!data.departures.length) return '<p class="tl-dep-note">Nessuna corsa programmata qui.</p>';
+    if (!data.departures.length) return `${alertsHtml(data.alerts)}<p class="tl-dep-note">Nessuna corsa programmata qui.</p>`;
     const rows = data.departures.map(d => {
-      const times = d.times.length ? d.times.map(timeText).join(" · ") : "nessun’altra corsa oggi";
+      const shown = directionTimes(d);
+      const times = shown.text;
       const towards = d.headsign ? ` → ${escapeHtml(d.headsign)}` : "";
-      return `<li><span class="tl-chip" style="--line-color:${escapeHtml(lineColor(d.mode, d.color))}">${escapeHtml(d.code)}</span>${towards}<br><span class="tl-dep-times">${escapeHtml(times)}</span></li>`;
+      return `<li><span class="tl-chip" style="--line-color:${escapeHtml(lineColor(d.mode, d.color))}">${escapeHtml(d.code)}</span>${towards}<br><span class="tl-dep-times${shown.live ? " live" : ""}">${shown.live ? '<span class="tl-live-dot" aria-label="tempo reale"></span>' : ""}${escapeHtml(times)}</span>${shown.scheduled ? `<br><span class="tl-dep-scheduled">orario: ${escapeHtml(shown.scheduled)}</span>` : ""}</li>`;
     }).join("");
-    return `<ul class="tl-departures">${rows}</ul><p class="tl-dep-note">Orari programmati alle ${escapeHtml(data.now)}, non in tempo reale.</p>`;
+    const shownRoutes = new Set(data.departures.map(d => d.route_id));
+    return `${alertsHtml(data.alerts, shownRoutes)}<ul class="tl-departures">${rows}</ul><p class="tl-dep-note">${realtimeNote(data)} Aggiornato alle ${escapeHtml(data.now)}.</p>`;
   }
 
   function popupHtml(props, departures = null) {
@@ -304,5 +342,5 @@ const TransportLayer = (() => {
     return {setVisible, isVisible: () => visible, reload: load, focus, clearFocus, focusedRoutes: () => focused?.routeIds || null};
   }
 
-  return {create, statusText, viewportQuery, lineStyle, focusLineStyle, lineLabelPoint, colorForLine, stopIconHtml, popupHtml, lineColor, departuresHtml, timeText, wheelchairText};
+  return {directionTimes, realtimeText, alertsHtml, realtimeNote, create, statusText, viewportQuery, lineStyle, focusLineStyle, lineLabelPoint, colorForLine, stopIconHtml, popupHtml, lineColor, departuresHtml, timeText, wheelchairText};
 })();

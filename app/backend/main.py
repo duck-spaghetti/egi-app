@@ -185,10 +185,19 @@ def transit_place(place_id: str, rows: list[dict[str, Any]] = Depends(subjects))
                     departure["times"]
                     and (not directions[key]["times"] or departure["times"][0]["in_min"] < directions[key]["times"][0]["in_min"])
                 ):
-                    directions[key] = {"headsign": departure["headsign"], "direction_id": departure["direction_id"], "times": departure["times"]}
+                    directions[key] = {
+                        "headsign": departure["headsign"],
+                        "direction_id": departure["direction_id"],
+                        "times": departure["times"],
+                        "realtime": departure["realtime"],
+                    }
+                elif departure["realtime"] and not directions[key]["realtime"]:
+                    directions[key]["realtime"] = departure["realtime"]
         row["next"] = sorted(directions.values(), key=lambda d: (d["direction_id"], d["headsign"]))
     result["stops"] = group_by_stop(lines)
     result["schedule_availability"] = schedule["availability"]
+    result["realtime"] = schedule["realtime"]
+    result["alerts"] = schedule["alerts"]
     result["now"] = schedule["now"]
     return result
 

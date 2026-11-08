@@ -158,7 +158,12 @@ day; a direction with no further trip says so. `GET /api/preview/transit/departu
 load when opened and stay open across layer refreshes. Each "Vicino a" row shows
 the next two times per direction, gathered from the nearest stop and same-named
 stops of that line within 150 m (other platform, other side of the street).
-Everything is labelled scheduled, not realtime. Wheelchair access is shown only
+When `realtime/latest.json` was refreshed within 3 minutes, directions also show
+predicted times (green dot, delay or advance in minutes) above the scheduled ones,
+which stay visible because predictions only cover trips already tracked; stale
+realtime falls back to scheduled times and says so. Service alerts in force for a
+stop's lines or the stop itself appear under the stop (collapsed beyond two) and in
+popups. Wheelchair access is shown only
 when the source states it; the current Rome feed leaves it empty for every stop.
 
 This is scheduled service with source attribution and a visible licensing

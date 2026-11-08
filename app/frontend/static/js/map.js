@@ -288,7 +288,7 @@ function renderFilters() {
 
 /* "Vicino a": lines near a service's place (see app/backend/transit_nearby.py). */
 const TRANSIT_STOPS_SHOWN = 4;
-const TRANSIT_NOTE = "Tempi a piedi stimati in linea d’aria (+30%, 4 km/h). Linee e prossimi passaggi secondo l’orario programmato di Roma Servizi per la Mobilità: non sono dati in tempo reale, ritardi e soppressioni non sono inclusi. Accessibilità indicata solo dove la fonte la dichiara.";
+const TRANSIT_NOTE = "Tempi a piedi stimati in linea d’aria (+30%, 4 km/h). Linee, orari, previsioni e avvisi: Roma Servizi per la Mobilità. Le corse soppresse non sono indicate. Accessibilità indicata solo dove la fonte la dichiara.";
 
 async function loadTransitSummaries() {
   try {
@@ -339,8 +339,10 @@ function modeName(mode) {
 
 function transitNext(row) {
   return (row.next || []).map(direction => {
-    const times = direction.times.length ? direction.times.map(TransportLayer.timeText).join(" · ") : "nessun’altra corsa oggi";
-    return `<span class="transit-next">${direction.headsign ? `→ ${escapeHtml(direction.headsign)}: ` : ""}${escapeHtml(times)}</span>`;
+    const shown = TransportLayer.directionTimes(direction);
+    const live = shown.live ? '<span class="tl-live-dot" aria-label="tempo reale"></span>' : "";
+    const scheduled = shown.scheduled ? `<span class="transit-scheduled">orario: ${escapeHtml(shown.scheduled)}</span>` : "";
+    return `<span class="transit-next${shown.live ? " live" : ""}">${live}${direction.headsign ? `→ ${escapeHtml(direction.headsign)}: ` : ""}${escapeHtml(shown.text)}</span>${scheduled}`;
   }).join("");
 }
 
@@ -350,14 +352,21 @@ function transitLine(row) {
   return `<li class="transit-line"><button type="button" class="line-chip-button" data-focus-route="${escapeHtml(row.route_id)}" aria-label="Mostra ${escapeHtml(modeName(row.mode))} ${escapeHtml(row.code)} sulla mappa">${lineChip(row)}</button>${night}<span class="transit-next-wrap">${transitNext(row) || '<span class="transit-next">Orari non disponibili</span>'}</span></li>`;
 }
 
+/** Alerts naming one of the group's lines or stops. */
+function stopAlerts(group, alerts) {
+  const routes = new Set(group.lines.map(line => line.route_id));
+  const stops = new Set(group.stop_ids || []);
+  return (alerts || []).filter(alert => (alert.routes || []).some(r => routes.has(r)) || (alert.stops || []).some(s => stops.has(s)));
+}
+
 /** A stop (same-named stops within 150 m) with its lines and a "show all its lines" button. */
-function transitStopGroup(group, index) {
+function transitStopGroup(group, index, alerts = []) {
   const metro = group.modes.includes("metro");
   const place = metro ? "Stazione" : group.modes.length === 1 && group.modes[0] === "tram" ? "Fermata tram" : "Fermata";
   const icon = metro ? '<span class="tl-roundel">M</span>' : group.modes[0] === "tram" ? '<span class="tl-stop tl-tram">T</span>' : '<span class="tl-stop tl-bus">Bus</span>';
   const wheelchair = group.wheelchair === "yes" ? ` · <span class="wheelchair-tag">accessibile in sedia a rotelle</span>` : group.wheelchair === "no" ? " · non accessibile in sedia a rotelle" : "";
   const count = group.lines.length;
-  return `<li class="transit-stop-group"><div class="transit-stop-head"><span class="transit-stop-icon">${icon}</span><span class="transit-text"><span class="transit-stop">${place} ${escapeHtml(group.stop_name)}</span><span class="transit-meta">circa ${group.walk_min} min a piedi · ${group.distance_m} m in linea d’aria · ${count} ${count === 1 ? "linea" : "linee"}${wheelchair}</span></span><button type="button" class="transit-row-focus" data-focus-stop="${index}" aria-label="Mostra sulla mappa le linee di ${escapeHtml(group.stop_name)}">Mostra linee</button></div><ul class="transit-lines">${group.lines.map(transitLine).join("")}</ul></li>`;
+  return `<li class="transit-stop-group"><div class="transit-stop-head"><span class="transit-stop-icon">${icon}</span><span class="transit-text"><span class="transit-stop">${place} ${escapeHtml(group.stop_name)}</span><span class="transit-meta">circa ${group.walk_min} min a piedi · ${group.distance_m} m in linea d’aria · ${count} ${count === 1 ? "linea" : "linee"}${wheelchair}</span></span><button type="button" class="transit-row-focus" data-focus-stop="${index}" aria-label="Mostra sulla mappa le linee di ${escapeHtml(group.stop_name)}">Mostra linee</button></div>${TransportLayer.alertsHtml(stopAlerts(group, alerts), new Set(group.lines.map(line => line.route_id)))}<ul class="transit-lines">${group.lines.map(transitLine).join("")}</ul></li>`;
 }
 
 function renderTransitRows(data) {
@@ -369,11 +378,12 @@ function renderTransitRows(data) {
   const lines = data.lines || [];
   const stops = data.stops || [];
   if (!lines.length) return `${head}<p>Nessuna linea metro, tram o autobus in servizio oggi entro 500 m (metro entro 800 m).</p><p class="source-note">${TRANSIT_NOTE}</p>`;
-  const shown = stops.slice(0, TRANSIT_STOPS_SHOWN).map(transitStopGroup).join("");
+  const alerts = data.alerts || [];
+  const shown = stops.slice(0, TRANSIT_STOPS_SHOWN).map((g, i) => transitStopGroup(g, i, alerts)).join("");
   const rest = stops.slice(TRANSIT_STOPS_SHOWN);
-  const more = rest.length ? `<details class="transit-more-lines"><summary>Altre ${rest.length} fermate</summary><ul class="transit-list">${rest.map((g, i) => transitStopGroup(g, i + TRANSIT_STOPS_SHOWN)).join("")}</ul></details>` : "";
+  const more = rest.length ? `<details class="transit-more-lines"><summary>Altre ${rest.length} fermate</summary><ul class="transit-list">${rest.map((g, i) => transitStopGroup(g, i + TRANSIT_STOPS_SHOWN, alerts)).join("")}</ul></details>` : "";
   const all = `<button type="button" class="transit-focus-all" data-focus-route="*">Mostra tutte le ${lines.length} linee sulla mappa</button>`;
-  return `${head}${all}<ul class="transit-list">${shown}</ul>${more}<p class="source-note">${TRANSIT_NOTE}</p>`;
+  return `${head}${all}<ul class="transit-list">${shown}</ul>${more}<p class="source-note">${TransportLayer.realtimeNote(data)} ${TRANSIT_NOTE}</p>`;
 }
 
 async function loadTransitDetail(poi) {
