@@ -4,8 +4,19 @@ Before working in this directory, read and follow the shared workspace
 [AGENTS.md](../AGENTS.md) and the documents it conditionally references.
 Keep this component in the `project_egi` workspace so these pointers resolve.
 
-The original application drafts are on `origin/wip`, not `main`; use the clone
-location and revision recorded in the shared context. Read them as draft evidence
-before proposing reuse. The user selected keeping the original clone in
-`../../personal_projects/egi-app` as a reference; this directory is for the restart.
-Adoption of the draft stack remains pending.
+This directory contains the implemented read-only Helpinet/transport preview,
+using the user-selected FastAPI/Jinja2/Uvicorn subset. Read [README.md](README.md)
+for environment, startup, test commands, runtime files and data limits.
+
+Before task execution, read the approved specification/plan and its latest execution
+record. Current shared efforts are indexed by the workspace
+[tracker guide](../docs/agents/issue-tracker.md); post-handoff work is in
+[the P0–P5 plan](../.scratch/post-handoff/plan.md). Local Git uses `main` without a
+remote under consolidation D1, with local commits for approved tasks. Approval and
+checkpoint boundaries remain those of the selected task.
+
+The original clone at `../../personal_projects/egi-app` remains a reference; its
+draft `origin/wip` and remote do not identify this app's branch or delivery target.
+The preview reads source evidence, not the canonical public directory. Canonical
+editorial integration, old CRUD consumers, production deployment and adoption of
+other draft dependencies require their own approved scope.

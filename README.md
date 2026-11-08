@@ -9,6 +9,12 @@ This is a local preview of unreviewed Helpinet data, not the approved public dir
 Routes use `/api/preview`. No canonical entity, editorial approval or publication is
 created. Blank descriptions remain blank; source hours have a separately labelled preview status; coordinates are source claims. Missing coordinates stay in the list.
 
+Local Git uses `main`, without a remote, under the approved consolidation workflow.
+Current task/approval and dated verification evidence are indexed in the workspace
+[tracker guide](../docs/agents/issue-tracker.md) and
+[post-handoff plan](../.scratch/post-handoff/plan.md). The original draft is reference
+history; production/editorial integration is a separate scope.
+
 ## Setup and start
 
 Use the selected existing FastAPI/Jinja2/Uvicorn stack in a dedicated `.venv`.
@@ -31,6 +37,14 @@ sh scripts/start.sh
 ```
 
 Open `http://127.0.0.1:8000/map?city_id=1&lang=it` or the entry wizard at `/`.
+If that port belongs to another session, preserve its process. With the recorded
+preview database already running, a separate instance can use:
+
+```sh
+.venv/bin/python -m uvicorn app.backend.main:app --host 127.0.0.1 --port 8001
+```
+
+Use the actual instance's port for browsing and live tests; 8001 was used for R3.
 The app binds only loopback. It uses a dedicated `egi_preview_reader` role, with only
 selected source-table read grants and a read-only transaction default. It has no
 canonical-draft table grants and cannot load or publish data.
@@ -57,12 +71,13 @@ not touch any other existing PostgreSQL target.
 From sibling `egi-importer`, after the preview database is running:
 
 ```sh
-python3 scripts/load_preview.py --preview
-python3 scripts/load_preview.py
+python3 scripts/load_preview.py --input runs/helpinet-02/normalized/bundle.json --preview
+python3 scripts/load_preview.py --input runs/helpinet-02/normalized/bundle.json
 ```
 
-Select `--input` for another validated normalized bundle. Source/record IDs are
-reused; repeated content is not duplicated. A new capture or interpretation preserves
+These select the delivered v0.2 interpretation; omitting `--input` retains the
+script's historical v0.1 default. Select another validated bundle explicitly.
+Source/record IDs are reused; repeated content is not duplicated. A new capture or interpretation preserves
 history. The loader commits its complete import unit or rolls back. Imported source
 subjects remain separate from canonical publication.
 
@@ -81,6 +96,7 @@ cache behaviour, transport projection) run with:
 ```sh
 .venv/bin/python -m unittest discover -s tests -v
 node tests/test_map.cjs
+node tests/test_transport_layer.cjs
 ```
 
 With the app running, the live HTTP tests against the real preview database run too:
@@ -89,18 +105,25 @@ With the app running, the live HTTP tests against the real preview database run 
 EGI_APP_BASE_URL=http://127.0.0.1:8000 .venv/bin/python -m unittest discover -s tests -v
 ```
 
+Use the serving port (for example 8001) in `EGI_APP_BASE_URL`. For changed JavaScript,
+run `node --check` on the affected files. Last recorded suite/browser results are
+in the post-handoff plan; commands here do not claim a currently running server or
+a fresh passing test result. TestClient's httpx deprecation is known; the user
+selected retaining the existing test-only dependency.
+
 Database-backed loader tests run separately under egi-importer with EGI_TEST_DSN
 pointing specifically to the dedicated egi_import_contract database. Recorded evidence
 and the scope are in [v0.1 plan](docs/v01-plan.md).
 
 ## Limits
 
-The local preview has an optional metro/tram/bus layer under Cerca → Layer, drawn
-by `app/frontend/static/js/transport-layer.js` (the only transport code on the map
-page). Enable Trasporti and select Metro/Tram/Autobus independently. Metro routes
-show at all zooms in their official colours, tram routes from zoom 12, thin muted
-bus routes from 13; metro stations from 13, tram and bus stops from 14, always above
-the lines. Same-named metro platforms within 150 m are shown as one station marker
+The local preview has an optional metro/rail/tram/bus layer under Cerca → Layer,
+drawn by `app/frontend/static/js/transport-layer.js`; `map.js` wires service
+badges/cards and focus actions. Enable Trasporti and select Metro/Treni/Tram/Autobus
+independently. Metro and rail routes show at all zooms, tram routes from zoom 12,
+thin muted bus routes from 13; rail stations from 12, metro stations from 13,
+tram and bus stops from 14, always above the lines. Same-named metro platforms
+within 150 m are shown as one station marker
 ("M A B B1" at Termini) listing every source `stop_id`; this is display grouping,
 not deduplication. Bus and tram stops stay the feed's directional stops. A legend
 sits under the toggle. No request is sent while the map has no size.
@@ -127,15 +150,17 @@ asks to check the update job.
 ### Nearby transit ("Vicino a")
 
 `GET /api/preview/transit/places` returns, for every located place, the nearest
-metro line, the nearest daytime bus line and the number of lines; the list shows it
-as a compact badge. `GET /api/preview/transit/places/{place_id}` returns every line
-running today with a stop within 500 m (metro 800 m): one row per line at its
-nearest stop, metro first, night lines (`n…`) last. Walking time is an estimate:
+metro, rail and daytime surface line and total line count; the list shows a compact
+badge. `GET /api/preview/transit/places/{place_id}` returns timed lines scheduled
+today and explicitly untimed OSM rail with a stop within 500 m (metro/rail 800 m):
+one row per line at its nearest stop, metro/rail first, night lines (`n…`) last.
+Walking time is an estimate:
 straight-line distance × 1.3 at 4 km/h, rounded up, and the card says so. The
-service card shows five rows and "Altre N linee". No badge for itinerant services,
+service card shows four stop groups followed by "Altre N fermate". No badge for itinerant services,
 remote/directory services or services without coordinates. Logic and constants are
-in `app/backend/transit_nearby.py`; transport unavailable or outside its calendar
-hides the rows and leaves services untouched.
+in `app/backend/transit_nearby.py` and `app/backend/osm_rail.py`; unavailable or
+out-of-calendar timed sources contribute no timed rows, while an independent OSM
+runtime may still supply untimed rows. Service data remains usable.
 
 The "Vicino a" section lists stops (same-named stops within 150 m form one stop;
 metro stations first, then by walking time), each with its lines and their next
@@ -166,8 +191,9 @@ stop's lines or the stop itself appear under the stop (collapsed beyond two) and
 popups. Wheelchair access is shown only
 when the source states it; the current Rome feed leaves it empty for every stop.
 
-This is scheduled service with source attribution and a visible licensing
-discrepancy, not realtime arrivals or approved public data. No DB grant or schema
+Bus/tram predictions are available where the realtime feed covers them; metro and
+NeTEx rail remain scheduled, and OSM rail has no times. All remain attributed
+source data, not approved public EGI information. No transport DB grant or schema
 change. See sibling [importer instructions](../egi-importer/README.md) and
 [execution evidence](../egi-importer/docs/tpl-execution.md).
 
@@ -178,11 +204,12 @@ change. See sibling [importer instructions](../egi-importer/README.md) and
 - Leaflet/cluster libraries and fonts retain the original external providers; map tiles use the standard OpenStreetMap endpoint with visible attribution;
   network access is needed for the basemap. No offline map is claimed.
 - Contribution forms, original CRUD routers, editorial matching and public export are
-  not connected. No hosting, Git initialization, commit or remote setup is performed.
+  not connected. Local Git history now exists; hosting and remote delivery remain
+  separately scoped.
 
 ## Historical v0.1 verification — 2026-11-08
 
-The app is running on http://127.0.0.1:8000. Three live HTTP checks and JavaScript
+At that checkpoint the app ran on http://127.0.0.1:8000. Three live HTTP checks and JavaScript
 helper checks passed. A browser walkthrough confirmed the 315-result list, a source
 UUID detail, the 46-result native cibo filter and restoration of all services.
 No console errors/warnings were observed in the checked tab. The original CARTO
@@ -195,7 +222,7 @@ See [execution evidence](docs/v01-execution.md) and [verification](docs/v01-veri
 
 One service per card, provisional related services from the native parent, deterministic evidence-linked summaries distinct from empty original descriptions, positive access claims, readable unknown-aware hours, native need/type/prestation filters, local category icons and explicit reference-point distance ordering are now available. Missing-point physical services remain listed; Rubrica requires explicit remote delivery. Inspect `/benchmark` for field-by-field coverage. New preview copy is Italian.
 
-Use `python3 scripts/load_preview.py --input runs/helpinet-02/normalized/bundle.json` from egi-importer to repeat the delivered v0.2 load. The script's historical default still selects v0.1; select `--input` explicitly. See [v0.2 plan](docs/v02-plan.md) and [execution evidence](docs/v02-execution.md) for reproduction, acceptance and limits. Current verification: 15 importer tests, 9 app tests, Node checks and browser walkthrough passed.
+Use `python3 scripts/load_preview.py --input runs/helpinet-02/normalized/bundle.json` from egi-importer to repeat the delivered v0.2 load. The script's historical default still selects v0.1; select `--input` explicitly. See [v0.2 plan](docs/v02-plan.md) and [execution evidence](docs/v02-execution.md) for reproduction, acceptance and limits. At the v0.2 checkpoint, 15 importer tests, 9 app tests, Node checks and a browser walkthrough passed; later verification is recorded in the shared task plans.
 
 ## Cross-category POIs and source opening status
 
@@ -235,5 +262,5 @@ because no active route was available in the inspected OSM data.
 
 Refresh manually from `egi-importer` with `python3 scripts/osm_rail.py poll`; no new
 job is installed. See [the runtime contract](../egi-importer/docs/osm-rail-format.md).
-Tests: `.venv/bin/python -m unittest discover -s tests`, `node tests/test_map.cjs`,
-`node tests/test_transport_layer.cjs`. Live tests also require `EGI_APP_BASE_URL`.
+The Verify section covers independent runtime fixtures, source merging and the
+popup lifecycle test that ensures untimed stops make no departures request.
