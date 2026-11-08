@@ -16,9 +16,9 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from .preview import AREA, LANGUAGES, categories, services
 from .presentation import coverage
 from .subjects import PostgresSubjectSource, SubjectSource, SubjectSourceUnavailable
-from .transport import ROOT as TRANSPORT_ROOT, transport_view
-from .transit_nearby import group_by_stop, lines_near_places, summary as transit_summary
-from .departures import next_departures
+from .transport import ROOTS as TRANSPORT_ROOTS, transport_view_all
+from .transit_nearby import group_by_stop, lines_near_places_all, summary as transit_summary
+from .departures import next_departures_all
 from .cycleways import cycleways_view
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -122,7 +122,7 @@ def preview_transport(
     east: float = Query(default=12.8, ge=-180, le=180),
     north: float = Query(default=42.1, ge=-90, le=90),
     zoom: int = Query(default=11, ge=0, le=19),
-    modes: str = "metro,tram,bus",
+    modes: str = "metro,rail,tram,bus",
     routes: str | None = Query(default=None, max_length=2000),
 ):
     """Return source-scheduled metro/tram/bus features independently of service data.
@@ -131,12 +131,12 @@ def preview_transport(
     only those lines, whole, with their stops.
     """
     selected = set(modes.split(","))
-    if west >= east or south >= north or not selected <= {"metro", "tram", "bus"}:
+    if west >= east or south >= north or not selected <= {"metro", "rail", "tram", "bus"}:
         raise HTTPException(422, "Viewport o modalità TPL non validi")
     focus = {r for r in routes.split(",") if r} if routes is not None else None
     if focus is not None and not 0 < len(focus) <= 80:
         raise HTTPException(422, "Elenco linee non valido")
-    return transport_view([west, south, east, north], zoom, selected, routes=focus)
+    return transport_view_all([west, south, east, north], zoom, selected, TRANSPORT_ROOTS, routes=focus)
 
 
 def place_points(rows: list[dict[str, Any]]) -> dict[str, tuple[float, float]]:
@@ -154,9 +154,29 @@ def place_points(rows: list[dict[str, Any]]) -> dict[str, tuple[float, float]]:
 @app.get("/api/preview/transit/places")
 def transit_places(rows: list[dict[str, Any]] = Depends(subjects)):
     """List badge for every located place: nearest metro and bus line, line count."""
-    result = lines_near_places(place_points(rows), TRANSPORT_ROOT)
+    result = lines_near_places_all(place_points(rows), TRANSPORT_ROOTS)
     result["places"] = {k: transit_summary(v) for k, v in result["places"].items()}
     return result
+
+
+MAX_DIRECTIONS = 4
+
+
+def upcoming_directions(directions: list[dict]) -> list[dict]:
+    """Directions that still have trips, soonest first, at most MAX_DIRECTIONS.
+
+    A busy station (Termini) has dozens of train destinations; only the next few
+    matter. If none has a further trip today, one empty entry says so.
+    """
+    def first(d):
+        """Minutes to the next trip, realtime first."""
+        times = (d.get("realtime") or d["times"])[:1]
+        return times[0]["in_min"] if times else None
+
+    live = sorted((d for d in directions if first(d) is not None), key=first)
+    if live:
+        return live[:MAX_DIRECTIONS]
+    return directions[:1]
 
 
 @app.get("/api/preview/transit/places/{place_id}")
@@ -165,14 +185,14 @@ def transit_place(place_id: str, rows: list[dict[str, Any]] = Depends(subjects))
     points = place_points(rows)
     if place_id not in points:
         raise HTTPException(404, "Luogo senza coordinate nella preview")
-    result = lines_near_places({place_id: points[place_id]}, TRANSPORT_ROOT)
+    result = lines_near_places_all({place_id: points[place_id]}, TRANSPORT_ROOTS)
     result["lines"] = lines = result.pop("places").get(place_id, [])
     # Next scheduled departures of each row's line at its nearest stop.
-    schedule = next_departures(
+    schedule = next_departures_all(
         sorted({stop for row in lines for stop in row["stop_ids"]}),
         {row["route_id"] for row in lines},
-        limit=2,
-        root=TRANSPORT_ROOT,
+        2,
+        TRANSPORT_ROOTS,
     )
     by_stop_route: dict[tuple, list] = {}
     for departure in schedule["departures"]:
@@ -194,7 +214,7 @@ def transit_place(place_id: str, rows: list[dict[str, Any]] = Depends(subjects))
                     }
                 elif departure["realtime"] and not directions[key]["realtime"]:
                     directions[key]["realtime"] = departure["realtime"]
-        row["next"] = sorted(directions.values(), key=lambda d: (d["direction_id"], d["headsign"]))
+        row["next"] = upcoming_directions(list(directions.values()))
     result["stops"] = group_by_stop(lines)
     result["schedule_availability"] = schedule["availability"]
     result["realtime"] = schedule["realtime"]
@@ -214,7 +234,7 @@ def transit_departures(
     if not 0 < len(stop_ids) <= 40:
         raise HTTPException(422, "Elenco fermate non valido")
     route_ids = {r for r in routes.split(",") if r} if routes else None
-    return next_departures(stop_ids, route_ids, limit, TRANSPORT_ROOT)
+    return next_departures_all(stop_ids, route_ids, limit, TRANSPORT_ROOTS)
 
 
 @app.get("/api/preview/cycleways")

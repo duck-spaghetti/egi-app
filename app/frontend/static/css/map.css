@@ -1376,3 +1376,8 @@ html[dir="rtl"] .sheet-back-head .arrow,
 .cycle-swatch.lane { border-top:3px dashed #5aae61; }
 .cycle-swatch.path { border-top:3px dotted #2a9d8f; }
 #cycle-toggle { margin-top:12px; }
+
+/* Rail (F7) */
+.tl-roundel.tl-train { background:#00704A;font-size:8px;letter-spacing:-.3px; }
+.tl-roundel.tl-train svg { width:12px;height:12px; }
+.transit-stop-icon .tl-roundel.tl-train { width:22px;height:22px; }

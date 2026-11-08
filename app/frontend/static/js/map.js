@@ -108,6 +108,7 @@ function initMap() {
     status: document.getElementById("transport-status"),
     modes: {
       metro: document.getElementById("transport-metro"),
+      rail: document.getElementById("transport-rail"),
       tram: document.getElementById("transport-tram"),
       bus: document.getElementById("transport-bus"),
     },
@@ -314,19 +315,18 @@ function transitEligible(poi) {
 }
 
 function lineChip(row) {
-  const metro = row.mode === "metro";
-  const tram = row.mode === "tram";
   const color = TransportLayer.lineColor(row.mode, row.color);
-  const label = `${metro ? "Metro" : tram ? "Tram" : "Autobus"} ${row.code}`;
-  return `<span class="line-chip ${escapeHtml(row.mode)}" style="--line-color:${escapeHtml(color)}" title="${escapeHtml(label)}"><span class="line-mode" aria-hidden="true">${metro ? "M" : tram ? "T" : "Bus"}</span><span class="line-code">${escapeHtml(row.code)}</span><span class="visually-hidden">${escapeHtml(label)}</span></span>`;
+  const label = `${modeName(row.mode)} ${row.code}`;
+  const short = {metro: "M", rail: "Treno", tram: "T"}[row.mode] || "Bus";
+  return `<span class="line-chip ${escapeHtml(row.mode)}" style="--line-color:${escapeHtml(color)}" title="${escapeHtml(label)}"><span class="line-mode" aria-hidden="true">${short}</span><span class="line-code">${escapeHtml(row.code)}</span><span class="visually-hidden">${escapeHtml(label)}</span></span>`;
 }
 
 function transitBadge(poi) {
   if (!transitEligible(poi)) return "";
   const summary = state.transitByPlace[poi.place_id];
-  if (!summary || (!summary.metro && !summary.surface)) return "";
-  const parts = [summary.metro, summary.surface].filter(Boolean).map(row =>
-    `<span class="transit-pair">${lineChip(row)}<span class="transit-walk">${row.mode === "metro" ? `${escapeHtml(row.stop_name)} ` : ""}${row.walk_min}′</span></span>`
+  if (!summary || (!summary.metro && !summary.rail && !summary.surface)) return "";
+  const parts = [summary.metro, summary.rail, summary.surface].filter(Boolean).map(row =>
+    `<span class="transit-pair">${lineChip(row)}<span class="transit-walk">${row.mode === "metro" || row.mode === "rail" ? `${escapeHtml(row.stop_name)} ` : ""}${row.walk_min}′</span></span>`
   );
   const extra = summary.lines - parts.length;
   return `<span class="transit-badge" aria-label="Trasporti vicini, minuti a piedi stimati">${parts.join("")}${extra > 0 ? `<span class="transit-more">+${extra} linee</span>` : ""}</span>`;
@@ -338,7 +338,7 @@ function transitSectionShell(poi) {
 }
 
 function modeName(mode) {
-  return mode === "metro" ? "Metro" : mode === "tram" ? "Tram" : "Autobus";
+  return {metro: "Metro", rail: "Treno", tram: "Tram"}[mode] || "Autobus";
 }
 
 function transitNext(row) {
@@ -366,8 +366,9 @@ function stopAlerts(group, alerts) {
 /** A stop (same-named stops within 150 m) with its lines and a "show all its lines" button. */
 function transitStopGroup(group, index, alerts = []) {
   const metro = group.modes.includes("metro");
-  const place = metro ? "Stazione" : group.modes.length === 1 && group.modes[0] === "tram" ? "Fermata tram" : "Fermata";
-  const icon = metro ? '<span class="tl-roundel">M</span>' : group.modes[0] === "tram" ? '<span class="tl-stop tl-tram">T</span>' : '<span class="tl-stop tl-bus">Bus</span>';
+  const rail = group.modes.includes("rail");
+  const place = metro ? "Stazione" : rail ? "Stazione ferroviaria" : group.modes.length === 1 && group.modes[0] === "tram" ? "Fermata tram" : "Fermata";
+  const icon = metro ? '<span class="tl-roundel">M</span>' : rail ? '<span class="tl-roundel tl-train">FS</span>' : group.modes[0] === "tram" ? '<span class="tl-stop tl-tram">T</span>' : '<span class="tl-stop tl-bus">Bus</span>';
   const wheelchair = group.wheelchair === "yes" ? ` · <span class="wheelchair-tag">accessibile in sedia a rotelle</span>` : group.wheelchair === "no" ? " · non accessibile in sedia a rotelle" : "";
   const count = group.lines.length;
   return `<li class="transit-stop-group"><div class="transit-stop-head"><span class="transit-stop-icon">${icon}</span><span class="transit-text"><span class="transit-stop">${place} ${escapeHtml(group.stop_name)}</span><span class="transit-meta">circa ${group.walk_min} min a piedi · ${group.distance_m} m in linea d’aria · ${count} ${count === 1 ? "linea" : "linee"}${wheelchair}</span></span><button type="button" class="transit-row-focus" data-focus-stop="${index}" aria-label="Mostra sulla mappa le linee di ${escapeHtml(group.stop_name)}">Mostra linee</button></div>${TransportLayer.alertsHtml(stopAlerts(group, alerts), new Set(group.lines.map(line => line.route_id)))}<ul class="transit-lines">${group.lines.map(transitLine).join("")}</ul></li>`;
@@ -381,7 +382,7 @@ function renderTransitRows(data) {
   }
   const lines = data.lines || [];
   const stops = data.stops || [];
-  if (!lines.length) return `${head}<p>Nessuna linea metro, tram o autobus in servizio oggi entro 500 m (metro entro 800 m).</p><p class="source-note">${TRANSIT_NOTE}</p>`;
+  if (!lines.length) return `${head}<p>Nessuna linea metro, treno, tram o autobus in servizio oggi entro 500 m (metro e treni entro 800 m).</p><p class="source-note">${TRANSIT_NOTE}</p>`;
   const alerts = data.alerts || [];
   const shown = stops.slice(0, TRANSIT_STOPS_SHOWN).map((g, i) => transitStopGroup(g, i, alerts)).join("");
   const rest = stops.slice(TRANSIT_STOPS_SHOWN);

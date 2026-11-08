@@ -14,7 +14,7 @@ from collections import defaultdict
 
 WALK_M_PER_MIN = 4000 / 60  # 4 km/h, slower than the usual 5 km/h on purpose
 DETOUR_FACTOR = 1.3  # straight line → street distance
-RADIUS_M = {"metro": 800, "tram": 500, "bus": 500}
+RADIUS_M = {"metro": 800, "rail": 800, "tram": 500, "bus": 500}
 SIBLING_M = 150  # same-named stops this close count as one stop for departures
 CELL_DEG = 0.01  # ~830 m east-west, ~1.1 km north-south at Rome
 METHOD = {
@@ -44,10 +44,11 @@ def is_night_line(code: str, mode: str) -> bool:
 
 
 def line_sort_key(row: dict) -> tuple:
-    """Metro first, night lines last, then walking time and natural code (2 before 19)."""
+    """Metro, then trains, then others; night lines last; then walking time and natural code."""
     parts = re.split(r"(\d+)", row["code"])
     natural = [int(p) if p.isdigit() else p for p in parts]
-    return (row["mode"] != "metro", row["night"], row["walk_min"], row["distance_m"], natural)
+    rank = {"metro": 0, "rail": 1}.get(row["mode"], 2)
+    return (rank, row["night"], row["walk_min"], row["distance_m"], natural)
 
 
 class StopIndex:
@@ -85,7 +86,8 @@ class StopIndex:
 def stop_index(version: str, network: dict) -> StopIndex:
     """Return the cached index for an immutable version, building it once."""
     if version not in _indexes:
-        _indexes.clear()  # keep only the current version in memory
+        if len(_indexes) >= 4:  # two sources × (active, pending)
+            _indexes.pop(next(iter(_indexes)))
         _indexes[version] = StopIndex(network)
     return _indexes[version]
 
@@ -178,15 +180,16 @@ def group_by_stop(rows: list[dict]) -> list[dict]:
             group.update(distance_m=row["distance_m"], walk_min=row["walk_min"], stop_point=row["stop_point"])
     for group in groups:
         group["lines"].sort(key=line_sort_key)
-        group["modes"] = sorted({r["mode"] for r in group["lines"]}, key=["metro", "tram", "bus"].index)
-    return sorted(groups, key=lambda g: (g["modes"][0] != "metro", g["walk_min"], g["distance_m"]))
+        group["modes"] = sorted({r["mode"] for r in group["lines"]}, key=["metro", "rail", "tram", "bus"].index)
+    return sorted(groups, key=lambda g: ({"metro": 0, "rail": 1}.get(g["modes"][0], 2), g["walk_min"], g["distance_m"]))
 
 
 def summary(rows: list[dict]) -> dict:
     """Compact list badge: nearest metro, nearest daytime tram/bus line, total lines."""
     return {
         "metro": next((r for r in rows if r["mode"] == "metro"), None),
-        "surface": next((r for r in rows if r["mode"] != "metro" and not r["night"]), None),
+        "rail": next((r for r in rows if r["mode"] == "rail"), None),
+        "surface": next((r for r in rows if r["mode"] in ("tram", "bus") and not r["night"]), None),
         "lines": len(rows),
     }
 
@@ -229,3 +232,21 @@ def lines_near_places(
         },
     )
     return result
+
+
+def lines_near_places_all(points: dict[str, tuple[float, float]], roots, day: str | None = None) -> dict:
+    """lines_near_places over several runtimes (Roma Mobilità, rail), rows merged per place.
+
+    Availability is "available" when any source is; per-source states are listed.
+    """
+    results = [lines_near_places(points, root, day) for root in roots]
+    merged = dict(results[0])
+    merged["sources"] = [{"availability": r["availability"], "source_url": r.get("source_url")} for r in results]
+    states = [r["availability"] for r in results]
+    merged["availability"] = "available" if "available" in states else states[0]
+    places: dict[str, list] = {}
+    for result in results:
+        for place_id, rows in result.get("places", {}).items():
+            places.setdefault(place_id, []).extend(rows)
+    merged["places"] = {k: sorted(v, key=line_sort_key) for k, v in places.items()}
+    return merged

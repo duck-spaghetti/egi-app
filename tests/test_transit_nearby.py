@@ -18,6 +18,7 @@ from app.backend.subjects import StaticSubjectSource
 from app.backend.transit_nearby import (
     StopIndex,
     group_by_stop,
+    lines_near_places_all,
     display_code,
     lines_near_places,
     nearby_lines,
@@ -138,7 +139,24 @@ class RankingTests(unittest.TestCase):
         rows = nearby_lines(index, {"svc"}, LON, LAT)
         self.assertEqual([(r["code"], r["night"]) for r in rows], [("49", False), ("n92", True)])
         self.assertEqual(summary(rows)["surface"]["code"], "49")
+        self.assertIsNone(summary(rows)["rail"])
         self.assertEqual(summary(rows)["lines"], 2)
+
+
+class DirectionTrimTests(unittest.TestCase):
+    """Only directions with trips left, soonest first, at most four."""
+
+    def test_trim(self):
+        """Empty directions drop out unless nothing is left."""
+        from app.backend.main import upcoming_directions
+
+        def d(name, minutes):
+            """A direction with an optional next time."""
+            return {"headsign": name, "direction_id": "", "times": [{"time": "x", "in_min": minutes}] if minutes is not None else [], "realtime": []}
+
+        out = upcoming_directions([d("a", None), d("b", 9), d("c", 3), d("e", 5), d("f", 7), d("g", 1)])
+        self.assertEqual([x["headsign"] for x in out], ["g", "c", "e", "f"])
+        self.assertEqual([x["headsign"] for x in upcoming_directions([d("a", None), d("b", None)])], ["a"])
 
 
 class AvailabilityTests(unittest.TestCase):
@@ -157,6 +175,9 @@ class AvailabilityTests(unittest.TestCase):
         self.assertEqual(result["availability"], "available")
         self.assertEqual([r["mode"] for r in result["places"]["p"]][0], "metro")
         self.assertEqual({r["mode"] for r in result["places"]["p"]}, {"metro", "bus", "tram"})
+        merged = lines_near_places_all({"p": (LON, LAT)}, [self.root, self.root.parent / "missing"], "2026-01-05")
+        self.assertEqual(merged["availability"], "available")
+        self.assertEqual([s["availability"] for s in merged["sources"]], ["available", "unavailable"])
 
     def test_outside_calendar_and_unavailable(self):
         """Explicit availability and no rows instead of an error."""
@@ -181,7 +202,7 @@ class EndpointTests(unittest.TestCase):
         app.dependency_overrides[subject_source] = lambda: StaticSubjectSource(rows)
         self.addCleanup(app.dependency_overrides.clear)
         self.client = TestClient(app)
-        root_patch = patch.object(main, "TRANSPORT_ROOT", FIXTURE)
+        root_patch = patch.object(main, "TRANSPORT_ROOTS", (FIXTURE,))
         root_patch.start()
         self.addCleanup(root_patch.stop)
 

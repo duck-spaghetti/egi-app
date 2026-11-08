@@ -211,3 +211,14 @@ infrastructure in the viewport from zoom 12 (`app/backend/cycleways.py`, format
 "Piste ciclabili" toggle: separated paths solid dark green, tracks dashed, lanes
 light dashed, shared paths dotted, with a legend and ODbL attribution. No official
 Rome dataset was found; the data is not verified by EGI.
+
+### Trains
+
+`.local/rail` (override `EGI_RAIL_ROOT`) is a second runtime in the same format,
+built from Trenitalia's NeTEx; `transport.ROOTS` lists both and the `*_all` helpers
+merge them (features, nearby lines, departures). Rail shows as mode `rail`: dashed
+green lines by train category (REG, RV, FR, IC…), FS station markers from zoom 12,
+"Stazione ferroviaria" groups in "Vicino a" (800 m), and the "Treni" checkbox. For
+each category only destinations with trips left are listed, soonest first (at most
+four in the card, eight in popups). Scheduled times only; no FL codes in the source;
+Roma-Lido, Roma-Viterbo and Roma-Giardinetti are not available.

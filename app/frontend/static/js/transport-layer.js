@@ -9,12 +9,14 @@
  * Pure helpers are exposed for tests.
  */
 const TransportLayer = (() => {
-  const MODES = ["metro", "tram", "bus"];
+  const MODES = ["metro", "rail", "tram", "bus"];
+  const RAIL_COLOR = "#00704A";
   const TRAM_COLOR = "#7a4fa0";
   const BUS_COLOR = "#3d4a5c";
   const METRO_FALLBACK = "#355c7d";
   // Distinct, dark enough for white text; used when single lines are focused (F2).
   const LINE_PALETTE = ["#b2182b", "#2166ac", "#1b7837", "#762a83", "#b35806", "#01665e", "#8c510a", "#c51b7d", "#4d4d4d", "#35978f"];
+  const TRAIN_GLYPH = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M5 1h6a3 3 0 0 1 3 3v6a2.5 2.5 0 0 1-1.6 2.33l1.3 1.94a.75.75 0 1 1-1.25.83L10.95 13h-5.9l-1.5 2.1a.75.75 0 1 1-1.25-.83l1.3-1.94A2.5 2.5 0 0 1 2 10V4a3 3 0 0 1 3-3Zm-1 3v3h8V4a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1Zm1 5.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm6 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/></svg>';
   const BUS_GLYPH = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M4 1.5h8a2 2 0 0 1 2 2V12a1 1 0 0 1-1 1v1.25a.75.75 0 0 1-1.5 0V13h-7v1.25a.75.75 0 0 1-1.5 0V13a1 1 0 0 1-1-1V3.5a2 2 0 0 1 2-2Zm0 2v4h8v-4Zm.75 6.25a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm6.5 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/></svg>';
 
   function escapeHtml(value) {
@@ -24,6 +26,7 @@ const TransportLayer = (() => {
   function lineColor(mode, color) {
     if (mode === "metro") return color || METRO_FALLBACK;
     if (mode === "tram") return color || TRAM_COLOR;
+    if (mode === "rail") return color || RAIL_COLOR;
     return BUS_COLOR;
   }
 
@@ -38,6 +41,7 @@ const TransportLayer = (() => {
   function lineStyle(mode, color) {
     if (mode === "metro") return {color: lineColor(mode, color), weight: 5, opacity: 0.9};
     if (mode === "tram") return {color: lineColor(mode, color), weight: 3.5, opacity: 0.8};
+    if (mode === "rail") return {color: lineColor(mode, color), weight: 4, opacity: 0.7, dashArray: "10 4"};
     return {color: BUS_COLOR, weight: 2, opacity: 0.4};
   }
 
@@ -73,6 +77,9 @@ const TransportLayer = (() => {
   /** Marker HTML: M roundel with line letters for stations, glyph squares for stops. */
   function stopIconHtml(props, highlighted = false) {
     const near = highlighted ? " tl-near" : "";
+    if (props.transport_type === "rail") {
+      return `<span class="tl-station tl-rail${near}"><span class="tl-roundel tl-train">${TRAIN_GLYPH}</span>${lineChips(props.routes)}</span>`;
+    }
     if (props.kind === "station" || props.transport_type === "metro") {
       return `<span class="tl-station${near}"><span class="tl-roundel">M</span>${lineChips(props.routes)}</span>`;
     }
@@ -123,7 +130,7 @@ const TransportLayer = (() => {
   /** Footnote on what the times are. */
   function realtimeNote(data) {
     const status = data?.realtime?.status;
-    if (status === "live") return "<span class=\"tl-live-dot\" aria-hidden=\"true\"></span> = previsione in tempo reale (Atac, Roma TPL); gli altri orari sono programmati.";
+    if (status === "live") return "<span class=\"tl-live-dot\" aria-hidden=\"true\"></span> = previsione in tempo reale (Atac, Roma TPL); gli altri orari, treni inclusi, sono programmati.";
     if (status === "stale") return "Tempo reale non aggiornato: mostro solo orari programmati.";
     return "Orari programmati, non in tempo reale.";
   }
@@ -132,20 +139,25 @@ const TransportLayer = (() => {
   function departuresHtml(data) {
     if (!data || data.availability !== "available") return '<p class="tl-dep-note">Orari non disponibili.</p>';
     if (!data.departures.length) return `${alertsHtml(data.alerts)}<p class="tl-dep-note">Nessuna corsa programmata qui.</p>`;
-    const rows = data.departures.map(d => {
+    // Busy stations list many destinations: keep those with trips left, soonest first.
+    const pending = data.departures.filter(d => d.times.length || d.realtime?.length);
+    const shownDepartures = (pending.length ? pending : data.departures.slice(0, 1)).slice(0, 8);
+    const hidden = data.departures.length - shownDepartures.length;
+    const rows = shownDepartures.map(d => {
       const shown = directionTimes(d);
       const times = shown.text;
       const towards = d.headsign ? ` → ${escapeHtml(d.headsign)}` : "";
       return `<li><span class="tl-chip" style="--line-color:${escapeHtml(lineColor(d.mode, d.color))}">${escapeHtml(d.code)}</span>${towards}<br><span class="tl-dep-times${shown.live ? " live" : ""}">${shown.live ? '<span class="tl-live-dot" aria-label="tempo reale"></span>' : ""}${escapeHtml(times)}</span>${shown.scheduled ? `<br><span class="tl-dep-scheduled">orario: ${escapeHtml(shown.scheduled)}</span>` : ""}</li>`;
     }).join("");
     const shownRoutes = new Set(data.departures.map(d => d.route_id));
-    return `${alertsHtml(data.alerts, shownRoutes)}<ul class="tl-departures">${rows}</ul><p class="tl-dep-note">${realtimeNote(data)} Aggiornato alle ${escapeHtml(data.now)}.</p>`;
+    const more = hidden > 0 ? `<p class="tl-dep-note">${hidden === 1 ? "1 altra destinazione" : `${hidden} altre destinazioni`} senza corse a breve non ${hidden === 1 ? "mostrata" : "mostrate"}.</p>` : "";
+    return `${alertsHtml(data.alerts, shownRoutes)}<ul class="tl-departures">${rows}</ul>${more}<p class="tl-dep-note">${realtimeNote(data)} Aggiornato alle ${escapeHtml(data.now)}.</p>`;
   }
 
   function popupHtml(props, departures = null) {
-    const kind = props.kind === "station" || props.transport_type === "metro" ? "Stazione metro" : props.transport_type === "tram" ? "Fermata tram" : "Fermata autobus";
+    const kind = props.transport_type === "rail" ? "Stazione ferroviaria" : props.kind === "station" || props.transport_type === "metro" ? "Stazione metro" : props.transport_type === "tram" ? "Fermata tram" : "Fermata autobus";
     const code = props.code ? ` · ${escapeHtml(props.code)}` : "";
-    return `<strong>${escapeHtml(props.name)}</strong><br><span class="tl-popup-kind">${kind}${code}</span><div class="tl-popup-lines">${lineChips(props.routes)}</div><div class="tl-dep">${departures ?? "Carico i prossimi passaggi…"}</div><small>${escapeHtml(wheelchairText(props.wheelchair_boarding))}<br>Linee in servizio oggi · Roma Servizi per la Mobilità</small>`;
+    return `<strong>${escapeHtml(props.name)}</strong><br><span class="tl-popup-kind">${kind}${code}</span><div class="tl-popup-lines">${lineChips(props.routes)}</div><div class="tl-dep">${departures ?? "Carico i prossimi passaggi…"}</div><small>${escapeHtml(wheelchairText(props.wheelchair_boarding))}<br>Linee in servizio oggi · ${props.transport_type === "rail" ? "Trenitalia (NeTEx, NAP nazionale)" : "Roma Servizi per la Mobilità"}</small>`;
   }
 
   /** Status line for the transport panel. */
@@ -199,7 +211,7 @@ const TransportLayer = (() => {
         const geometry = feature.geometry;
         if (geometry.type === "Point") {
           const [lng, lat] = geometry.coordinates;
-          const station = props.kind === "station" || props.transport_type === "metro";
+          const station = props.kind === "station" || props.transport_type === "metro" || props.transport_type === "rail";
           const ids = props.stop_ids || [props.stop_id];
           const near = Boolean(focused && ids.some(id => focused.stopIds.has(id)));
           L.marker([lat, lng], {
@@ -223,7 +235,7 @@ const TransportLayer = (() => {
               html: `<span class="tl-line-label" style="--line-color:${escapeHtml(style.color)}">${escapeHtml(props.code || props.name)}</span>`})}).addTo(layer);
           }
           L.geoJSON(geometry, {style, interactive: true})
-            .bindPopup(`<strong>${escapeHtml(props.transport_type === "metro" ? "Metro" : props.transport_type === "tram" ? "Tram" : "Autobus")} ${escapeHtml(props.code || props.name)}</strong><br><small>Percorso programmato · Roma Servizi per la Mobilità</small>`)
+            .bindPopup(`<strong>${escapeHtml({metro: "Metro", rail: "Treno", tram: "Tram"}[props.transport_type] || "Autobus")} ${escapeHtml(props.code || props.name)}</strong><br><small>Percorso programmato · Roma Servizi per la Mobilità</small>`)
             .on("popupopen", () => { popupOpen = true; })
             .on("popupclose", releasePopup)
             .addTo(layer);

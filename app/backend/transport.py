@@ -25,9 +25,14 @@ ROOT = Path(
         "EGI_TRANSPORT_ROOT", Path(__file__).resolve().parents[3] / ".local/transport"
     )
 )
+# Trenitalia rail (NeTEx from the NAP) is a second runtime in the same format.
+RAIL_ROOT = Path(
+    os.environ.get("EGI_RAIL_ROOT", Path(__file__).resolve().parents[3] / ".local/rail")
+)
+ROOTS = (ROOT, RAIL_ROOT)
 
 
-FORMAT = "egi-transport/5"
+FORMAT = "egi-transport/6"
 FULL_DETAIL_ZOOM = 17
 # Twice the 6 h schedule plus slack: older means the poller stopped running.
 STALE_AFTER = timedelta(hours=24)
@@ -42,7 +47,7 @@ class ActiveNetwork(NamedTuple):
     network: dict
 
 
-@lru_cache(maxsize=2)
+@lru_cache(maxsize=4)
 def read_network(root: str, version: str) -> dict:
     """Cache immutable networks (active and pending); a new version is a new key."""
     if not VERSION.fullmatch(version):
@@ -104,9 +109,9 @@ def intersects(a: list, b: list) -> bool:
     return a[0] <= b[2] and a[2] >= b[0] and a[1] <= b[3] and a[3] >= b[1]
 
 
-LINE_MIN_ZOOM = {"metro": 0, "tram": 12, "bus": 13}
-STOP_MIN_ZOOM = {"metro": 13, "tram": 14, "bus": 14}
-MODE_ORDER = {"metro": 0, "tram": 1, "bus": 2}
+LINE_MIN_ZOOM = {"metro": 0, "rail": 0, "tram": 12, "bus": 13}
+STOP_MIN_ZOOM = {"metro": 13, "rail": 12, "tram": 14, "bus": 14}
+MODE_ORDER = {"metro": 0, "rail": 1, "tram": 2, "bus": 3}
 STATION_RADIUS_M = 150
 
 
@@ -272,3 +277,17 @@ def transport_view(
     except (OSError, ValueError, KeyError, TypeError):
         result.update(availability="unavailable", features=[])
         return result
+
+
+def transport_view_all(bbox, zoom, modes, roots=ROOTS, day=None, routes=None) -> dict:
+    """transport_view over several runtimes; status fields come from the first source."""
+    results = [transport_view(bbox, zoom, modes, root, day, routes) for root in roots]
+    merged = dict(results[0])
+    merged["features"] = [f for r in results for f in r["features"]]
+    merged["sources"] = [
+        {"availability": r["availability"], "source_url": (r.get("manifest") or {}).get("source_url"), "refresh": r.get("refresh")}
+        for r in results
+    ]
+    if merged["availability"] != "available" and any(r["availability"] == "available" for r in results):
+        merged["availability"] = "available"
+    return merged

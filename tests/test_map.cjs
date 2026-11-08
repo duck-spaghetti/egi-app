@@ -130,7 +130,7 @@ vm.runInContext(`
   if(rendered.at(-1).length<2) throw Error('clearing focus does not restore all sites');
   renderMarkers=realRender;
   const dep=TransportLayer.departuresHtml({availability:'available',now:'07:50',departures:[{code:'49',mode:'bus',headsign:'<Termini>',times:[{time:'08:00',in_min:10},{time:'09:15',in_min:85}]},{code:'8',mode:'tram',headsign:'',times:[]}]});
-  if(!dep.includes('08:00 (tra 10 min)') || !dep.includes('09:15') || dep.includes('(tra 85') || !dep.includes('nessun’altra corsa oggi') || dep.includes('<Termini>') || !dep.includes('non in tempo reale')) throw Error('departures popup wrong');
+  if(!dep.includes('08:00 (tra 10 min)') || !dep.includes('09:15') || dep.includes('(tra 85') || !dep.includes('1 altra destinazione') || dep.includes('<Termini>') || !dep.includes('non in tempo reale')) throw Error('departures popup wrong');
   if(TransportLayer.timeText({time:'21:57',in_min:0})!=='21:57 (in partenza)') throw Error('departing-now wording');
   const filled=TransportLayer.popupHtml({kind:'station',name:'Termini',routes:[]},'<ul class="tl-departures"></ul>');
   if(filled.includes('Carico') || !filled.includes('tl-departures') || !TransportLayer.popupHtml({kind:'station',name:'T',routes:[]}).includes('Carico')) throw Error('popup departures slot wrong');
@@ -154,8 +154,17 @@ vm.runInContext(`
   if(CycleLayer.style('separated').dashArray || !CycleLayer.style('lane').dashArray || CycleLayer.style('unknown')!==CycleLayer.style('path')) throw Error('cycle styles wrong');
   if(CycleLayer.popupHtml({label:'Corsia ciclabile',name:'<x>',surface:'asphalt',oneway:true}).includes('<x>') || !CycleLayer.popupHtml({label:'Corsia',name:''}).includes('OpenStreetMap')) throw Error('cycle popup escaping/attribution');
   if(!CycleLayer.statusText({availability:'available',min_zoom:12,features:[]},11).includes('zoom 12')) throw Error('cycle zoom hint missing');
+  const manyTrains=Array.from({length:12},(_,i)=>({code:'FR',mode:'rail',headsign:'D'+i,times:i<3?[{time:'22:3'+i,in_min:10+i}]:[],realtime:[]}));
+  const busy=TransportLayer.departuresHtml({availability:'available',now:'22:20',departures:manyTrains,alerts:[]});
+  if((busy.match(/<li>/g)||[]).length!==3 || !busy.includes('9 altre destinazioni')) throw Error('busy station not trimmed');
+  const railIcon=TransportLayer.stopIconHtml({kind:'stop',transport_type:'rail',name:'ROMA TUSCOLANA',routes:[{mode:'rail',display_code:'REG',color:'#00704A'}]});
+  if(!railIcon.includes('tl-rail') || !railIcon.includes('>REG<')) throw Error('rail station icon missing');
+  if(!TransportLayer.popupHtml({kind:'stop',transport_type:'rail',name:'X',routes:[]}).includes('Stazione ferroviaria') || !TransportLayer.popupHtml({kind:'stop',transport_type:'rail',name:'X',routes:[]}).includes('Trenitalia')) throw Error('rail popup kind or source');
+  if(!TransportLayer.lineStyle('rail','#00704A').dashArray || TransportLayer.lineColor('rail',null)!=='#00704A') throw Error('rail line style');
+  const railBadge=(()=>{ const p=make('rb','Mensa',[12.5,41.9],1,'Mensa',7,false); p.place_id='place-r'; state.transitByPlace={'place-r':{metro:null,rail:row('REG','rail',6,{stop_name:'ROMA TUSCOLANA'}),surface:row('49','bus',2),lines:9}}; return transitBadge(p); })();
+  if(!railBadge.includes('Treno REG') || !railBadge.includes('ROMA TUSCOLANA')) throw Error('rail missing from list badge');
   // Regression: a multi-service map pin must open the service chooser (broke in F1).
   const twoAtSite=twoSiteFixture();
   openServiceChooser(twoAtSite);
 `,sandbox);
-console.log('PASS: source filters, cross-category sites, contacts, Rome hours and open-now membership/closing boundaries, transit badge and rows, transport layer, focus view, departures, realtime, cycleways');
+console.log('PASS: source filters, cross-category sites, contacts, Rome hours and open-now membership/closing boundaries, transit badge and rows, transport layer, focus view, departures, realtime, cycleways, rail');

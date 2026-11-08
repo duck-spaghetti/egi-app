@@ -209,3 +209,23 @@ def next_departures(
         ),
     )
     return result
+
+
+def next_departures_all(
+    stop_ids: list[str],
+    route_ids: set[str] | None,
+    limit: int,
+    roots,
+    now: datetime | None = None,
+) -> dict:
+    """next_departures over several runtimes; realtime status comes from the first.
+
+    Stop and route IDs of different sources do not collide in practice (Roma
+    Mobilità codes vs RFI station codes); each source simply finds only its own.
+    """
+    results = [next_departures(stop_ids, route_ids, limit, root, now) for root in roots]
+    merged = dict(results[0])
+    merged["availability"] = "available" if any(r["availability"] == "available" for r in results) else results[0]["availability"]
+    merged["departures"] = [d for r in results for d in r["departures"]]
+    merged["alerts"] = [a for r in results for a in r["alerts"]]
+    return merged
