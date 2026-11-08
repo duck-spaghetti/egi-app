@@ -76,6 +76,7 @@ vm.runInContext(`
   if(filteredPois(at('2026-11-09T14:00:00Z')).length!==4) throw Error('disabling open-now loses unknown schedules');
   const tpl=transportStatusText({availability:'available',service_date:'2026-11-08',refresh:{result:'failed',last_checked_at:'2026-11-08T18:00:00Z'},manifest:{updated_at:'2026-11-08T06:00:00Z'}});
   if(!tpl.includes('ultima versione valida') || !tpl.includes('Rete programmata')) throw Error('transport failure or schedule qualification missing');
+  if(!transportStatusText({availability:'available',service_date:'2026-11-08',refresh:{},manifest:{},refresh_stale:true}).includes('Nessun controllo automatico')) throw Error('stopped poller not reported');
   if(!transportStatusText({availability:'outside_calendar'}).includes('non contiene servizio programmato per oggi')) throw Error('expired transport feed presented as current');
   if(!transportStatusText({availability:'unavailable'}).includes('servizi EGI restano consultabili')) throw Error('transport failure obscures independent service data');
 `,sandbox);

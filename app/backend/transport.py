@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import NamedTuple
@@ -25,6 +25,8 @@ ROOT = Path(
 
 
 FORMAT = "egi-transport/1"
+# Twice the 6 h schedule plus slack: older means the poller stopped running.
+STALE_AFTER = timedelta(hours=24)
 VERSION = re.compile(r"[a-f0-9]{64}-" + re.escape(FORMAT.split("/")[1]))
 
 
@@ -75,6 +77,15 @@ def load_active(root: Path, day: str | None = None) -> ActiveNetwork:
     return ActiveNetwork(manifest, status, read_network(str(root), manifest["version"]))
 
 
+def refresh_stale(status: dict, now: datetime | None = None) -> bool:
+    """Tell whether no poll attempt was recorded within STALE_AFTER."""
+    try:
+        last = datetime.fromisoformat(status["last_attempt_at"])
+    except (KeyError, TypeError, ValueError):
+        return True
+    return (now or datetime.now(timezone.utc)) - last > STALE_AFTER
+
+
 def intersects(a: list, b: list) -> bool:
     """Test bounding-box intersection including touching edges."""
     return a[0] <= b[2] and a[2] >= b[0] and a[1] <= b[3] and a[3] >= b[1]
@@ -102,7 +113,12 @@ def transport_view(
     }
     try:
         manifest, status, network = load_active(root, today)
-        result.update(manifest=manifest, refresh=status, availability="available")
+        result.update(
+            manifest=manifest,
+            refresh=status,
+            refresh_stale=refresh_stale(status),
+            availability="available",
+        )
         active_services = set(network["service_dates"].get(today, []))
         if not active_services:
             result["availability"] = "outside_calendar"

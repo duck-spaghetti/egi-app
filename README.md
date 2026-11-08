@@ -114,7 +114,9 @@ Bus geometry is suppressed below zoom 13, and points follow the above thresholds
 The browser debounces viewport requests, cancels old requests and rechecks every
 minute. That refresh only reads local files; the importer checks upstream every
 six hours independently via launchd. Missing/expired transport is explicit and
-never prevents Helpinet loading. Failed fetches retain the last valid version.
+never prevents Helpinet loading. Failed fetches retain the last valid version. When no poll
+attempt was recorded for 24 hours the response sets `refresh_stale` and the map
+asks to check the update job.
 
 This is scheduled service with source attribution and a visible licensing
 discrepancy, not realtime arrivals or approved public data. No DB grant or schema

@@ -10,7 +10,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from app.backend.transport import load_active, read_network, transport_view
+from datetime import datetime, timedelta, timezone
+
+from app.backend.transport import (
+    load_active,
+    read_network,
+    refresh_stale,
+    transport_view,
+)
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "transport-root"
 PRODUCER = (
@@ -77,6 +84,19 @@ class TransportViewTests(unittest.TestCase):
         self.assertEqual(data["availability"], "available")
         self.assertEqual(len(data["features"]), 4)
         self.assertEqual(data["refresh"]["result"], "failed")
+
+    def test_stale_refresh_is_flagged(self):
+        """An old or missing last attempt means the scheduled poller stopped."""
+        old = self.view([12, 41, 13, 43], 14, {"metro"})
+        self.assertTrue(old["refresh_stale"])
+        now = datetime.now(timezone.utc)
+        self.assertFalse(refresh_stale({"last_attempt_at": now.isoformat()}, now))
+        self.assertTrue(
+            refresh_stale(
+                {"last_attempt_at": (now - timedelta(hours=25)).isoformat()}, now
+            )
+        )
+        self.assertTrue(refresh_stale({}, now))
 
     def test_missing_transport_is_explicit(self):
         """An absent or unreadable feed is represented separately from services."""
