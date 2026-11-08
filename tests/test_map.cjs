@@ -1,0 +1,82 @@
+/* Check recovered frontend behavior without installing a JavaScript test runtime. */
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const path = require('node:path');
+let source = fs.readFileSync(path.join(__dirname, '../app/frontend/static/js/map.js'), 'utf8');
+// Isolate pure adaptation/filter helpers; real browser bootstrap is checked separately.
+source = source.replace(/init\(\)\.catch\(\(error\) => \{[\s\S]*?\n\}\);/, '');
+const sandbox = {document:{getElementById:()=>({})}, window:{EGI_MAP_CONTEXT:{languageCode:'it'},EGI_I18N:{t:(_key,_args,fallback)=>fallback||''}}, console, URLSearchParams};
+vm.createContext(sandbox);
+vm.runInContext(source,sandbox);
+vm.runInContext(`
+  const originalId='c5cbfdcd-30e3-5e37-a40e-efb488e4a884';
+  const adapted=normalizePublicService({id:originalId,name:'Missing coordinates',place:{address:'Unknown',geometry:null},category:{id:1,slug:'cibo',label:'cibo'},data_status:'unreviewed_source_preview'});
+  if(adapted.id!==originalId || adapted.latitude!==null || adapted.longitude!==null) throw Error('source UUID or missing coordinates lost');
+  const status=listOpeningStatus(adapted);
+  if(status.isOpen!==null || status.label!=='Da verificare') throw Error('unknown hours became closed');
+  state.pois=[adapted]; state.categories=[{id:1,slug:'cibo'}]; state.filters.cats=new Set(['cibo']); state.userLoc={lat:41.9,lng:12.5};
+  const filtered=filteredPois();
+  if(filtered.length!==1 || filtered[0]._dist!==null) throw Error('missing location invented a distance');
+
+  if(normalizeCategoryIconPath('/static/assets/icons/default/eat.svg')!=='/static/assets/icons/default/eat.svg') throw Error('valid category icon rejected');
+  if(normalizeCategoryIconPath('https://evil.example/icon.svg')) throw Error('external icon accepted');
+  if(googleMapsDirectionsHref(adapted).includes('0%2C0')) throw Error('missing point became origin');
+  const make=(id,title,coords,need,type,presta,access,section='services')=>normalizePublicService({id,service_title:title,place:{address:'Roma',geometry:coords?{type:'Point',coordinates:coords}:null},category:{id:need,slug:need===1?'cibo':'ascolto'},native_classifications:{tipologia:type,prestazioni:[{id:presta,nome:'Caffè e pasti'}]},access_raw:{appuntamento:access},placement:{section},source_group:{external_key:'group-1'}});
+  const near=make('near','Zeta',[12.5,41.9],1,'Mensa',7,true);
+  const far=make('far','Alfa',[12.6,41.9],1,'Mensa',8,false);
+  const missing=make('missing','Aaa',null,1,'Mensa',7,false);
+  const remote=make('remote','Telefono',[12.5,41.9],2,'Ascolto',9,true,'directory');
+  state.pois=[missing,far,near,remote]; state.categories=[{id:1,slug:'cibo'},{id:2,slug:'ascolto'}];
+  state.filters.cats=new Set(['cibo','ascolto']); state.filters.order='distance';
+  if(filteredPois().map(p=>p.id).join(',')!=='near,far,missing,remote') throw Error('distance sorting or unknown-last broken');
+  state.filters.type='Mensa'; state.filters.prestation='7'; state.filters.access='appuntamento'; state.filters.q='caffe pasti';
+  if(filteredPois().map(p=>p.id).join(',')!=='near') throw Error('AND filters, accent folding or positive flags broken');
+  state.filters.type=''; state.filters.prestation=''; state.filters.access=''; state.filters.q='';
+  state.filters.section='needs_position';
+  if(filteredPois().map(p=>p.id).join(',')!=='missing') throw Error('missing-position section lost service');
+  state.filters.section='directory';
+  if(filteredPois().map(p=>p.id).join(',')!=='remote' || googleMapsDirectionsHref(remote)!==null) throw Error('directory eligibility or route broken');
+  state.filters.section='all'; state.filters.cats=new Set();
+  if(filteredPois().length) throw Error('empty need selection became all');
+
+  const hours=(ranges,issues=[])=>({days:[{day:'lun',label:'Lunedì',intervals:ranges.map(([a,b])=>({opens_raw:a,closes_raw:b,review_note:null})),issues}]});
+  const at=iso=>new Date(iso);
+  // Monday in winter: Europe/Rome is one hour ahead of these explicit UTC fixtures.
+  const schedule=hours([['09:00','12:00'],['11:30','18:00']]);
+  let opening=sourceOpeningStatus(schedule,at('2026-11-09T08:00:00Z'));
+  if(opening.label!=='Aperto ora') throw Error('opening boundary or overlapping ranges broken');
+  opening=sourceOpeningStatus(schedule,at('2026-11-09T14:00:00Z'));
+  if(opening.label!=='Aperto ora · chiude tra 3 h') throw Error('three-hour closing threshold broken');
+  opening=sourceOpeningStatus(schedule,at('2026-11-09T13:59:00Z'));
+  if(opening.label!=='Aperto ora') throw Error('closing countdown appeared too early');
+  opening=sourceOpeningStatus(schedule,at('2026-11-09T07:30:00Z'));
+  if(opening.label!=='Apre tra 30 min') throw Error('opening countdown broken');
+  opening=sourceOpeningStatus(schedule,at('2026-11-09T17:00:00Z'));
+  if(opening.kind!=='unknown') throw Error('closing boundary became open or falsely closed');
+  const summer=sourceOpeningStatus(hours([['09:00','18:00']]),at('2026-07-06T07:00:00Z'));
+  if(summer.kind!=='open') throw Error('Rome summer timezone ignored');
+  if(sourceOpeningStatus(hours([]),at('2026-11-09T09:00:00Z')).kind!=='unknown') throw Error('missing day became closed');
+  if(sourceOpeningStatus(hours([['22:00','02:00']],['ambiguous']),at('2026-11-09T22:00:00Z')).kind!=='unknown') throw Error('ambiguous overnight opening invented');
+  if(contactAction({type:'phone',value:'06 123456'}).label!=='06 123456' || contactAction({type:'email',value:'info@example.org'}).label!=='info@example.org') throw Error('contact values replaced by generic actions');
+  if(contactAction({type:'email',value:'info@example.org',label:'Segreteria'}).label!=='Segreteria') throw Error('explicit contact label lost');
+  const samePoint=make('same','Sportello',[12.5,41.9],2,'Ascolto',9,true);
+  const otherPoint=make('other','Altrove',[12.6,41.9],2,'Ascolto',9,true);
+  state.pois=[near,samePoint,otherPoint,missing];
+  const sites=siteGroups([near]);
+  if(sites.length!==1 || sites[0].length!==2 || !sites[0].some(p=>p.id==='same')) throw Error('cross-category siblings hidden or different point inherited');
+  if(!categoryBadge({label:'igiene_personale',icon_path:'/static/assets/icons/default/shower.svg'}).includes('Igiene Personale')) throw Error('category caption or badge icon missing');
+
+  const withHours=(id,display)=>({...near,id,raw:{...near.raw,hours_display:display}});
+  state.pois=[withHours('open',hours([['09:00','18:00']])),withHours('later',hours([['16:00','18:00']])),withHours('unknown',hours([])),withHours('ambiguous',hours([['22:00','02:00']],['verify']))];
+  state.filters.cats=new Set(['cibo']); state.filters.openNow=true;
+  if(filteredPois(at('2026-11-09T14:00:00Z')).map(p=>p.id).join(',')!=='open') throw Error('open-now filter includes upcoming/unknown/ambiguous schedules');
+  if(filteredPois(at('2026-11-09T17:00:00Z')).length!==0) throw Error('open-now filter retains services at closing boundary');
+  state.filters.openNow=false;
+  if(filteredPois(at('2026-11-09T14:00:00Z')).length!==4) throw Error('disabling open-now loses unknown schedules');
+  const tpl=transportStatusText({availability:'available',service_date:'2026-11-08',refresh:{result:'failed',last_checked_at:'2026-11-08T18:00:00Z'},manifest:{updated_at:'2026-11-08T06:00:00Z'}});
+  if(!tpl.includes('ultima versione valida') || !tpl.includes('Rete programmata')) throw Error('transport failure or schedule qualification missing');
+  if(!transportStatusText({availability:'outside_calendar'}).includes('non contiene servizio programmato per oggi')) throw Error('expired transport feed presented as current');
+  if(!transportStatusText({availability:'unavailable'}).includes('servizi EGI restano consultabili')) throw Error('transport failure obscures independent service data');
+`,sandbox);
+console.log('PASS: source filters, cross-category sites, contacts, Rome hours and open-now membership/closing boundaries');

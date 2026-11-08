@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="{{ lang or 'it' }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>{% block title %}EGI{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="/static/js/i18n.js" defer></script>
+    {% block head %}{% endblock %}
+  </head>
+  <body>
+    <div class="preview-banner" role="status">EGI v0.2 · Preview locale · Dati Helpinet non revisionati</div>
+    <style>.preview-banner{position:fixed;top:0;left:0;right:0;z-index:5000;background:#6a4611;color:#fff;text-align:center;padding:6px 10px;font:12px/1.4 system-ui;min-height:29px}.preview-note{background:#fff3d6;padding:12px;border-radius:8px;font-size:13px}.source-evidence{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.5 monospace}.list-opening.unknown{color:#79551d}#app{top:29px!important}#wizard{padding-top:45px}</style>
+    {% block body %}{% endblock %}
+  </body>
+</html>

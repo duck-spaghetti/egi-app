@@ -1,0 +1,24 @@
+{
+  "url": "http://127.0.0.1:8000/map?city_id=1&lang=it",
+  "mode": "local-unreviewed-preview",
+  "http_tests": {
+    "count": 3,
+    "exit_code": 0
+  },
+  "frontend_helper_tests": "passed",
+  "browser": {
+    "map": "visible with OpenStreetMap basemap",
+    "list_count": 315,
+    "detail": "Telefono Rosa, source UUID and original hours/provenance",
+    "native_cibo_filter_count": 46,
+    "restored_count": 315,
+    "console_errors_warnings": []
+  },
+  "runtime": {
+    "fastapi": "0.136.3",
+    "jinja2": "3.1.6",
+    "uvicorn": "0.46.0"
+  },
+  "git_changes_published": false,
+  "public_canonical_publication": false
+}

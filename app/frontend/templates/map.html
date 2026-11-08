@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+
+{% block title %}EGI — {{ city.name if city else "Mappa" }}{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css" />
+  <link rel="stylesheet" href="/static/css/map.css" />
+{% endblock %}
+
+{% block body %}
+<div id="app">
+  <div class="stage" id="stage">
+    <div id="map"></div>
+    <div class="list-view" id="list-view">
+      <div class="list-header">
+        <h2 data-i18n="map.nearby_places">Luoghi vicini</h2>
+        <div class="sub"><span id="list-count">0</span> <span data-i18n="map.results_count_label">risultati</span></div>
+        <div class="list-sort"><label for="sort-services">Ordina per</label><select id="sort-services"><option value="name">Nome del servizio</option><option value="distance">Distanza in linea d’aria</option></select><button type="button" id="pick-reference">Scegli punto sulla mappa</button></div>
+        <p class="source-note" id="reference-status">Scegli una posizione per ordinare per distanza</p>
+      </div>
+      <div id="poi-list"></div>
+    </div>
+
+    <div class="map-brand" aria-label="EGI">
+      <img src="/static/assets/icons/egi-logo.svg" alt="EGI" class="brand-logo" />
+    </div>
+    <span class="map-city-tag" id="city-label">{{ city.name if city else "Roma" }}</span>
+
+    <div class="floating-actions" aria-label="Controlli mappa">
+      <button class="nav-btn" data-sheet="filters">
+        <span class="control-icon">
+          <img src="/static/assets/icons/default/search.svg" alt="" aria-hidden="true" />
+        </span>
+        <span class="control-label" data-i18n="map.search">Cerca</span>
+      </button>
+      <button class="view-toggle" id="view-toggle" aria-label="Cambia vista" data-i18n-aria-label="map.change_view">
+        <span class="view-toggle-track" aria-hidden="true">
+          <span class="view-toggle-option view-toggle-option-map">
+            <img src="/static/assets/icons/ui/map-marker.svg" alt="" />
+            <span data-i18n="map.map_view">Mappa</span>
+          </span>
+          <span class="view-toggle-option view-toggle-option-list">
+            <img src="/static/assets/icons/ui/list.svg" alt="" />
+            <span data-i18n="map.list">Lista</span>
+          </span>
+        </span>
+        <span class="sr-only" id="view-toggle-label" data-i18n="map.list">Lista</span>
+      </button>
+      <button class="nav-btn" data-sheet="settings">
+        <span class="control-icon">
+          <img src="/static/assets/icons/ui/menu-dots.svg" alt="" aria-hidden="true" />
+        </span>
+        <span class="control-label" data-i18n="map.more">Altro</span>
+      </button>
+      <button class="nav-btn nav-btn-sos" data-sheet="sos" aria-label="SOS">
+        <span class="control-icon">
+          <img src="/static/assets/icons/ui/phone.svg" alt="" aria-hidden="true" />
+        </span>
+      </button>
+      <button class="nav-btn nav-btn-location" data-sheet="location">
+        <span class="control-icon">
+          <img src="/static/assets/icons/default/setting.svg" alt="" aria-hidden="true" />
+        </span>
+        <span class="control-label" data-i18n="map.location">Posizione</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-backdrop" id="backdrop"></div>
+
+<div class="sheet" id="sheet-sos">
+  <div class="grabber"></div>
+  <div class="sheet-head">
+    <h2 data-i18n="map.emergency_numbers">Numeri di emergenza</h2>
+    <button class="sheet-close" data-close data-i18n="common.close">Chiudi</button>
+  </div>
+  <div class="sheet-body">
+    <div class="sos-card sheet-sos-card">
+      <div class="nums">
+        <a class="sos-num primary" href="tel:112"><span>Emergenza unica europea</span><span class="num">112</span></a>
+        <a class="sos-num" href="tel:800440022"><span>Sala Operativa Sociale Roma</span><span class="num">800 440 022</span></a>
+        <a class="sos-num" href="tel:1522"><span>Antiviolenza donne</span><span class="num">1522</span></a>
+        <a class="sos-num" href="tel:114"><span>Emergenza infanzia</span><span class="num">114</span></a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="sheet-filters">
+  <div class="grabber"></div>
+  <div class="sheet-head">
+    <h2 data-i18n="map.search">Cerca</h2>
+    <button class="sheet-close" data-close data-i18n="common.close">Chiudi</button>
+  </div>
+  <div class="sheet-body">
+    <div class="filter-group service-search">
+      <label for="service-query">Cerca servizio, struttura, prestazione o indirizzo</label>
+      <input id="service-query" type="search" placeholder="Es. doccia, italiano, appuntamento…" autocomplete="off">
+      <label for="section-filter">Sezione</label>
+      <select id="section-filter"><option value="all">Tutti i servizi</option><option value="services">Servizi territoriali e da verificare</option><option value="directory">Rubrica · servizi a distanza</option><option value="needs_position">Posizione da completare</option></select>
+    </div>
+    <fieldset class="discovery-path">
+      <legend>Trova il servizio</legend>
+      <label class="open-now-filter" style="display:flex;align-items:center;gap:9px;margin:0 0 14px;font-weight:600;cursor:pointer"><input id="open-now-filter" type="checkbox" style="width:18px;height:18px;margin:0"> Aperti ora</label>
+      <p class="source-note">Secondo gli orari Helpinet. Con il filtro attivo, gli orari sconosciuti o ambigui sono esclusi.</p>
+      <div class="discovery-step"><h3>1 · Bisogno</h3><div class="cat-grid" id="cat-grid"></div></div>
+      <div class="discovery-refine">
+        <div><label for="service-type-filter">2 · Tipo di servizio</label><select id="service-type-filter"></select></div>
+        <div><label for="prestation-filter">3 · Prestazione</label><select id="prestation-filter"></select></div>
+      </div>
+      <p class="source-note">Scegli uno o più bisogni, poi affina tipo e prestazione. I punti mostrano anche gli altri servizi disponibili nella stessa posizione.</p>
+    </fieldset>
+    <div class="filter-group service-search">
+      <label for="access-filter">Indicazione di accesso o destinatario</label><select id="access-filter"></select>
+    </div>
+    <div class="filter-group">
+      <h3>Layer</h3>
+      <button class="layer-toggle" id="transport-toggle" type="button" aria-pressed="false">
+        <span class="dot"></span>
+        <span>Trasporti · metro e autobus</span>
+      </button>
+      <div id="transport-modes" class="transport-modes">
+        <label><input type="checkbox" id="transport-metro" checked> Metro</label>
+        <label><input type="checkbox" id="transport-bus" checked> Autobus</label>
+      </div>
+      <p id="transport-status" class="source-note" role="status">Verifica dati trasporti…</p>
+      <p class="source-note">Rete programmata, senza arrivi in tempo reale. Ingrandisci per vedere i percorsi bus e le fermate.
+        Fonte: <a href="https://romamobilita.it/sistemi-e-tecnologie/open-data/" target="_blank" rel="noopener">Roma Servizi per la Mobilità</a>.
+        Licenza del feed da chiarire: i cataloghi riportano CC BY-SA e CC BY 4.0. Preview locale non revisionata.</p>
+    </div>
+
+    <div class="filter-actions">
+      <button class="btn" id="reset-filters" data-i18n="map.deselect_all">Deseleziona tutto</button>
+      <button class="btn primary" id="select-all-filters" data-i18n="map.select_all">Seleziona tutto</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="sheet-location">
+  <div class="grabber"></div>
+  <div class="sheet-head">
+    <h2 data-i18n="map.your_location">La tua posizione</h2>
+    <button class="sheet-close" data-close data-i18n="common.close">Chiudi</button>
+  </div>
+  <div class="sheet-body">
+    <div class="loc-section">
+      <h3 data-i18n="map.current_status">Stato attuale</h3>
+      <div class="loc-status" id="loc-status">
+        <span class="label" data-i18n="map.position">Posizione</span>
+        <span data-i18n="map.no_position_set">Nessuna posizione impostata</span>
+      </div>
+    </div>
+
+    <div class="loc-section">
+      <h3 data-i18n="map.use_geolocation">Usa la geolocalizzazione</h3>
+      <button class="btn primary" id="geo-btn" data-i18n="map.find_my_position">Trova la mia posizione</button>
+    </div>
+
+    <div class="loc-section service-search">
+      <h3>Oppure scegli un riferimento</h3>
+      <p class="source-note">Puoi scegliere un punto dalla lista o inserire coordinate. Le distanze sono in linea d’aria.</p>
+      <button type="button" id="pick-reference-location">Scegli un punto sulla mappa</button>
+      <label for="reference-lat">Latitudine</label><input id="reference-lat" type="number" step="any" min="-90" max="90" placeholder="41.9028">
+      <label for="reference-lng">Longitudine</label><input id="reference-lng" type="number" step="any" min="-180" max="180" placeholder="12.4964">
+      <button type="button" id="apply-reference">Usa questo punto</button>
+      <button type="button" id="clear-reference">Rimuovi riferimento</button>
+      <div class="suggestions" id="suggestions"></div>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="sheet-settings">
+  <div class="grabber"></div>
+  <div class="sheet-head">
+    <h2 id="settings-title" data-i18n="map.more">Altro</h2>
+    <div class="sheet-head-actions">
+      <button class="sheet-back-head hidden" id="settings-back-head" type="button" data-i18n="common.back">
+        <span class="arrow" aria-hidden="true">←</span>
+        <span>Indietro</span>
+      </button>
+      <button class="sheet-close" data-close data-i18n="common.close">Chiudi</button>
+    </div>
+  </div>
+  <div class="sheet-body">
+    <div id="settings-main">
+      <div class="settings-section-title" data-i18n="map.preferences">Preferenze</div>
+      <div class="settings-list">
+        <div class="row" data-sub="city">
+          <div class="left">
+            <div class="icon"><img src="/static/assets/icons/default/building.svg" alt="" aria-hidden="true" /></div>
+            <div class="text">
+              <div class="name" data-i18n="map.city">Città</div>
+              <div class="desc" data-i18n="map.change_active_map">Cambia la mappa attiva</div>
+            </div>
+          </div>
+          <div class="value" id="city-value">{{ city.name if city else "Roma" }}</div>
+        </div>
+        <div class="row" data-sub="language">
+          <div class="left">
+            <div class="icon"><img src="/static/assets/icons/ui/language-exchange.svg" alt="" aria-hidden="true" /></div>
+            <div class="text">
+              <div class="name" data-i18n="map.language">Lingua</div>
+              <div class="desc" data-i18n="map.app_and_content_language">Lingua dell'app e dei contenuti</div>
+            </div>
+          </div>
+          <div class="value" id="lang-value">{{ language.code if language else "IT" }}</div>
+        </div>
+      </div>
+
+      <div class="settings-section-title" data-i18n="map.contribute">Contribuire</div>
+      <div class="settings-list">
+        <a class="row" href="/contribuisci?city_id={{ city.id if city else '' }}&lang={{ language.code if language else 'it' }}">
+          <div class="left">
+            <div class="icon"><img src="/static/assets/icons/ui/square-plus.svg" alt="" aria-hidden="true" /></div>
+            <div class="text">
+              <div class="name" data-i18n="map.add_place">Aggiungere un luogo</div>
+              <div class="desc" data-i18n="map.report_missing_service">Segnala un servizio mancante</div>
+            </div>
+          </div>
+          <div class="value">→</div>
+        </a>
+        <a class="row" href="https://github.com" target="_blank" rel="noreferrer">
+          <div class="left">
+            <div class="icon"><img src="/static/assets/icons/brands/github.svg" alt="" aria-hidden="true" /></div>
+            <div class="text">
+              <div class="name" data-i18n="map.github">GitHub</div>
+              <div class="desc" data-i18n="map.source_and_contributions">Codice sorgente e contributi</div>
+            </div>
+          </div>
+          <div class="value">↗</div>
+        </a>
+      </div>
+
+      <p><a href="/benchmark">Copertura dei dati Helpinet</a></p>
+      <div class="app-meta-block">
+        <div class="logo">
+          <img src="/static/assets/icons/egi-logo.svg" alt="EGI" class="brand-logo" />
+        </div>
+        <div class="v">v0.2 preview — {{ city.name if city else "Roma" }}</div>
+        <div style="margin-top:6px">Open source · AGPL-3.0</div>
+      </div>
+    </div>
+
+    <div class="sub-page" id="sub-language">
+      <p style="color:var(--ink-soft);font-size:13px;margin:0 0 14px" data-i18n="map.choose_language_for_content">Scegli la lingua dell'app e del dettaglio servizi.</p>
+      <div class="lang-toggle" id="lang-list"></div>
+    </div>
+
+    <div class="sub-page" id="sub-city">
+      <div class="settings-list" id="city-list"></div>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="sheet-detail">
+  <div class="grabber"></div>
+  <div class="sheet-head">
+    <h2 data-i18n="map.detail">Dettaglio</h2>
+    <button class="sheet-close" data-close data-i18n="common.close">Chiudi</button>
+  </div>
+  <div class="sheet-body" id="detail-body"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  window.EGI_MAP_CONTEXT = {
+    cityId: {{ city.id if city else 'null' }},
+    cityName: {{ city.name|tojson if city else '"Roma"' }},
+    latitude: {{ city.center_lat if city else '41.9028' }},
+    longitude: {{ city.center_lng if city else '12.4964' }},
+    zoom: {{ city.default_zoom if city else '12' }},
+    boundsNorth: {{ city.bbox_north if city else '41.991' }},
+    boundsSouth: {{ city.bbox_south if city else '41.800' }},
+    boundsEast: {{ city.bbox_east if city else '12.650' }},
+    boundsWest: {{ city.bbox_west if city else '12.350' }},
+    languageCode: {{ language.code|tojson if language else '"IT"' }}
+  };
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<script src="/static/js/map.js" defer></script>
+{% endblock %}

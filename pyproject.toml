@@ -1,0 +1,10 @@
+[project]
+name = "egi-app"
+version = "0.1.0"
+description = "Local EGI preview of imported, unreviewed Helpinet evidence"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.136.1,<0.137.0",
+    "jinja2>=3.1.6,<4.0.0",
+    "uvicorn>=0.46.0,<0.47.0",
+]
