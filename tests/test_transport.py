@@ -16,6 +16,7 @@ from app.backend.transport import (
     load_active,
     read_network,
     refresh_stale,
+    route_geometry,
     transport_view,
 )
 
@@ -104,6 +105,19 @@ class TransportViewTests(unittest.TestCase):
         data = self.view([12, 41, 13, 43], 14, {"metro"})
         self.assertEqual(data["availability"], "unavailable")
         self.assertEqual(data["features"], [])
+
+    def test_route_detail_follows_zoom(self):
+        """Simplified levels are served below FULL_DETAIL_ZOOM, full geometry above."""
+        feature = {
+            "geometry": {"type": "LineString", "coordinates": [[0, 0], [1, 1], [2, 0]]},
+            "simplified": {"11": [[0, 0], [2, 0]], "13": [[0, 0], [1, 1], [2, 0]]},
+        }
+        self.assertEqual(route_geometry(feature, 12)["coordinates"], [[0, 0], [2, 0]])
+        self.assertEqual(len(route_geometry(feature, 14)["coordinates"]), 3)
+        self.assertIs(route_geometry(feature, 17), feature["geometry"])
+        self.assertIs(route_geometry({"geometry": feature["geometry"]}, 11), feature["geometry"])
+        served = self.view([12, 41, 13, 43], 14, {"bus"})["features"]
+        self.assertTrue(all("simplified" not in f for f in served))
 
     def test_unknown_format_is_rejected(self):
         """A newer importer format is unavailable rather than misread."""

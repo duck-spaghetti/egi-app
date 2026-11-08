@@ -24,7 +24,8 @@ ROOT = Path(
 )
 
 
-FORMAT = "egi-transport/1"
+FORMAT = "egi-transport/2"
+FULL_DETAIL_ZOOM = 17
 # Twice the 6 h schedule plus slack: older means the poller stopped running.
 STALE_AFTER = timedelta(hours=24)
 VERSION = re.compile(r"[a-f0-9]{64}-" + re.escape(FORMAT.split("/")[1]))
@@ -86,6 +87,15 @@ def refresh_stale(status: dict, now: datetime | None = None) -> bool:
     return (now or datetime.now(timezone.utc)) - last > STALE_AFTER
 
 
+def route_geometry(feature: dict, zoom: int) -> dict:
+    """Pick the coarsest detail level made for this zoom; full geometry from FULL_DETAIL_ZOOM."""
+    levels = feature.get("simplified", {})
+    usable = [int(z) for z in levels if int(z) <= zoom]
+    if zoom >= FULL_DETAIL_ZOOM or not usable:
+        return feature["geometry"]
+    return {"type": "LineString", "coordinates": levels[str(max(usable))]}
+
+
 def intersects(a: list, b: list) -> bool:
     """Test bounding-box intersection including touching edges."""
     return a[0] <= b[2] and a[2] >= b[0] and a[1] <= b[3] and a[3] >= b[1]
@@ -134,6 +144,7 @@ def transport_view(
                 if not active_services.intersection(props["service_ids"]):
                     continue
                 public = {k: v for k, v in props.items() if k != "service_ids"}
+                geometry = route_geometry(feature, zoom)
             else:
                 memberships = []
                 for route_id, services in props["services_by_route"].items():
@@ -148,6 +159,7 @@ def transport_view(
                 if not memberships:
                     continue
                 public = {k: v for k, v in props.items() if k != "services_by_route"}
+                geometry = feature["geometry"]
                 public["routes"] = memberships
                 public["transport_type"] = (
                     "metro" if any(r["mode"] == "metro" for r in memberships) else "bus"
@@ -156,7 +168,7 @@ def transport_view(
                 {
                     "type": "Feature",
                     "id": feature["id"],
-                    "geometry": feature["geometry"],
+                    "geometry": geometry,
                     "properties": public,
                 }
             )

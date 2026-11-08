@@ -109,7 +109,9 @@ Only `load_active` in `app/backend/transport.py` knows that layout; it follows
 the copy still matches the producer's.
 Parameters: west/south/east/north (WGS84 bbox), zoom (0–19), modes (`metro,bus`,
 `metro` or `bus`). It returns GeoJSON plus active-version and refresh metadata.
-Bounding boxes select intersecting route shapes; full source shapes are retained.
+Bounding boxes select intersecting route shapes. Below zoom 17 the response uses the
+importer's simplified levels (50 m from zoom 11, 12 m from 13, 3 m from 15); full
+source shapes from zoom 17. Responses over 1 KB are gzip-compressed (level 5).
 Bus geometry is suppressed below zoom 13, and points follow the above thresholds.
 The browser debounces viewport requests, cancels old requests and rechecks every
 minute. That refresh only reads local files; the importer checks upstream every

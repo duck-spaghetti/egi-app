@@ -10,6 +10,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .preview import AREA, LANGUAGES, categories, services
@@ -23,6 +24,8 @@ app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=["127.0.0.1", "localhost", "[::1]", "testserver"],
 )
+# Transport GeoJSON and the service list are megabytes of repetitive JSON.
+app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
 app.mount("/static", StaticFiles(directory=ROOT / "app/frontend/static"), name="static")
 app.mount(
     "/translations", StaticFiles(directory=ROOT / "translations"), name="translations"
