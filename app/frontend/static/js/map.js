@@ -293,7 +293,7 @@ function renderFilters() {
 
 /* "Vicino a": lines near a service's place (see app/backend/transit_nearby.py). */
 const TRANSIT_STOPS_SHOWN = 4;
-const TRANSIT_NOTE = "Tempi a piedi stimati in linea d’aria (+30%, 4 km/h). Linee, orari, previsioni e avvisi: Roma Servizi per la Mobilità. Le corse soppresse non sono indicate. Accessibilità indicata solo dove la fonte la dichiara.";
+const TRANSIT_NOTE = "Tempi a piedi stimati in linea d’aria (+30%, 4 km/h). Bus, metro e tram: Roma Servizi per la Mobilità; treni: Trenitalia (NeTEx, NAP nazionale); ferrovie senza orari: © OpenStreetMap contributors (ODbL 1.0), servizio odierno non verificato. Le corse soppresse non sono indicate. Accessibilità indicata solo dove la fonte la dichiara.";
 
 async function loadTransitSummaries() {
   try {
@@ -342,6 +342,7 @@ function modeName(mode) {
 }
 
 function transitNext(row) {
+  if (row.untimed) return `<span class="transit-next">${TransportLayer.UNTIMED_NOTE}</span>`;
   return (row.next || []).map(direction => {
     const shown = TransportLayer.directionTimes(direction);
     const live = shown.live ? '<span class="tl-live-dot" aria-label="tempo reale"></span>' : "";
@@ -368,7 +369,7 @@ function transitStopGroup(group, index, alerts = []) {
   const metro = group.modes.includes("metro");
   const rail = group.modes.includes("rail");
   const place = metro ? "Stazione" : rail ? "Stazione ferroviaria" : group.modes.length === 1 && group.modes[0] === "tram" ? "Fermata tram" : "Fermata";
-  const icon = metro ? '<span class="tl-roundel">M</span>' : rail ? '<span class="tl-roundel tl-train">FS</span>' : group.modes[0] === "tram" ? '<span class="tl-stop tl-tram">T</span>' : '<span class="tl-stop tl-bus">Bus</span>';
+  const icon = metro ? '<span class="tl-roundel">M</span>' : rail ? `<span class="tl-roundel tl-train">${TransportLayer.TRAIN_GLYPH}</span>` : group.modes[0] === "tram" ? '<span class="tl-stop tl-tram">T</span>' : '<span class="tl-stop tl-bus">Bus</span>';
   const wheelchair = group.wheelchair === "yes" ? ` · <span class="wheelchair-tag">accessibile in sedia a rotelle</span>` : group.wheelchair === "no" ? " · non accessibile in sedia a rotelle" : "";
   const count = group.lines.length;
   return `<li class="transit-stop-group"><div class="transit-stop-head"><span class="transit-stop-icon">${icon}</span><span class="transit-text"><span class="transit-stop">${place} ${escapeHtml(group.stop_name)}</span><span class="transit-meta">circa ${group.walk_min} min a piedi · ${group.distance_m} m in linea d’aria · ${count} ${count === 1 ? "linea" : "linee"}${wheelchair}</span></span><button type="button" class="transit-row-focus" data-focus-stop="${index}" aria-label="Mostra sulla mappa le linee di ${escapeHtml(group.stop_name)}">Mostra linee</button></div>${TransportLayer.alertsHtml(stopAlerts(group, alerts), new Set(group.lines.map(line => line.route_id)))}<ul class="transit-lines">${group.lines.map(transitLine).join("")}</ul></li>`;
@@ -382,7 +383,7 @@ function renderTransitRows(data) {
   }
   const lines = data.lines || [];
   const stops = data.stops || [];
-  if (!lines.length) return `${head}<p>Nessuna linea metro, treno, tram o autobus in servizio oggi entro 500 m (metro e treni entro 800 m).</p><p class="source-note">${TRANSIT_NOTE}</p>`;
+  if (!lines.length) return `${head}<p>Nessuna linea con fermate nei dati disponibili entro 500 m (metro e treni entro 800 m).</p><p class="source-note">${TRANSIT_NOTE}</p>`;
   const alerts = data.alerts || [];
   const shown = stops.slice(0, TRANSIT_STOPS_SHOWN).map((g, i) => transitStopGroup(g, i, alerts)).join("");
   const rest = stops.slice(TRANSIT_STOPS_SHOWN);

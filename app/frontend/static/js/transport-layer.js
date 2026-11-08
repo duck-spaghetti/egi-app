@@ -13,6 +13,7 @@ const TransportLayer = (() => {
   const RAIL_COLOR = "#00704A";
   const TRAM_COLOR = "#7a4fa0";
   const BUS_COLOR = "#3d4a5c";
+  const UNTIMED_NOTE = "Orari non disponibili come dati aperti (OpenStreetMap).";
   const METRO_FALLBACK = "#355c7d";
   // Distinct, dark enough for white text; used when single lines are focused (F2).
   const LINE_PALETTE = ["#b2182b", "#2166ac", "#1b7837", "#762a83", "#b35806", "#01665e", "#8c510a", "#c51b7d", "#4d4d4d", "#35978f"];
@@ -157,18 +158,28 @@ const TransportLayer = (() => {
   function popupHtml(props, departures = null) {
     const kind = props.transport_type === "rail" ? "Stazione ferroviaria" : props.kind === "station" || props.transport_type === "metro" ? "Stazione metro" : props.transport_type === "tram" ? "Fermata tram" : "Fermata autobus";
     const code = props.code ? ` · ${escapeHtml(props.code)}` : "";
-    return `<strong>${escapeHtml(props.name)}</strong><br><span class="tl-popup-kind">${kind}${code}</span><div class="tl-popup-lines">${lineChips(props.routes)}</div><div class="tl-dep">${departures ?? "Carico i prossimi passaggi…"}</div><small>${escapeHtml(wheelchairText(props.wheelchair_boarding))}<br>Linee in servizio oggi · ${props.transport_type === "rail" ? "Trenitalia (NeTEx, NAP nazionale)" : "Roma Servizi per la Mobilità"}</small>`;
+    const times = props.untimed ? `<p class="tl-dep-note">${UNTIMED_NOTE}</p>` : departures ?? "Carico i prossimi passaggi…";
+    const source = props.untimed ? "Rete da © OpenStreetMap contributors (ODbL 1.0) · servizio odierno non verificato" : `Linee in servizio oggi · ${props.transport_type === "rail" ? "Trenitalia (NeTEx, NAP nazionale)" : "Roma Servizi per la Mobilità"}`;
+    return `<strong>${escapeHtml(props.name)}</strong><br><span class="tl-popup-kind">${kind}${code}</span><div class="tl-popup-lines">${lineChips(props.routes)}</div><div class="tl-dep">${times}</div><small>${escapeHtml(wheelchairText(props.wheelchair_boarding))}<br>${source}</small>`;
+  }
+
+  /** Attribute route geometry without presenting OSM as a scheduled service. */
+  function routePopupHtml(props) {
+    const source = props.untimed ? `© OpenStreetMap contributors (ODbL 1.0) · ${UNTIMED_NOTE}` : `Percorso programmato · ${props.transport_type === "rail" ? "Trenitalia (NeTEx, NAP nazionale)" : "Roma Servizi per la Mobilità"}`;
+    return `<strong>${escapeHtml({metro: "Metro", rail: "Treno", tram: "Tram"}[props.transport_type] || "Autobus")} ${escapeHtml(props.code || props.name)}</strong><br><small>${source}</small>`;
   }
 
   /** Status line for the transport panel. */
   function statusText(data) {
     if (data.availability === "unavailable") return "Dati trasporti non disponibili. Nuovo controllo automatico; i servizi EGI restano consultabili.";
     if (data.availability === "outside_calendar") return "Il feed disponibile non contiene servizio programmato per oggi. In attesa di aggiornamento.";
+    const osm = data.osm_rail?.availability === "available" ? " Ferrovie aggiuntive: © OpenStreetMap contributors (ODbL 1.0), senza orari; servizio odierno non verificato." : "";
+    if (osm && !(data.sources || []).some(s => !s.untimed && s.availability === "available")) return osm.trim();
     const format = value => value ? new Date(value).toLocaleString("it-IT", {timeZone:"Europe/Rome"}) : "non disponibile";
     const refresh = data.refresh || {};
     let warning = refresh.result === "failed" ? " Ultimo tentativo fallito: uso l’ultima versione valida." : "";
     if (data.refresh_stale) warning += " Nessun controllo automatico nelle ultime 24 ore: verificare il job di aggiornamento.";
-    return `Rete programmata per ${data.service_date}. Ultimo controllo riuscito: ${format(refresh.last_checked_at)}. Dati aggiornati: ${format(data.manifest?.updated_at)}.${warning}`;
+    return `Rete programmata per ${data.service_date}. Ultimo controllo riuscito: ${format(refresh.last_checked_at)}. Dati aggiornati: ${format(data.manifest?.updated_at)}.${warning}${osm}`;
   }
 
   /** Query for the viewport, or null while the map has no usable size or bounds. */
@@ -222,7 +233,7 @@ const TransportLayer = (() => {
           }).bindPopup(popupHtml(props), {maxWidth: 280})
             .on("popupopen", event => {
               popupOpen = true;
-              loadDepartures(event.popup, ids, props);
+              if (!props.untimed) loadDepartures(event.popup, ids, props);
             })
             .on("popupclose", releasePopup)
             .addTo(layer);
@@ -235,7 +246,7 @@ const TransportLayer = (() => {
               html: `<span class="tl-line-label" style="--line-color:${escapeHtml(style.color)}">${escapeHtml(props.code || props.name)}</span>`})}).addTo(layer);
           }
           L.geoJSON(geometry, {style, interactive: true})
-            .bindPopup(`<strong>${escapeHtml({metro: "Metro", rail: "Treno", tram: "Tram"}[props.transport_type] || "Autobus")} ${escapeHtml(props.code || props.name)}</strong><br><small>Percorso programmato · Roma Servizi per la Mobilità</small>`)
+            .bindPopup(routePopupHtml(props))
             .on("popupopen", () => { popupOpen = true; })
             .on("popupclose", releasePopup)
             .addTo(layer);
@@ -354,5 +365,5 @@ const TransportLayer = (() => {
     return {setVisible, isVisible: () => visible, reload: load, focus, clearFocus, focusedRoutes: () => focused?.routeIds || null};
   }
 
-  return {directionTimes, realtimeText, alertsHtml, realtimeNote, create, statusText, viewportQuery, lineStyle, focusLineStyle, lineLabelPoint, colorForLine, stopIconHtml, popupHtml, lineColor, departuresHtml, timeText, wheelchairText};
+  return {TRAIN_GLYPH, UNTIMED_NOTE, routePopupHtml, directionTimes, realtimeText, alertsHtml, realtimeNote, create, statusText, viewportQuery, lineStyle, focusLineStyle, lineLabelPoint, colorForLine, stopIconHtml, popupHtml, lineColor, departuresHtml, timeText, wheelchairText};
 })();

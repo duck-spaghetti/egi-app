@@ -205,6 +205,9 @@ class EndpointTests(unittest.TestCase):
         root_patch = patch.object(main, "TRANSPORT_ROOTS", (FIXTURE,))
         root_patch.start()
         self.addCleanup(root_patch.stop)
+        osm_patch = patch.object(main, "OSM_RAIL_ROOT", FIXTURE / "no-osm-runtime")
+        osm_patch.start()
+        self.addCleanup(osm_patch.stop)
 
     def test_list_and_detail_shapes(self):
         """Summary covers located places only; unknown place is 404."""

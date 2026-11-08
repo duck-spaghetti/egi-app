@@ -17,9 +17,10 @@ from .preview import AREA, LANGUAGES, categories, services
 from .presentation import coverage
 from .subjects import PostgresSubjectSource, SubjectSource, SubjectSourceUnavailable
 from .transport import ROOTS as TRANSPORT_ROOTS, transport_view_all
-from .transit_nearby import group_by_stop, lines_near_places_all, summary as transit_summary
+from .transit_nearby import group_by_stop, line_sort_key, lines_near_places_all, summary as transit_summary
 from .departures import next_departures_all
 from .cycleways import cycleways_view
+from .osm_rail import ROOT as OSM_RAIL_ROOT, nearby_places as osm_nearby_places, rail_view as osm_rail_view
 
 ROOT = Path(__file__).resolve().parents[2]
 app = FastAPI(title="EGI v0.2 — local source preview", version="0.2.0")
@@ -125,7 +126,7 @@ def preview_transport(
     modes: str = "metro,rail,tram,bus",
     routes: str | None = Query(default=None, max_length=2000),
 ):
-    """Return source-scheduled metro/tram/bus features independently of service data.
+    """Return scheduled transport and explicitly untimed OSM rail independently of services.
 
     routes (comma-separated route_ids, at most 80) switches to the focus view:
     only those lines, whole, with their stops.
@@ -136,7 +137,15 @@ def preview_transport(
     focus = {r for r in routes.split(",") if r} if routes is not None else None
     if focus is not None and not 0 < len(focus) <= 80:
         raise HTTPException(422, "Elenco linee non valido")
-    return transport_view_all([west, south, east, north], zoom, selected, TRANSPORT_ROOTS, routes=focus)
+    bbox = [west, south, east, north]
+    result = transport_view_all(bbox, zoom, selected, TRANSPORT_ROOTS, routes=focus)
+    osm = osm_rail_view(bbox, zoom, selected, focus, OSM_RAIL_ROOT)
+    result["features"].extend(osm["features"])
+    result["sources"].append({k: v for k, v in osm.items() if k != "features"})
+    result["osm_rail"] = {k: v for k, v in osm.items() if k != "features"}
+    if osm["availability"] == "available":
+        result["availability"] = "available"
+    return result
 
 
 def place_points(rows: list[dict[str, Any]]) -> dict[str, tuple[float, float]]:
@@ -153,9 +162,22 @@ def place_points(rows: list[dict[str, Any]]) -> dict[str, tuple[float, float]]:
 
 @app.get("/api/preview/transit/places")
 def transit_places(rows: list[dict[str, Any]] = Depends(subjects)):
-    """List badge for every located place: nearest metro and bus line, line count."""
-    result = lines_near_places_all(place_points(rows), TRANSPORT_ROOTS)
+    """List badges for located places, including explicitly untimed nearby rail."""
+    result = nearby_transit(place_points(rows))
     result["places"] = {k: transit_summary(v) for k, v in result["places"].items()}
+    return result
+
+
+def nearby_transit(points: dict[str, tuple[float, float]]) -> dict:
+    """Merge timed nearby lines with OSM station rows, preserving source availability."""
+    result = lines_near_places_all(points, TRANSPORT_ROOTS)
+    osm = osm_nearby_places(points, OSM_RAIL_ROOT)
+    result["sources"].append({k: v for k, v in osm.items() if k not in {"places", "method"}})
+    if osm["availability"] == "available":
+        result["availability"] = "available"
+    for place_id, rows in osm["places"].items():
+        result["places"].setdefault(place_id, []).extend(rows)
+        result["places"][place_id].sort(key=line_sort_key)
     return result
 
 
@@ -181,16 +203,17 @@ def upcoming_directions(directions: list[dict]) -> list[dict]:
 
 @app.get("/api/preview/transit/places/{place_id}")
 def transit_place(place_id: str, rows: list[dict[str, Any]] = Depends(subjects)):
-    """All lines running today near one place, nearest stop and walking estimate each."""
+    """Nearby scheduled lines and untimed OSM rail with nearest stops and walking estimates."""
     points = place_points(rows)
     if place_id not in points:
         raise HTTPException(404, "Luogo senza coordinate nella preview")
-    result = lines_near_places_all({place_id: points[place_id]}, TRANSPORT_ROOTS)
+    result = nearby_transit({place_id: points[place_id]})
     result["lines"] = lines = result.pop("places").get(place_id, [])
     # Next scheduled departures of each row's line at its nearest stop.
+    timed = [row for row in lines if not row.get("untimed")]
     schedule = next_departures_all(
-        sorted({stop for row in lines for stop in row["stop_ids"]}),
-        {row["route_id"] for row in lines},
+        sorted({stop for row in timed for stop in row["stop_ids"]}),
+        {row["route_id"] for row in timed},
         2,
         TRANSPORT_ROOTS,
     )

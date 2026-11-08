@@ -163,6 +163,14 @@ vm.runInContext(`
   if(!TransportLayer.lineStyle('rail','#00704A').dashArray || TransportLayer.lineColor('rail',null)!=='#00704A') throw Error('rail line style');
   const railBadge=(()=>{ const p=make('rb','Mensa',[12.5,41.9],1,'Mensa',7,false); p.place_id='place-r'; state.transitByPlace={'place-r':{metro:null,rail:row('REG','rail',6,{stop_name:'ROMA TUSCOLANA'}),surface:row('49','bus',2),lines:9}}; return transitBadge(p); })();
   if(!railBadge.includes('Treno REG') || !railBadge.includes('ROMA TUSCOLANA')) throw Error('rail missing from list badge');
+  const untimed = {kind:'stop',transport_type:'rail',name:'<Stazione>',routes:[],untimed:true};
+  const untimedPopup = TransportLayer.popupHtml(untimed);
+  if(!untimedPopup.includes('Orari non disponibili come dati aperti (OpenStreetMap)') || !untimedPopup.includes('ODbL 1.0') || untimedPopup.includes('Carico') || untimedPopup.includes('Trenitalia') || untimedPopup.includes('Linee in servizio oggi') || untimedPopup.includes('<Stazione>')) throw Error('untimed popup misstates schedule/source');
+  const osmRow=row('Metromare','rail',3,{route_id:'osm:Metromare',untimed:true,next:[]});
+  if(!transitLine(osmRow).includes('OpenStreetMap') || transitLine(osmRow).includes('nessun’altra corsa')) throw Error('untimed row lacks explicit schedule limit');
+  if(!TransportLayer.routePopupHtml({...untimed,code:'Metromare'}).includes('OpenStreetMap') || TransportLayer.routePopupHtml({...untimed,code:'Metromare'}).includes('Percorso programmato')) throw Error('OSM route presented as scheduled');
+  const osmOnly=TransportLayer.statusText({availability:'available',osm_rail:{availability:'available'},sources:[{availability:'unavailable'},{availability:'available',untimed:true}]});
+  if(!osmOnly.includes('senza orari') || osmOnly.includes('Rete programmata')) throw Error('untimed-only status claims a calendar');
   // Regression: a multi-service map pin must open the service chooser (broke in F1).
   const twoAtSite=twoSiteFixture();
   openServiceChooser(twoAtSite);

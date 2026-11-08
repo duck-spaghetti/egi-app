@@ -220,5 +220,20 @@ merge them (features, nearby lines, departures). Rail shows as mode `rail`: dash
 green lines by train category (REG, RV, FR, IC…), FS station markers from zoom 12,
 "Stazione ferroviaria" groups in "Vicino a" (800 m), and the "Treni" checkbox. For
 each category only destinations with trips left are listed, soonest first (at most
-four in the card, eight in popups). Scheduled times only; no FL codes in the source;
-Roma-Lido, Roma-Viterbo and Roma-Giardinetti are not available.
+four in the card, eight in popups). Scheduled times only; no FL codes in the source.
+
+### Metromare and Roma–Viterbo without times
+
+`.local/osm-rail` (override `EGI_OSM_RAIL_ROOT`) adds OSM COTRAL routes/stations to
+the existing rail layer and route focus, independently of timed-feed availability.
+Stations appear from zoom 12; nearby-service rows use the 800 m rail radius.
+Metromare, Roma–Viterbo urban and extraurban are explicitly `untimed`: cards and
+popups explain that times are unavailable as open data, and popup opening does not
+request departures. Current-day service is not verified. Source: © OpenStreetMap
+contributors (ODbL 1.0), distinct from Trenitalia. Roma–Giardinetti is excluded
+because no active route was available in the inspected OSM data.
+
+Refresh manually from `egi-importer` with `python3 scripts/osm_rail.py poll`; no new
+job is installed. See [the runtime contract](../egi-importer/docs/osm-rail-format.md).
+Tests: `.venv/bin/python -m unittest discover -s tests`, `node tests/test_map.cjs`,
+`node tests/test_transport_layer.cjs`. Live tests also require `EGI_APP_BASE_URL`.
