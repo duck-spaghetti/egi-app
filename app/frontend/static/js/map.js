@@ -8,6 +8,8 @@ const state = {
   transportStops: [],
   transportModes: new Set(["metro", "bus"]),
   transportAvailability: "loading",
+  transitByPlace: {},
+  transitAvailability: "loading",
   cityOptions: [],
   filters: {
     cats: new Set(),
@@ -154,6 +156,8 @@ async function loadData() {
   state.transportStops = [];
   void loadTransport();
   setInterval(loadTransport, 60000);
+  void loadTransitSummaries();
+  setInterval(loadTransitSummaries, 300000);
   state.filters.cats = new Set(state.categories.map((category) => category.slug));
 }
 
@@ -346,6 +350,88 @@ async function loadTransport() {
     if (error.name === "AbortError" || request.signal.aborted) return;
     if (node) node.textContent = "Trasporti non raggiungibili. I dati già caricati restano visibili; nuovo tentativo automatico tra un minuto.";
   }
+}
+
+/* "Vicino a": lines near a service's place (see app/backend/transit_nearby.py). */
+const TRANSIT_ROWS_SHOWN = 5;
+const TRANSIT_NOTE = "Tempi stimati in linea d’aria (+30%, 4 km/h). Linee in servizio oggi secondo l’orario programmato di Roma Servizi per la Mobilità; nessun dato in tempo reale.";
+
+async function loadTransitSummaries() {
+  try {
+    const response = await fetch("/api/preview/transit/places");
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    state.transitAvailability = data.availability;
+    state.transitByPlace = data.places || {};
+  } catch (_error) {
+    state.transitAvailability = "unavailable";
+    state.transitByPlace = {};
+  }
+  renderList(filteredPois());
+}
+
+function transitEligible(poi) {
+  const raw = poi.raw || {};
+  return poi.latitude !== null && poi.longitude !== null && !raw.itinerant_source && raw.placement?.section !== "directory";
+}
+
+function lineChip(row) {
+  const metro = row.mode === "metro";
+  const color = row.color || (metro ? "#355c7d" : "#4a4a4a");
+  const label = `${metro ? "Metro" : "Autobus"} ${row.code}`;
+  return `<span class="line-chip ${metro ? "metro" : "bus"}" style="--line-color:${escapeHtml(color)}" title="${escapeHtml(label)}"><span class="line-mode" aria-hidden="true">${metro ? "M" : "Bus"}</span><span class="line-code">${escapeHtml(row.code)}</span><span class="visually-hidden">${escapeHtml(label)}</span></span>`;
+}
+
+function transitBadge(poi) {
+  if (!transitEligible(poi)) return "";
+  const summary = state.transitByPlace[poi.place_id];
+  if (!summary || (!summary.metro && !summary.bus)) return "";
+  const parts = [summary.metro, summary.bus].filter(Boolean).map(row =>
+    `<span class="transit-pair">${lineChip(row)}<span class="transit-walk">${row.mode === "metro" ? `${escapeHtml(row.stop_name)} ` : ""}${row.walk_min}′</span></span>`
+  );
+  const extra = summary.lines - parts.length;
+  return `<span class="transit-badge" aria-label="Trasporti vicini, minuti a piedi stimati">${parts.join("")}${extra > 0 ? `<span class="transit-more">+${extra} linee</span>` : ""}</span>`;
+}
+
+function transitSectionShell(poi) {
+  if (!transitEligible(poi)) return "";
+  return `<section class="detail-section transit-near" data-transit-place="${escapeHtml(poi.place_id)}"><h3>Vicino a</h3><p class="source-note">Cerco fermate e linee vicine…</p></section>`;
+}
+
+function transitRow(row) {
+  const place = row.mode === "metro" ? "Stazione" : "Fermata";
+  const night = row.night ? ` · <span class="night-tag">notturna</span>` : "";
+  return `<li class="transit-row">${lineChip(row)}<span class="transit-text"><span class="transit-stop">${place} ${escapeHtml(row.stop_name)}</span><span class="transit-meta">circa ${row.walk_min} min a piedi · ${row.distance_m} m in linea d’aria${night}</span></span></li>`;
+}
+
+function renderTransitRows(data) {
+  const head = "<h3>Vicino a</h3>";
+  if (data.availability !== "available") {
+    const reason = data.availability === "outside_calendar" ? "Orario dei trasporti non disponibile per oggi." : "Dati sui trasporti non disponibili al momento.";
+    return `${head}<p class="source-note">${reason}</p>`;
+  }
+  const lines = data.lines || [];
+  if (!lines.length) return `${head}<p>Nessuna linea metro o autobus in servizio oggi entro 500 m (metro entro 800 m).</p><p class="source-note">${TRANSIT_NOTE}</p>`;
+  const shown = lines.slice(0, TRANSIT_ROWS_SHOWN);
+  const rest = lines.slice(TRANSIT_ROWS_SHOWN);
+  const more = rest.length ? `<details class="transit-more-lines"><summary>Altre ${rest.length} linee</summary><ul class="transit-list">${rest.map(transitRow).join("")}</ul></details>` : "";
+  return `${head}<ul class="transit-list">${shown.map(transitRow).join("")}</ul>${more}<p class="source-note">${TRANSIT_NOTE}</p>`;
+}
+
+async function loadTransitDetail(poi) {
+  const node = document.querySelector("[data-transit-place]");
+  if (!node) return;
+  let data;
+  try {
+    const response = await fetch(`/api/preview/transit/places/${encodeURIComponent(poi.place_id)}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    data = await response.json();
+  } catch (_error) {
+    data = { availability: "unavailable", lines: [] };
+  }
+  // The sheet may already show another service.
+  if (!node.isConnected || node.dataset.transitPlace !== String(poi.place_id)) return;
+  node.innerHTML = renderTransitRows(data);
 }
 
 function transportStatusText(data) {
@@ -581,7 +667,7 @@ function renderList(list) {
     const siblings=sameSourceGroup(poi).length;
     const distance=state.userLoc ? (poi._dist==null ? "Distanza non disponibile" : poi._dist<1?`${Math.round(poi._dist*1000)} m`:`${poi._dist.toFixed(1)} km`) : "";
     const icon=normalizeCategoryIconPath(poi.category_icon_path);
-    return `<button type="button" class="poi-item" data-id="${escapeHtml(poi.id)}"><span class="marker-stripe" style="background:${poi.category_color}"></span><span class="info"><span class="service-list-title"><span class="name">${escapeHtml(poi.title)}</span></span><span class="facility-name">${escapeHtml(raw.facility_name || raw.name || "")}${siblings>1?` · ${siblings} servizi`:""}</span><span class="meta">${categoryBadge(resolveCategory(poi))}${distance?`<span class="dist">${escapeHtml(distance)}</span>`:""}</span>${openingBadge(poi)}<span class="source-note">${escapeHtml(raw.placement?.label || "Posizione da verificare")}${raw.itinerant_source?" · Itinerante":""}</span></span></button>`;
+    return `<button type="button" class="poi-item" data-id="${escapeHtml(poi.id)}"><span class="marker-stripe" style="background:${poi.category_color}"></span><span class="info"><span class="service-list-title"><span class="name">${escapeHtml(poi.title)}</span></span><span class="facility-name">${escapeHtml(raw.facility_name || raw.name || "")}${siblings>1?` · ${siblings} servizi`:""}</span><span class="meta">${categoryBadge(resolveCategory(poi))}${distance?`<span class="dist">${escapeHtml(distance)}</span>`:""}</span>${openingBadge(poi)}${transitBadge(poi)}<span class="source-note">${escapeHtml(raw.placement?.label || "Posizione da verificare")}${raw.itinerant_source?" · Itinerante":""}</span></span></button>`;
   }).join("");
   wrap.querySelectorAll(".poi-item").forEach(el=>el.addEventListener("click",()=>openDetail(el.dataset.id)));
 }
@@ -615,6 +701,7 @@ async function openDetail(id) {
     <p class="detail-address">${escapeHtml(poi.address || raw.placement?.label || "Indirizzo non indicato")}</p>
     ${renderDetailHeaderActions(poi)}
     <p class="source-note">Helpinet · dati non revisionati.${raw.itinerant_source?" Servizio itinerante: il punto della fonte non è una sede fissa verificata.":""}</p>
+    ${transitSectionShell(poi)}
     <section class="detail-section"><h3>Descrizione</h3><p>${escapeHtml(description)}</p>${!raw.description && summary?.text?'<span class="derived-label">Sintesi ricavata dai campi della fonte · non descrizione originale</span>':""}</section>
     <section class="detail-section"><h3>Prestazioni indicate</h3><div class="service-chips">${prestations.map(v=>`<span class="service-chip">${escapeHtml(v.nome)}</span>`).join("") || "Non indicate"}</div></section>
     <section class="detail-section"><h3>Accesso e destinatari</h3>${renderSourceAccess(raw.access_display)}</section>
@@ -625,6 +712,7 @@ async function openDetail(id) {
     ${siblings.length?`<section class="detail-section"><h3>Altri servizi presso ${escapeHtml(raw.facility_name || "questo gruppo")}</h3><p class="source-note">Collegamento provvisorio dal gruppo Helpinet. Ogni scheda mantiene orari, accesso e contatti indipendenti.</p>${siblings.map(serviceButton).join("")}</section>`:""}
     <details class="detail-section"><summary>Provenienza e dati originali</summary><p>Osservazione locale: ${escapeHtml(raw.observed_at || "—")}. Acquisizione originale sconosciuta.</p><pre class="source-evidence">${escapeHtml(JSON.stringify({record:raw.source_locator,gruppo:raw.source_group,sintesi:raw.derived_summary,campi_originali:raw.source_values,da_verificare:raw.review_required},null,2))}</pre></details>`;
   bindServiceButtons();
+  void loadTransitDetail(poi);
   document.querySelector("#sheet-detail .sheet-body").scrollTop=0;
   openSheet("sheet-detail");
 }
@@ -1523,6 +1611,7 @@ function openServiceChooser(items, matched = new Set(items.map(p=>p.id))) {
   document.querySelector("#sheet-detail .sheet-head h2").textContent = "Scegli il servizio";
   document.getElementById("detail-body").innerHTML = `<h2>${escapeHtml(items[0].raw?.facility_name || "Gruppo della fonte")}</h2><p>${items.length} servizi con questa posizione. Scegli una scheda.</p>${items.map(p=>serviceButton(p,matched.has(p.id))).join("")}<p class="source-note">Collegamento provvisorio dal gruppo Helpinet; ogni servizio mantiene le proprie caratteristiche.</p>`;
   bindServiceButtons();
+  void loadTransitDetail(poi);
   document.querySelector("#sheet-detail .sheet-body").scrollTop=0;
   openSheet("sheet-detail");
 }

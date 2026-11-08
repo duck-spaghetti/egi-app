@@ -16,7 +16,8 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from .preview import AREA, LANGUAGES, categories, services
 from .presentation import coverage
 from .subjects import PostgresSubjectSource, SubjectSource, SubjectSourceUnavailable
-from .transport import transport_view
+from .transport import ROOT as TRANSPORT_ROOT, transport_view
+from .transit_nearby import lines_near_places, summary as transit_summary
 
 ROOT = Path(__file__).resolve().parents[2]
 app = FastAPI(title="EGI v0.2 — local source preview", version="0.2.0")
@@ -126,6 +127,37 @@ def preview_transport(
     if west >= east or south >= north or not selected <= {"metro", "bus"}:
         raise HTTPException(422, "Viewport o modalità TPL non validi")
     return transport_view([west, south, east, north], zoom, selected)
+
+
+def place_points(rows: list[dict[str, Any]]) -> dict[str, tuple[float, float]]:
+    """Map each located place of the imported services to its source coordinates."""
+    points = {}
+    for service in services(rows):
+        place = service.get("place") or {}
+        geometry = place.get("geometry") or {}
+        if place.get("id") and geometry.get("type") == "Point":
+            lon, lat = geometry["coordinates"]
+            points[place["id"]] = (lon, lat)
+    return points
+
+
+@app.get("/api/preview/transit/places")
+def transit_places(rows: list[dict[str, Any]] = Depends(subjects)):
+    """List badge for every located place: nearest metro and bus line, line count."""
+    result = lines_near_places(place_points(rows), TRANSPORT_ROOT)
+    result["places"] = {k: transit_summary(v) for k, v in result["places"].items()}
+    return result
+
+
+@app.get("/api/preview/transit/places/{place_id}")
+def transit_place(place_id: str, rows: list[dict[str, Any]] = Depends(subjects)):
+    """All lines running today near one place, nearest stop and walking estimate each."""
+    points = place_points(rows)
+    if place_id not in points:
+        raise HTTPException(404, "Luogo senza coordinate nella preview")
+    result = lines_near_places({place_id: points[place_id]}, TRANSPORT_ROOT)
+    result["lines"] = result.pop("places").get(place_id, [])
+    return result
 
 
 @app.get("/api/preview/languages")

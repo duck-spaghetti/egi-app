@@ -120,6 +120,19 @@ never prevents Helpinet loading. Failed fetches retain the last valid version. W
 attempt was recorded for 24 hours the response sets `refresh_stale` and the map
 asks to check the update job.
 
+### Nearby transit ("Vicino a")
+
+`GET /api/preview/transit/places` returns, for every located place, the nearest
+metro line, the nearest daytime bus line and the number of lines; the list shows it
+as a compact badge. `GET /api/preview/transit/places/{place_id}` returns every line
+running today with a stop within 500 m (metro 800 m): one row per line at its
+nearest stop, metro first, night lines (`n…`) last. Walking time is an estimate:
+straight-line distance × 1.3 at 4 km/h, rounded up, and the card says so. The
+service card shows five rows and "Altre N linee". No badge for itinerant services,
+remote/directory services or services without coordinates. Logic and constants are
+in `app/backend/transit_nearby.py`; transport unavailable or outside its calendar
+hides the rows and leaves services untouched.
+
 This is scheduled service with source attribution and a visible licensing
 discrepancy, not realtime arrivals or approved public data. No DB grant or schema
 change. See sibling [importer instructions](../egi-importer/README.md) and
