@@ -264,3 +264,14 @@ Refresh manually from `egi-importer` with `python3 scripts/osm_rail.py poll`; no
 job is installed. See [the runtime contract](../egi-importer/docs/osm-rail-format.md).
 The Verify section covers independent runtime fixtures, source merging and the
 popup lifecycle test that ensures untimed stops make no departures request.
+
+### Source wording and operations (2026-11-08)
+
+The transport panel distinguishes bus/tram realtime predictions, scheduled metro/
+Trenitalia and untimed OSM rail. It retains the Roma licence uncertainty and now
+explicitly identifies the unstated NAP NeTEx licence. See the dated
+[source evidence and unsent clarification drafts](../egi-importer/docs/source-licensing.md).
+The approved operations bundle installed the daily rail job and pruned four old
+derived Roma transport versions, preserving original captures and active data.
+Actual verification and limits are in the shared
+[operations record](../.scratch/post-handoff/operations-plan.md).
