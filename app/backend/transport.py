@@ -9,6 +9,7 @@ from in-progress refreshes.
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 from datetime import datetime, timedelta, timezone
@@ -17,6 +18,8 @@ from pathlib import Path
 from typing import NamedTuple
 from zoneinfo import ZoneInfo
 
+from .transit_nearby import display_code, stop_index
+
 ROOT = Path(
     os.environ.get(
         "EGI_TRANSPORT_ROOT", Path(__file__).resolve().parents[3] / ".local/transport"
@@ -24,7 +27,7 @@ ROOT = Path(
 )
 
 
-FORMAT = "egi-transport/2"
+FORMAT = "egi-transport/3"
 FULL_DETAIL_ZOOM = 17
 # Twice the 6 h schedule plus slack: older means the poller stopped running.
 STALE_AFTER = timedelta(hours=24)
@@ -101,6 +104,73 @@ def intersects(a: list, b: list) -> bool:
     return a[0] <= b[2] and a[2] >= b[0] and a[1] <= b[3] and a[3] >= b[1]
 
 
+LINE_MIN_ZOOM = {"metro": 0, "tram": 12, "bus": 13}
+STOP_MIN_ZOOM = {"metro": 13, "tram": 14, "bus": 14}
+MODE_ORDER = {"metro": 0, "tram": 1, "bus": 2}
+STATION_RADIUS_M = 150
+
+
+def route_order(route: dict) -> tuple:
+    """Metro before tram before bus, then natural line code."""
+    code = route.get("display_code") or route["code"]
+    natural = [int(p) if p.isdigit() else p for p in re.split(r"(\d+)", code)]
+    return (MODE_ORDER.get(route["mode"], 9), natural)
+
+
+def group_stations(stops: list[dict]) -> list[dict]:
+    """Show same-named metro stops within STATION_RADIUS_M as one station marker.
+
+    GTFS has one stop per platform/direction and no parent_station; this merge is
+    for display only and keeps every source stop_id in the merged properties.
+    """
+    clusters: list[list[dict]] = []
+    others = []
+    for stop in stops:
+        if stop["properties"]["transport_type"] != "metro":
+            others.append(stop)
+            continue
+        lon, lat = stop["geometry"]["coordinates"]
+        for cluster in clusters:
+            head = cluster[0]
+            hlon, hlat = head["geometry"]["coordinates"]
+            same_name = head["properties"]["name"].casefold() == stop["properties"]["name"].casefold()
+            kx = 111_320 * math.cos(math.radians(lat))
+            if same_name and math.hypot((lon - hlon) * kx, (lat - hlat) * 110_540) <= STATION_RADIUS_M:
+                cluster.append(stop)
+                break
+        else:
+            clusters.append([stop])
+    stations = []
+    for cluster in clusters:
+        routes = {}
+        for stop in cluster:
+            for route in stop["properties"]["routes"]:
+                routes.setdefault(route["route_id"], route)
+        coords = [s["geometry"]["coordinates"] for s in cluster]
+        first = cluster[0]["properties"]
+        stations.append(
+            {
+                "type": "Feature",
+                "id": "station:" + first["stop_id"],
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [
+                        round(sum(c[0] for c in coords) / len(coords), 6),
+                        round(sum(c[1] for c in coords) / len(coords), 6),
+                    ],
+                },
+                "properties": {
+                    "kind": "station",
+                    "name": first["name"],
+                    "stop_ids": [s["properties"]["stop_id"] for s in cluster],
+                    "routes": sorted(routes.values(), key=route_order),
+                    "transport_type": "metro",
+                },
+            }
+        )
+    return stations + others
+
+
 def transport_view(
     bbox: list[float],
     zoom: int,
@@ -133,45 +203,59 @@ def transport_view(
         if not active_services:
             result["availability"] = "outside_calendar"
             return result
+        colors = stop_index(manifest["version"], network).colors
+        stops = []
         for feature in network["features"]:
             if not intersects(feature["bbox"], bbox):
                 continue
             props = feature["properties"]
             if props["kind"] == "route":
                 mode = props["transport_type"]
-                if mode not in modes or (mode == "bus" and zoom < 13):
+                if mode not in modes or zoom < LINE_MIN_ZOOM.get(mode, 13):
                     continue
                 if not active_services.intersection(props["service_ids"]):
                     continue
                 public = {k: v for k, v in props.items() if k != "service_ids"}
-                geometry = route_geometry(feature, zoom)
-            else:
-                memberships = []
-                for route_id, services in props["services_by_route"].items():
-                    route = network["routes"][route_id]
-                    threshold = 13 if route["mode"] == "metro" else 14
-                    if (
-                        route["mode"] in modes
-                        and zoom >= threshold
-                        and active_services.intersection(services)
-                    ):
-                        memberships.append({"route_id": route_id, **route})
-                if not memberships:
-                    continue
-                public = {k: v for k, v in props.items() if k != "services_by_route"}
-                geometry = feature["geometry"]
-                public["routes"] = memberships
-                public["transport_type"] = (
-                    "metro" if any(r["mode"] == "metro" for r in memberships) else "bus"
+                public["code"] = display_code(props["name"], mode)
+                result["features"].append(
+                    {
+                        "type": "Feature",
+                        "id": feature["id"],
+                        "geometry": route_geometry(feature, zoom),
+                        "properties": public,
+                    }
                 )
-            result["features"].append(
+                continue
+            memberships = []
+            for route_id, services in props["services_by_route"].items():
+                route = network["routes"][route_id]
+                if (
+                    route["mode"] in modes
+                    and zoom >= STOP_MIN_ZOOM.get(route["mode"], 14)
+                    and active_services.intersection(services)
+                ):
+                    memberships.append(
+                        {
+                            "route_id": route_id,
+                            **route,
+                            "display_code": display_code(route["code"], route["mode"]),
+                            "color": colors.get(route_id),
+                        }
+                    )
+            if not memberships:
+                continue
+            public = {k: v for k, v in props.items() if k != "services_by_route"}
+            public["routes"] = sorted(memberships, key=route_order)
+            public["transport_type"] = public["routes"][0]["mode"]
+            stops.append(
                 {
                     "type": "Feature",
                     "id": feature["id"],
-                    "geometry": geometry,
+                    "geometry": feature["geometry"],
                     "properties": public,
                 }
             )
+        result["features"].extend(group_stations(stops))
         return result
     except (OSError, ValueError, KeyError, TypeError):
         result.update(availability="unavailable", features=[])

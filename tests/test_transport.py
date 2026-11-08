@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from app.backend.transport import (
     load_active,
     read_network,
+    group_stations,
     refresh_stale,
     route_geometry,
     transport_view,
@@ -128,6 +129,61 @@ class TransportViewTests(unittest.TestCase):
             load_active(self.root)
         data = self.view([12, 41, 13, 43], 14, {"metro"})
         self.assertEqual(data["availability"], "unavailable")
+
+
+class StationAndTramTests(unittest.TestCase):
+    """Metro platforms show as one station; tram lines appear from zoom 12."""
+
+    def setUp(self):
+        """Copy the fixture, which has one metro, one tram and one bus route."""
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name) / "transport"
+        shutil.copytree(FIXTURE, self.root)
+        self.addCleanup(read_network.cache_clear)
+
+    @staticmethod
+    def metro_stop(stop_id, name, lon, lat, route="MEA"):
+        """A projected metro stop feature as transport_view builds it."""
+        return {
+            "type": "Feature",
+            "id": "stop:" + stop_id,
+            "geometry": {"type": "Point", "coordinates": [lon, lat]},
+            "properties": {
+                "kind": "stop",
+                "stop_id": stop_id,
+                "name": name,
+                "transport_type": "metro",
+                "routes": [{"route_id": route, "code": route, "mode": "metro", "display_code": route[-1]}],
+            },
+        }
+
+    def test_same_named_platforms_merge_within_150_m(self):
+        """Termini A and B platforms become one station; a far namesake stays apart."""
+        stops = [
+            self.metro_stop("a1", "Termini", 12.5000, 41.9000, "MEA"),
+            self.metro_stop("b1", "TERMINI", 12.5010, 41.9003, "MEB"),
+            self.metro_stop("x", "Termini", 12.5300, 41.9000, "MEA"),
+            self.metro_stop("r", "Repubblica", 12.5002, 41.9001, "MEA"),
+        ]
+        stations = group_stations(stops)
+        merged = [s for s in stations if len(s["properties"]["stop_ids"]) == 2]
+        self.assertEqual(len(stations), 3)
+        self.assertEqual(merged[0]["properties"]["stop_ids"], ["a1", "b1"])
+        self.assertEqual(
+            [r["route_id"] for r in merged[0]["properties"]["routes"]], ["MEA", "MEB"]
+        )
+        self.assertEqual(merged[0]["properties"]["kind"], "station")
+
+    def test_tram_lines_from_zoom_12_and_metro_codes(self):
+        """Tram is hidden at zoom 11 and shown at 12; route features carry display codes."""
+        bbox = [12.4, 41.8, 12.6, 42]
+        z11 = transport_view(bbox, 11, {"tram"}, self.root, SERVICE_DAY)["features"]
+        z12 = transport_view(bbox, 12, {"tram"}, self.root, SERVICE_DAY)["features"]
+        self.assertEqual(z11, [])
+        self.assertEqual([f["properties"]["transport_type"] for f in z12], ["tram"])
+        metro = transport_view(bbox, 11, {"metro"}, self.root, SERVICE_DAY)["features"]
+        self.assertEqual(metro[0]["properties"]["code"], "MA")
 
 
 class PendingVersionTests(unittest.TestCase):

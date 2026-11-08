@@ -517,7 +517,7 @@ html[dir="rtl"] .sheet-back-head .arrow,
   display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
   margin-top: 18px;
 }
-.transport-modes { display: flex; gap: 18px; margin: 12px 0; }
+.transport-modes { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 12px 0; }
 .transport-modes label { display: flex; gap: 6px; align-items: center; }
 
 .layer-toggle {
@@ -1306,3 +1306,18 @@ html[dir="rtl"] .sheet-back-head .arrow,
 .transit-meta { font-size:12px;color:var(--ink-soft); }
 .night-tag { display:inline-block;padding:0 5px;border-radius:4px;background:#26314f;color:#fff;font-size:11px; }
 .transit-more-lines summary { cursor:pointer;font-size:13px;font-weight:600;color:var(--accent);padding:4px 0; }
+
+/* Transport layer markers and legend (transport-layer.js) */
+.tl-icon { background:none;border:0; }
+.tl-station { display:inline-flex;align-items:center;gap:2px;padding:2px 4px 2px 2px;border-radius:999px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.35);white-space:nowrap;transform:translate(-11px,-11px); }
+.tl-roundel { display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#c4161c;color:#fff;font:800 11px/1 system-ui; }
+.tl-chip { display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 3px;border-radius:4px;background:var(--line-color,#3d4a5c);color:#fff;font:700 10px/1 system-ui; }
+.tl-stop { display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:5px;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4);color:#fff;font:800 10px/1 system-ui;transform:translate(-9px,-9px); }
+.tl-stop svg { width:12px;height:12px; }
+.tl-bus { background:#3d4a5c; }
+.tl-tram { background:#7a4fa0; }
+.tl-popup-kind { color:var(--ink-soft);font-size:12px; }
+.tl-popup-lines { display:flex;flex-wrap:wrap;gap:3px;margin:6px 0; }
+.transport-legend { list-style:none;margin:6px 0 10px;padding:0;display:grid;gap:8px;font-size:12px;color:var(--ink-soft); }
+.transport-legend li { display:flex;align-items:center;gap:8px; }
+.transport-legend .tl-station,.transport-legend .tl-stop { transform:none;flex:none; }

@@ -120,11 +120,11 @@ def preview_transport(
     east: float = Query(default=12.8, ge=-180, le=180),
     north: float = Query(default=42.1, ge=-90, le=90),
     zoom: int = Query(default=11, ge=0, le=19),
-    modes: str = "metro,bus",
+    modes: str = "metro,tram,bus",
 ):
-    """Return source-scheduled bus/metro features independently of service data."""
+    """Return source-scheduled metro/tram/bus features independently of service data."""
     selected = set(modes.split(","))
-    if west >= east or south >= north or not selected <= {"metro", "bus"}:
+    if west >= east or south >= north or not selected <= {"metro", "tram", "bus"}:
         raise HTTPException(422, "Viewport o modalità TPL non validi")
     return transport_view([west, south, east, north], zoom, selected)
 

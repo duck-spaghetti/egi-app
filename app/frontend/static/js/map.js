@@ -5,15 +5,11 @@ const state = {
   categoryTranslations: [],
   languages: [],
   pois: [],
-  transportStops: [],
-  transportModes: new Set(["metro", "bus"]),
-  transportAvailability: "loading",
   transitByPlace: {},
   transitAvailability: "loading",
   cityOptions: [],
   filters: {
     cats: new Set(),
-    showTransport: false,
     q: "", type: "", prestation: "", access: "", section: "all", order: "name", openNow: false,
   },
   view: "map",
@@ -37,18 +33,9 @@ const settingsBackHead = document.getElementById("settings-back-head");
 
 let map;
 let markersLayer;
-let transportLayer;
+let transport;
 let userMarker;
 let cityBounds;
-let transportRequest;
-let transportTimer;
-const STOP_MIN_ZOOM_BY_MODE = {
-  metro: 13,
-  tram: 14,
-  bus: 14,
-  bike: 15,
-  other: 14,
-};
 
 init().catch((error) => {
   console.error("Preview load failed", error);
@@ -105,18 +92,20 @@ function initMap() {
   } else {
     markersLayer = L.layerGroup();
   }
-  transportLayer = L.layerGroup();
-
   markersLayer.addTo(map);
-  transportLayer.addTo(map);
   map.setView(cityCenter, Number(context.zoom));
   const minCityZoom = map.getBoundsZoom(cityBounds, true, [18, 18]);
   map.setMinZoom(Math.max(6, minCityZoom - 2));
   map.setMaxBounds(cityBounds);
   map.panInsideBounds(cityBounds, { animate: false });
-  map.on("moveend", () => {
-    clearTimeout(transportTimer);
-    transportTimer = setTimeout(loadTransport, 180);
+  transport = TransportLayer.create(map, {
+    toggle: document.getElementById("transport-toggle"),
+    status: document.getElementById("transport-status"),
+    modes: {
+      metro: document.getElementById("transport-metro"),
+      tram: document.getElementById("transport-tram"),
+      bus: document.getElementById("transport-bus"),
+    },
   });
   map.on("click", event=>{
     if (!state.choosingReference) return;
@@ -153,9 +142,6 @@ async function loadData() {
     )
   );
   state.pois = services.map(normalizePublicService).filter(Boolean);
-  state.transportStops = [];
-  void loadTransport();
-  setInterval(loadTransport, 60000);
   void loadTransitSummaries();
   setInterval(loadTransitSummaries, 300000);
   state.filters.cats = new Set(state.categories.map((category) => category.slug));
@@ -210,21 +196,6 @@ function bindUi() {
     renderSearchOptions();
     refresh();
   });
-  document.getElementById("transport-toggle")?.addEventListener("click", () => {
-    state.filters.showTransport = !state.filters.showTransport;
-    renderTransportToggle();
-    refresh();
-    void loadTransport();
-  });
-  for (const mode of ["metro", "bus"]) {
-    document.getElementById(`transport-${mode}`)?.addEventListener("change", event => {
-      if (event.target.checked) state.transportModes.add(mode);
-      else state.transportModes.delete(mode);
-      state.transportStops = [];
-      renderTransportStops();
-      void loadTransport();
-    });
-  }
   document.getElementById("geo-btn").addEventListener("click", locateUser);
   document.getElementById("addr-input")?.addEventListener("keydown", async (event) => {
     if (event.key === "Enter") {
@@ -308,49 +279,11 @@ function updateViewToggle() {
 function renderFilters() {
   renderCatGrid();
   renderSearchOptions();
-  renderTransportToggle();
   renderLanguageList();
   renderCityList();
 }
 
-function renderTransportToggle() {
-  const button = document.getElementById("transport-toggle");
-  if (!button) return;
-  button.hidden = false;
-  button.classList.toggle("active", state.filters.showTransport);
-  button.setAttribute("aria-pressed", String(state.filters.showTransport));
-}
 
-async function loadTransport() {
-  if (!map) return;
-  transportRequest?.abort();
-  const request = new AbortController();
-  transportRequest = request;
-  const bbox = map.getBounds();
-  const modes = [...state.transportModes].join(",");
-  const node = document.getElementById("transport-status");
-  if (!modes) {
-    state.transportStops = [];
-    renderTransportStops();
-    if (node) node.textContent = "Seleziona almeno una modalità di trasporto.";
-    return;
-  }
-  const query = new URLSearchParams({west:bbox.getWest(), south:bbox.getSouth(), east:bbox.getEast(), north:bbox.getNorth(), zoom:map.getZoom(), modes});
-  try {
-    const response = await fetch(`/api/preview/transport?${query}`, {signal:request.signal});
-    if (!response.ok) throw Error(`HTTP ${response.status}`);
-    const data = await response.json();
-    if (request.signal.aborted) return;
-    state.transportAvailability = data.availability;
-    state.transportStops = data.features.map(feature => ({...feature.properties, geometry:feature.geometry}));
-    if (node) node.textContent = transportStatusText(data);
-    renderTransportToggle();
-    renderTransportStops();
-  } catch (error) {
-    if (error.name === "AbortError" || request.signal.aborted) return;
-    if (node) node.textContent = "Trasporti non raggiungibili. I dati già caricati restano visibili; nuovo tentativo automatico tra un minuto.";
-  }
-}
 
 /* "Vicino a": lines near a service's place (see app/backend/transit_nearby.py). */
 const TRANSIT_ROWS_SHOWN = 5;
@@ -377,16 +310,17 @@ function transitEligible(poi) {
 
 function lineChip(row) {
   const metro = row.mode === "metro";
-  const color = row.color || (metro ? "#355c7d" : "#4a4a4a");
-  const label = `${metro ? "Metro" : "Autobus"} ${row.code}`;
-  return `<span class="line-chip ${metro ? "metro" : "bus"}" style="--line-color:${escapeHtml(color)}" title="${escapeHtml(label)}"><span class="line-mode" aria-hidden="true">${metro ? "M" : "Bus"}</span><span class="line-code">${escapeHtml(row.code)}</span><span class="visually-hidden">${escapeHtml(label)}</span></span>`;
+  const tram = row.mode === "tram";
+  const color = TransportLayer.lineColor(row.mode, row.color);
+  const label = `${metro ? "Metro" : tram ? "Tram" : "Autobus"} ${row.code}`;
+  return `<span class="line-chip ${escapeHtml(row.mode)}" style="--line-color:${escapeHtml(color)}" title="${escapeHtml(label)}"><span class="line-mode" aria-hidden="true">${metro ? "M" : tram ? "T" : "Bus"}</span><span class="line-code">${escapeHtml(row.code)}</span><span class="visually-hidden">${escapeHtml(label)}</span></span>`;
 }
 
 function transitBadge(poi) {
   if (!transitEligible(poi)) return "";
   const summary = state.transitByPlace[poi.place_id];
-  if (!summary || (!summary.metro && !summary.bus)) return "";
-  const parts = [summary.metro, summary.bus].filter(Boolean).map(row =>
+  if (!summary || (!summary.metro && !summary.surface)) return "";
+  const parts = [summary.metro, summary.surface].filter(Boolean).map(row =>
     `<span class="transit-pair">${lineChip(row)}<span class="transit-walk">${row.mode === "metro" ? `${escapeHtml(row.stop_name)} ` : ""}${row.walk_min}′</span></span>`
   );
   const extra = summary.lines - parts.length;
@@ -399,7 +333,7 @@ function transitSectionShell(poi) {
 }
 
 function transitRow(row) {
-  const place = row.mode === "metro" ? "Stazione" : "Fermata";
+  const place = row.mode === "metro" ? "Stazione" : row.mode === "tram" ? "Fermata tram" : "Fermata";
   const night = row.night ? ` · <span class="night-tag">notturna</span>` : "";
   return `<li class="transit-row">${lineChip(row)}<span class="transit-text"><span class="transit-stop">${place} ${escapeHtml(row.stop_name)}</span><span class="transit-meta">circa ${row.walk_min} min a piedi · ${row.distance_m} m in linea d’aria${night}</span></span></li>`;
 }
@@ -411,7 +345,7 @@ function renderTransitRows(data) {
     return `${head}<p class="source-note">${reason}</p>`;
   }
   const lines = data.lines || [];
-  if (!lines.length) return `${head}<p>Nessuna linea metro o autobus in servizio oggi entro 500 m (metro entro 800 m).</p><p class="source-note">${TRANSIT_NOTE}</p>`;
+  if (!lines.length) return `${head}<p>Nessuna linea metro, tram o autobus in servizio oggi entro 500 m (metro entro 800 m).</p><p class="source-note">${TRANSIT_NOTE}</p>`;
   const shown = lines.slice(0, TRANSIT_ROWS_SHOWN);
   const rest = lines.slice(TRANSIT_ROWS_SHOWN);
   const more = rest.length ? `<details class="transit-more-lines"><summary>Altre ${rest.length} linee</summary><ul class="transit-list">${rest.map(transitRow).join("")}</ul></details>` : "";
@@ -434,15 +368,6 @@ async function loadTransitDetail(poi) {
   node.innerHTML = renderTransitRows(data);
 }
 
-function transportStatusText(data) {
-  if (data.availability === "unavailable") return "Dati trasporti non disponibili. Nuovo controllo automatico; i servizi EGI restano consultabili.";
-  if (data.availability === "outside_calendar") return "Il feed disponibile non contiene servizio programmato per oggi. In attesa di aggiornamento.";
-  const format = value => value ? new Date(value).toLocaleString("it-IT", {timeZone:"Europe/Rome"}) : "non disponibile";
-  const refresh = data.refresh || {};
-  let warning = refresh.result === "failed" ? " Ultimo tentativo fallito: uso l’ultima versione valida." : "";
-  if (data.refresh_stale) warning += " Nessun controllo automatico nelle ultime 24 ore: verificare il job di aggiornamento.";
-  return `Rete programmata per ${data.service_date}. Ultimo controllo riuscito: ${format(refresh.last_checked_at)}. Dati aggiornati: ${format(data.manifest?.updated_at)}.${warning}`;
-}
 
 function renderCatGrid() {
   const wrap = document.getElementById("cat-grid");
@@ -548,7 +473,6 @@ function applyShellTranslations() {
 function refresh() {
   const list = filteredPois();
   renderMarkers(list);
-  renderTransportStops();
   renderList(list);
 }
 
@@ -611,49 +535,6 @@ function renderMarkers(list) {
   if (state.userLoc) userMarker=L.marker([state.userLoc.lat,state.userLoc.lng],{icon:userIcon(),alt:"Punto di riferimento scelto"}).addTo(map);
 }
 
-function renderTransportStops() {
-  transportLayer.clearLayers();
-  if (!state.filters.showTransport) return;
-  state.transportStops.forEach((stop) => {
-    const geometry = stop.geometry;
-    if (!geometry || !geometry.type) return;
-    const mode = String(stop.transport_type || "").toLowerCase();
-    const color =
-      stop.color || (mode === "metro" ? "#355c7d" : mode === "tram" ? "#d4691a" : mode === "bike" ? "#2d5f3f" : "#5a5a5a");
-    const routeNames = (stop.routes || []).map(route => route.code).join(", ");
-    const popup = `<strong>${escapeHtml(stop.name)}</strong><br>${escapeHtml(
-      (stop.transport_type || "").toUpperCase()
-    )}${stop.code ? ` · ${escapeHtml(stop.code)}` : ""}${routeNames ? `<br>Linee: ${escapeHtml(routeNames)}` : ""}<br>Servizio programmato · Roma Servizi per la Mobilità`;
-
-    if (geometry.type === "Point" && Array.isArray(geometry.coordinates)) {
-      const minZoom = STOP_MIN_ZOOM_BY_MODE[mode] ?? STOP_MIN_ZOOM_BY_MODE.other;
-      if (map.getZoom() < minZoom) return;
-      const [lng, lat] = geometry.coordinates;
-      const marker = L.circleMarker([Number(lat), Number(lng)], {
-        radius: 5,
-        color,
-        fillColor: color,
-        fillOpacity: 0.9,
-        weight: 1,
-      });
-      marker.bindPopup(popup);
-      marker.addTo(transportLayer);
-      return;
-    }
-
-    if (geometry.type === "LineString" || geometry.type === "MultiLineString") {
-      const line = L.geoJSON(geometry, {
-        style: {
-          color,
-          weight: mode === "bike" ? 3 : 4,
-          opacity: 0.9,
-        },
-      });
-      line.bindPopup(popup);
-      line.addTo(transportLayer);
-    }
-  });
-}
 
 function renderList(list) {
   document.getElementById("list-count").textContent=String(list.length);

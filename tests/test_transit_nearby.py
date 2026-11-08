@@ -114,7 +114,7 @@ class RankingTests(unittest.TestCase):
         )
         rows = nearby_lines(index, {"svc"}, LON, LAT)
         self.assertEqual([(r["code"], r["night"]) for r in rows], [("49", False), ("n92", True)])
-        self.assertEqual(summary(rows)["bus"]["code"], "49")
+        self.assertEqual(summary(rows)["surface"]["code"], "49")
         self.assertEqual(summary(rows)["lines"], 2)
 
 
@@ -129,10 +129,11 @@ class AvailabilityTests(unittest.TestCase):
         shutil.copytree(FIXTURE, self.root)
 
     def test_fixture_day_ranks_fixture_lines(self):
-        """On a service day the fixture's metro and bus are both near (12.5, 41.9)."""
+        """On a service day the fixture's metro, tram and bus are all near (12.5, 41.9)."""
         result = lines_near_places({"p": (LON, LAT)}, self.root, "2026-01-05")
         self.assertEqual(result["availability"], "available")
-        self.assertEqual([r["mode"] for r in result["places"]["p"]], ["metro", "bus"])
+        self.assertEqual([r["mode"] for r in result["places"]["p"]][0], "metro")
+        self.assertEqual({r["mode"] for r in result["places"]["p"]}, {"metro", "bus", "tram"})
 
     def test_outside_calendar_and_unavailable(self):
         """Explicit availability and no rows instead of an error."""

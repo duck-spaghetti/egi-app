@@ -95,11 +95,15 @@ and the scope are in [v0.1 plan](docs/v01-plan.md).
 
 ## Limits
 
-The local preview now has an optional bus/metro layer under Cerca → Layer.
-Enable Trasporti and select Metro/Autobus independently. Metro routes show at all
-zooms, bus routes from zoom 13, metro points from 13 and bus points from 14.
-Points remain the feed's native directional stops, not deduplicated stations.
-Popup route membership follows the selected modes and today's service calendar.
+The local preview has an optional metro/tram/bus layer under Cerca → Layer, drawn
+by `app/frontend/static/js/transport-layer.js` (the only transport code on the map
+page). Enable Trasporti and select Metro/Tram/Autobus independently. Metro routes
+show at all zooms in their official colours, tram routes from zoom 12, thin muted
+bus routes from 13; metro stations from 13, tram and bus stops from 14, always above
+the lines. Same-named metro platforms within 150 m are shown as one station marker
+("M A B B1" at Termini) listing every source `stop_id`; this is display grouping,
+not deduplication. Bus and tram stops stay the feed's directional stops. A legend
+sits under the toggle. No request is sent while the map has no size.
 
 `/api/preview/transport` reads the sibling workspace `.local/transport` files;
 `EGI_TRANSPORT_ROOT` can explicitly select another runtime directory at startup.
@@ -107,8 +111,8 @@ Only `load_active` in `app/backend/transport.py` knows that layout; it follows
 `../egi-importer/docs/transport-format.md`. Tests use the vendored example in
 `tests/fixtures/transport-root` and, when the importer sits alongside, check that
 the copy still matches the producer's.
-Parameters: west/south/east/north (WGS84 bbox), zoom (0–19), modes (`metro,bus`,
-`metro` or `bus`). It returns GeoJSON plus active-version and refresh metadata.
+Parameters: west/south/east/north (WGS84 bbox), zoom (0–19), modes (any of
+`metro`, `tram`, `bus`, comma-separated). It returns GeoJSON plus active-version and refresh metadata.
 Bounding boxes select intersecting route shapes. Below zoom 17 the response uses the
 importer's simplified levels (50 m from zoom 11, 12 m from 13, 3 m from 15); full
 source shapes from zoom 17. Responses over 1 KB are gzip-compressed (level 5).

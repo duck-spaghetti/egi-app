@@ -1,6 +1,6 @@
 """Rank transport lines near a point for the "Vicino a" badge.
 
-nearby_lines answers: which bus/metro lines running on a given day stop near this
+nearby_lines answers: which metro, tram and bus lines running on a given day stop near this
 point, at which nearest stop, and how many minutes on foot. Walking time is an
 estimate from straight-line distance (no routing), deliberately on the slow side.
 The stop index is built once per immutable network version.
@@ -14,7 +14,7 @@ from collections import defaultdict
 
 WALK_M_PER_MIN = 4000 / 60  # 4 km/h, slower than the usual 5 km/h on purpose
 DETOUR_FACTOR = 1.3  # straight line → street distance
-RADIUS_M = {"metro": 800, "bus": 500}
+RADIUS_M = {"metro": 800, "tram": 500, "bus": 500}
 CELL_DEG = 0.01  # ~830 m east-west, ~1.1 km north-south at Rome
 METHOD = {
     "estimate": "straight_line",
@@ -125,10 +125,10 @@ def nearby_lines(
 
 
 def summary(rows: list[dict]) -> dict:
-    """Compact list badge: nearest metro line, nearest daytime bus line, total lines."""
+    """Compact list badge: nearest metro, nearest daytime tram/bus line, total lines."""
     return {
         "metro": next((r for r in rows if r["mode"] == "metro"), None),
-        "bus": next((r for r in rows if r["mode"] == "bus" and not r["night"]), None),
+        "surface": next((r for r in rows if r["mode"] != "metro" and not r["night"]), None),
         "lines": len(rows),
     }
 
