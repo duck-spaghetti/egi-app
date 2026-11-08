@@ -7,7 +7,8 @@ const transportSource = fs.readFileSync(path.join(__dirname, '../app/frontend/st
 let source = fs.readFileSync(path.join(__dirname, '../app/frontend/static/js/map.js'), 'utf8');
 // Isolate pure adaptation/filter helpers; real browser bootstrap is checked separately.
 source = source.replace(/init\(\)\.catch\(\(error\) => \{[\s\S]*?\n\}\);/, '');
-const sandbox = {document:{getElementById:()=>({})}, window:{EGI_MAP_CONTEXT:{languageCode:'it'},EGI_I18N:{t:(_key,_args,fallback)=>fallback||''}}, console, URLSearchParams};
+const fakeElement = () => ({classList:{add(){},remove(){},toggle(){}}, setAttribute(){}, addEventListener(){}, querySelectorAll:()=>[], innerHTML:'', textContent:'', scrollTop:0, dataset:{}});
+const sandbox = {document:{getElementById:()=>fakeElement(), querySelector:()=>fakeElement(), querySelectorAll:()=>[]}, window:{EGI_MAP_CONTEXT:{languageCode:'it'},EGI_I18N:{t:(_key,_args,fallback)=>fallback||''}}, console, URLSearchParams};
 vm.createContext(sandbox);
 vm.runInContext(transportSource + '\nthis.TransportLayer = TransportLayer;',sandbox);
 vm.runInContext(source,sandbox);
@@ -107,5 +108,8 @@ vm.runInContext(`
   if(!station.includes('tl-roundel') || !station.includes('>A<') || !station.includes('>B<')) throw Error('station icon lacks lines');
   if(!TransportLayer.stopIconHtml({kind:'stop',transport_type:'bus',routes:[]}).includes('tl-bus') || !TransportLayer.stopIconHtml({kind:'stop',transport_type:'tram',routes:[]}).includes('tl-tram')) throw Error('stop icons by mode missing');
   if(TransportLayer.popupHtml({kind:'stop',transport_type:'bus',name:'<b>x',routes:[]}).includes('<b>x')) throw Error('stop name not escaped in popup');
+  // Regression: a multi-service map pin must open the service chooser (broke in F1).
+  const twoAtSite=[make('site-a','Mensa',[12.5,41.9],1,'Mensa',7,false), make('site-b','Docce',[12.5,41.9],1,'Mensa',7,false)];
+  openServiceChooser(twoAtSite);
 `,sandbox);
 console.log('PASS: source filters, cross-category sites, contacts, Rome hours and open-now membership/closing boundaries, transit badge and rows, transport layer');

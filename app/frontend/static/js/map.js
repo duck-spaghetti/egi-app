@@ -1492,7 +1492,6 @@ function openServiceChooser(items, matched = new Set(items.map(p=>p.id))) {
   document.querySelector("#sheet-detail .sheet-head h2").textContent = "Scegli il servizio";
   document.getElementById("detail-body").innerHTML = `<h2>${escapeHtml(items[0].raw?.facility_name || "Gruppo della fonte")}</h2><p>${items.length} servizi con questa posizione. Scegli una scheda.</p>${items.map(p=>serviceButton(p,matched.has(p.id))).join("")}<p class="source-note">Collegamento provvisorio dal gruppo Helpinet; ogni servizio mantiene le proprie caratteristiche.</p>`;
   bindServiceButtons();
-  void loadTransitDetail(poi);
   document.querySelector("#sheet-detail .sheet-body").scrollTop=0;
   openSheet("sheet-detail");
 }
