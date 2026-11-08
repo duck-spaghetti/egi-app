@@ -1333,3 +1333,4 @@ html[dir="rtl"] .sheet-back-head .arrow,
 .tl-near.tl-stop { width:24px;height:24px;transform:translate(-12px,-12px);border-color:#ffd23f;box-shadow:0 0 0 4px rgba(255,210,63,.45),0 1px 4px rgba(0,0,0,.5); }
 .tl-near.tl-stop svg { width:15px;height:15px; }
 .tl-near.tl-station { box-shadow:0 0 0 4px rgba(255,210,63,.6),0 1px 4px rgba(0,0,0,.4); }
+.tl-focus-chip[hidden] { display:none; }

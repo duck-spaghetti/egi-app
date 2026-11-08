@@ -117,8 +117,17 @@ vm.runInContext(`
   const closest=TransportLayer.lineLabelPoint({type:'LineString',coordinates:[[12.4,41.8],[12.5,41.9],[12.6,42]]},[42,12.6]);
   if(closest[0]!==42 || closest[1]!==12.6) throw Error('line label not at vertex nearest the service');
   if(!TransportLayer.stopIconHtml({kind:'stop',transport_type:'bus',routes:[]},true).includes('tl-near')) throw Error('nearby stop not highlighted');
+  function twoSiteFixture(){ return [make('site-a','Mensa',[12.5,41.9],1,'Mensa',7,false), make('site-b','Docce',[12.5,41.9],1,'Mensa',7,false)]; }
+  // Focus view keeps only the focused site's markers.
+  const rendered=[]; const realRender=renderMarkers; renderMarkers=list=>rendered.push(list.map(p=>p.id)); renderList=()=>{};
+  state.pois=[near,far,...twoSiteFixture()]; state.filters={...state.filters,cats:new Set(['cibo','ascolto']),section:'all',type:'',prestation:'',access:'',q:'',openNow:false};
+  state.focusSiteKey=sourceSiteKey(far); refresh();
+  if(rendered.at(-1).join(',')!=='far') throw Error('focus view does not isolate the service site');
+  state.focusSiteKey=null; refresh();
+  if(rendered.at(-1).length<2) throw Error('clearing focus does not restore all sites');
+  renderMarkers=realRender;
   // Regression: a multi-service map pin must open the service chooser (broke in F1).
-  const twoAtSite=[make('site-a','Mensa',[12.5,41.9],1,'Mensa',7,false), make('site-b','Docce',[12.5,41.9],1,'Mensa',7,false)];
+  const twoAtSite=twoSiteFixture();
   openServiceChooser(twoAtSite);
 `,sandbox);
 console.log('PASS: source filters, cross-category sites, contacts, Rome hours and open-now membership/closing boundaries, transit badge and rows, transport layer, focus view');

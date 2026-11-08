@@ -6,6 +6,7 @@ const state = {
   languages: [],
   pois: [],
   transitByPlace: {},
+  focusSiteKey: null,
   transitAvailability: "loading",
   cityOptions: [],
   filters: {
@@ -383,6 +384,8 @@ function focusTransit(poi, rows) {
   if (!rows.length || !transport) return;
   closeSheets();
   if (state.view === "list") toggleView();
+  state.focusSiteKey = sourceSiteKey(poi);
+  refresh();
   const label = rows.length === 1
     ? `${modeName(rows[0].mode)} ${rows[0].code} vicino a ${poi.title}`
     : `${rows.length} linee vicino a ${poi.title}`;
@@ -391,6 +394,10 @@ function focusTransit(poi, rows) {
     label,
     stopIds: rows.map(row => row.stop_id),
     points: [[poi.latitude, poi.longitude], ...rows.filter(row => row.stop_point).map(row => [row.stop_point[1], row.stop_point[0]])],
+    onClear: () => {
+      state.focusSiteKey = null;
+      refresh();
+    },
   });
 }
 
@@ -498,7 +505,8 @@ function applyShellTranslations() {
 
 function refresh() {
   const list = filteredPois();
-  renderMarkers(list);
+  // In the transport focus view only the focused service's site stays on the map.
+  renderMarkers(state.focusSiteKey ? state.pois.filter(poi => sourceSiteKey(poi) === state.focusSiteKey) : list);
   renderList(list);
 }
 
@@ -1526,6 +1534,8 @@ function chooseReferencePoint() {
   state.choosingReference = true;
   closeSheets();
   if (state.view === "list") toggleView();
+  state.focusSiteKey = sourceSiteKey(poi);
+  refresh();
   document.getElementById("reference-status").textContent = "Tocca un punto sulla mappa come riferimento";
   showToast("Tocca la mappa per scegliere il riferimento");
 }

@@ -202,9 +202,9 @@ const TransportLayer = (() => {
       schedule();
     }
 
-    /** Show only routeIds; highlight stopIds; fit the map to points ([lat, lng]). */
-    function focus({routeIds, label, stopIds = [], points = []}) {
-      focused = {routeIds: [...new Set(routeIds)].slice(0, 80), label, stopIds: new Set(stopIds), center: points[0] || null};
+    /** Show only routeIds; highlight stopIds; fit the map to points ([lat, lng]); onClear runs when the focus ends. */
+    function focus({routeIds, label, stopIds = [], points = [], onClear = null}) {
+      focused = {routeIds: [...new Set(routeIds)].slice(0, 80), label, stopIds: new Set(stopIds), center: points[0] || null, onClear};
       chip.innerHTML = `<span>${escapeHtml(label)}</span><button type="button" aria-label="Chiudi vista linee e mostra tutta la rete">✕</button>`;
       chip.querySelector("button").addEventListener("click", () => clearFocus());
       chip.hidden = false;
@@ -214,7 +214,9 @@ const TransportLayer = (() => {
     }
 
     function clearFocus(reload = true) {
+      const onClear = focused?.onClear;
       focused = null;
+      onClear?.();
       chip.hidden = true;
       features = [];
       render();
