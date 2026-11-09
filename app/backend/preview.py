@@ -362,3 +362,66 @@ def map_service(row: dict[str, Any], category: dict[str, Any]) -> dict[str, Any]
         "coordinate_status": "geocoded_candidate_unverified" if point else "not_positioned",
         "is_active": True,
     }
+
+
+def debug_positions(rows: list[dict[str, Any]], source_code: str) -> dict[str, Any]:
+    """Every position candidate of one source, for local accuracy checks.
+
+    Unlike services(), this includes the candidates that are not shown as map points
+    (CAP area, municipality, ambiguous), with score, OSM match and alternatives.
+    """
+    points = []
+    for row in rows:
+        code = row.get("source_code", "helpinet")
+        if code != source_code:
+            continue
+        p = row["payload"]
+        if is_map_row(row):
+            geocode = row.get("geocode") or {}
+            chosen = geocode.get("chosen") or {}
+            shown, _ = map_position(geocode)
+            status = geocode.get("status") or "unresolved"
+            lat, lon = chosen.get("lat"), chosen.get("lon")
+            extra = {
+                "score": chosen.get("score"),
+                "match": chosen.get("display_name"),
+                "reasons": chosen.get("reasons", []),
+                "step": chosen.get("step"),
+                "ambiguous": bool(geocode.get("ambiguous")),
+                "alternatives": geocode.get("alternatives", []),
+                "postcode_anchor": geocode.get("postcode_anchor"),
+            }
+            layer = p.get("layer")
+        else:
+            shown = source_point(p["location"]["source_position"] or {})
+            status = "source_point" if shown else "no_position"
+            lat, lon = (shown["coordinates"][1], shown["coordinates"][0]) if shown else (None, None)
+            extra = {"ambiguous": False}
+            layer = p["source_classifications"].get("tipologia")
+        points.append({
+            "id": row["id"],
+            "name": p.get("name"),
+            "layer": layer,
+            "address": (p.get("location") or {}).get("address_raw"),
+            "status": status,
+            "lat": lat,
+            "lon": lon,
+            "shown_on_map": shown is not None,
+            "locator": row.get("source_locator"),
+            **extra,
+        })
+    counts: dict[str, int] = {}
+    for point in points:
+        counts[point["status"]] = counts.get(point["status"], 0) + 1
+    return {"source": source_code, "total": len(points), "status_counts": counts, "points": points}
+
+
+def source_list(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Displayed sources with their service counts."""
+    seen: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        code = row.get("source_code", "helpinet")
+        entry = seen.setdefault(code, {"code": code, "name": SOURCE_SHORT_NAMES.get(code, row.get("source_name") or "Helpinet"),
+                                       "dataset_url": row.get("dataset_url"), "services": 0})
+        entry["services"] += 1
+    return sorted(seen.values(), key=lambda e: e["name"])

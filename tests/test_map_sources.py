@@ -87,5 +87,25 @@ class MapSourceTests(unittest.TestCase):
             app.dependency_overrides.clear()
 
 
+    def test_debug_positions_include_hidden_candidates(self):
+        rows = [subject("h1", "Mensa", {}), map_row("a", "Mense", "matched_house"),
+                map_row("cap", "Mense", "postcode_area"), map_row("amb", "Mense", "matched_street", ambiguous=True)]
+        app.dependency_overrides[subject_source] = lambda: StaticSubjectSource(rows)
+        try:
+            client = TestClient(app)
+            data = client.get("/api/preview/debug/positions?source=programma-integra").json()
+            self.assertEqual(data["total"], 3)
+            by_id = {p["id"]: p for p in data["points"]}
+            self.assertTrue(by_id["a"]["shown_on_map"])
+            self.assertFalse(by_id["cap"]["shown_on_map"])
+            self.assertEqual(by_id["cap"]["lat"], 41.9, "hidden candidates keep their coordinates for checking")
+            self.assertTrue(by_id["amb"]["ambiguous"])
+            self.assertEqual(client.get("/api/preview/debug/positions?source=nessuna").status_code, 404)
+            codes = {s["code"]: s["services"] for s in client.get("/api/preview/debug/sources").json()}
+            self.assertEqual(codes, {"helpinet": 1, "programma-integra": 3})
+        finally:
+            app.dependency_overrides.clear()
+
+
 if __name__ == "__main__":
     unittest.main()

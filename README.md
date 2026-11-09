@@ -304,3 +304,19 @@ latest succeeded child `geocode` run; the cache probe covers all those run IDs.
   and a link to the original map. `/benchmark` still measures Helpinet only.
 - No cross-source deduplication: the same organization may appear once per source.
   No reuse licence is established for these maps, so they stay in the local preview.
+
+### Services above transport; one-source debug view (2026-11-09)
+
+Services are the primary layer. Marker clusters are opaque with a white halo, and the
+transport panes are dimmed (lines 70 %, stops 85 %) except while a line is focused,
+so transport stays secondary context under the services (panes: lines z 350, stops z 450,
+services z 600).
+
+`/map?debug=1` adds a "Debug fonti" panel for local position checks. Choosing a source
+hides the normal markers and draws every position candidate of that source, unclustered:
+green house, blue street, orange CAP area, red municipality only, purple source
+coordinates, dashed black ring when ambiguous. Statuses can be toggled. An optional
+line goes to the CAP centroid. Popups show the source address, OSM match, score,
+alternatives, an OpenStreetMap link and the service card. Data comes from
+`GET /api/preview/debug/sources` and `GET /api/preview/debug/positions?source=<code>`;
+these include candidates the normal map hides.

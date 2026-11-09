@@ -197,7 +197,10 @@ const TransportLayer = (() => {
     if (!map.getPane("transportLines")) map.createPane("transportLines").style.zIndex = 350;
     if (!map.getPane("transportStops")) map.createPane("transportStops").style.zIndex = 450;
     const layer = L.layerGroup().addTo(map);
-    const syncDetail = () => map.getContainer().classList.toggle("tl-detail", map.getZoom() >= DETAIL_ZOOM || Boolean(focused));
+    const syncDetail = () => {
+      map.getContainer().classList.toggle("tl-detail", map.getZoom() >= DETAIL_ZOOM || Boolean(focused));
+      map.getContainer().classList.toggle("tl-focused", Boolean(focused));
+    };
     map.on("zoomend", syncDetail);
     const modes = new Set(elements.modes ? MODES.filter(mode=>elements.modes[mode]?.checked) : MODES);
     let visible = false;

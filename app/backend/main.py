@@ -17,7 +17,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .geocoding import search_address
-from .preview import AREA, LANGUAGES, categories, is_map_row, services
+from .preview import AREA, LANGUAGES, categories, debug_positions, is_map_row, services, source_list
 from .presentation import coverage
 from .subjects import PostgresSubjectSource, SubjectSource, SubjectSourceUnavailable
 from .transport import ROOTS as TRANSPORT_ROOTS, transport_view_all
@@ -333,6 +333,21 @@ def source_coverage(rows: list[dict[str, Any]] = Depends(subjects)):
 def helpinet_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """The coverage benchmark measures Helpinet's native fields only."""
     return [r for r in rows if not is_map_row(r)]
+
+
+@app.get("/api/preview/debug/sources")
+def debug_sources(rows: list[dict[str, Any]] = Depends(subjects)):
+    """List displayed sources for the local position-check view (map ?debug=1)."""
+    return source_list(rows)
+
+
+@app.get("/api/preview/debug/positions")
+def debug_source_positions(source: str = Query(min_length=1, max_length=80), rows: list[dict[str, Any]] = Depends(subjects)):
+    """All position candidates of one source, including those not shown as map points."""
+    result = debug_positions(rows, source)
+    if not result["total"]:
+        raise HTTPException(404, "Fonte non presente nella preview")
+    return result
 
 
 @app.get("/benchmark", response_class=HTMLResponse)

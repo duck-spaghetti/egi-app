@@ -118,6 +118,13 @@ function initMap() {
       bus: document.getElementById("transport-bus"),
     },
   });
+  // Local position checks: ?debug=1 adds the one-source view (debug-sources.js).
+  if (new URLSearchParams(location.search).has("debug") && typeof DebugSources !== "undefined") {
+    DebugSources.create(map, {
+      setServicesVisible: visible => visible ? map.addLayer(markersLayer) : map.removeLayer(markersLayer),
+      openDetail: id => openDetail(id),
+    });
+  }
   map.on("click", event=>{
     if (!state.choosingReference) return;
     state.choosingReference=false;
