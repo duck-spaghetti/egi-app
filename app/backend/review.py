@@ -36,6 +36,8 @@ import unicodedata
 from collections import Counter, defaultdict
 from typing import Any
 
+from .identity import completeness, propose
+
 STOP = set("""di del della dello dei degli delle d e ed la il lo le i gli per a al alla alle ai in da dal dalla con su sul
 via viale piazza piazzale largo roma rm asl centro servizio servizi sede onlus odv aps ets odv consultorio familiare
 municipio associazione assoc cooperativa coop sociale soc onlus s n c snc the of and casa presso c o
@@ -308,16 +310,53 @@ def overlap_pairs(cards: list[dict[str, Any]], max_distance: float = 40.0) -> li
         if a.card["id"] > b.card["id"]:
             a, b = b, a
         ids = [a.card["id"], b.card["id"]]
-        pairs.append({
+        pair = {
             "pair_id": hashlib.sha1("|".join(ids).encode()).hexdigest()[:8],
             "tier": tier, "score": points, "evidence": why, **facts,
             "a": summary(a.card, a.point), "b": summary(b.card, b.point),
-        })
+        }
+        shared = set(facts["shared_contacts"])
+        pair["proposal"] = propose(pair, a.card, b.card, org_contacts=bool(shared) and shared <= org_contacts)
+        pairs.append(pair)
     _assign_groups(pairs)
+    _proposal_groups(pairs, {item.card["id"]: item.card for item in prepared})
     pairs.sort(key=lambda p: (p["tier"], -p["score"], p["distance_m"] if p["distance_m"] is not None else 9999, p["a"]["title"] or ""))
     for n, pair in enumerate(pairs, 1):
         pair["number"] = n
     return pairs
+
+
+def _proposal_groups(pairs: list[dict[str, Any]], cards: dict[str, dict[str, Any]]) -> None:
+    """Join confident "same service" proposals into one service mentioned by several datasets.
+
+    The most complete card of the group is its proposed primary; `mentions` counts the
+    sources (guide chapters count once per guide). Only a proposal: nothing is merged.
+    """
+    parent: dict[str, str] = {}
+
+    def find(x: str) -> str:
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for p in pairs:  # only confident pairs join: a generic card must not chain two sites into one
+        if p["proposal"]["decision"] == "same_service" and p["proposal"]["confidence"] == "alta":
+            parent[find(p["a"]["id"])] = find(p["b"]["id"])
+    members: dict[str, set[str]] = defaultdict(set)
+    for node in list(parent):
+        members[find(node)].add(node)
+    groups = {}
+    for root, ids in members.items():
+        primary = max(sorted(ids), key=lambda i: completeness(cards[i])[0])
+        sources = sorted({cards[i].get("source_code", "helpinet") for i in ids})
+        groups[root] = {"id": hashlib.sha1("|".join(sorted(ids)).encode()).hexdigest()[:6], "size": len(ids),
+                        "mentions": len(sources), "sources": sources, "primary": primary,
+                        "primary_title": cards[primary].get("service_title")}
+    for p in pairs:
+        root = find(p["a"]["id"]) if p["a"]["id"] in parent else None
+        p["proposal"]["group"] = groups.get(root) if root and p["proposal"]["decision"] == "same_service" else None
 
 
 def _assign_groups(pairs: list[dict[str, Any]]) -> None:
