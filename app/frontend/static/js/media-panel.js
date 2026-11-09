@@ -2,14 +2,12 @@
  *
  * MediaPanel.render(serviceId, container) asks /api/preview/media when the card opens
  * (never before) and shows the chosen representation: organisation or user photos
- * as images, Mapillary through its own viewer loaded only on request, and Google
- * Street View as an on-request link. Attribution and a link to the source are always
+ * as images, and Google Street View as an on-request link. Attribution and a link to the source are always
  * shown; sensitive services and remote/itinerant services get no image.
  */
 const MediaPanel = (() => {
   const PROVIDER = {
     organization: "Foto dell’organizzazione",
-    mapillary: "Mapillary",
     user: "Foto inviata da un utente",
   };
   const EXCLUDED = {
@@ -24,17 +22,11 @@ const MediaPanel = (() => {
   }
 
   function attribution(item) {
-    if (item.provider === "mapillary") {
-      return `Immagine <a href="${esc(item.page_url)}" target="_blank" rel="noopener">Mapillary</a>${item.author ? ` di ${esc(item.author)}` : ""} · ${esc(item.licence)}${item.distance_m != null ? ` · scattata a ${Math.round(item.distance_m)} m` : ""}${item.age_years != null ? `, ${item.age_years} anni fa` : ""}`;
-    }
     return `${esc(PROVIDER[item.provider] || item.provider)}${item.author ? ` · ${esc(item.author)}` : ""}${item.licence ? ` · ${esc(item.licence)}` : ""}`;
   }
 
   function figure(item, index) {
     const badge = item.is_360 ? '<span class="media-badge">360°</span>' : "";
-    if (item.provider === "mapillary") {
-      return `<figure class="media-figure" data-index="${index}">${badge}<button type="button" class="media-load" data-embed="${esc(item.embed_url)}">Mostra foto${item.is_360 ? " 360°" : ""} · Mapillary</button><figcaption>${attribution(item)}</figcaption></figure>`;
-    }
     return `<figure class="media-figure" data-index="${index}">${badge}<img src="${esc(item.url)}" alt="${esc(item.caption || "Ingresso del servizio")}" loading="lazy"><figcaption>${attribution(item)}</figcaption></figure>`;
   }
 
@@ -56,9 +48,6 @@ const MediaPanel = (() => {
       const data = await response.json();
       if (!container.isConnected) return data;
       container.innerHTML = html(data);
-      container.querySelectorAll(".media-load").forEach(button => button.addEventListener("click", () => {
-        button.outerHTML = `<iframe class="media-embed" title="Foto Mapillary" src="${esc(button.dataset.embed)}" allowfullscreen></iframe>`;
-      }));
       return data;
     } catch (_error) {
       return null; // photos are optional; the card works without them

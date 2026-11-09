@@ -3,14 +3,15 @@
 Decisions (user, 2026-11-09):
 - services that must not be easy to recognise get no image at all;
 - 360° images are preferred over flat ones;
-- provider priority: organisation submission, then Mapillary, then user submission;
-  Google Street View is offered only on request, as a link that opens Google Maps.
+- provider priority: organisation submission, then user submission; Google Street
+  View is offered only on request, as a link that opens Google Maps.
+Mapillary was tested (phase 1, .scratch/mapillary/) and removed on 2026-11-09: its
+car-mounted shots rarely show an entrance. It is recorded as future work.
 
 Inputs are local files written by other tools; nothing here downloads, stores or
 proxies images, and the app holds no provider token:
 - `.local/media/submissions.json`: approved organisation/user submissions (interim
   store until the `media.*` schema is approved; empty or absent is normal);
-- `.local/mapillary/candidates.json`: Mapillary metadata from the phase-1 run.
 The whole module is switched off with EGI_MEDIA_ENABLED=0.
 """
 
@@ -25,10 +26,7 @@ from typing import Any
 
 PROJECT = Path(__file__).resolve().parents[3]
 SUBMISSIONS = PROJECT / ".local/media/submissions.json"
-MAPILLARY = PROJECT / ".local/mapillary/candidates.json"
-PROVIDER_ORDER = ["organization", "mapillary", "user"]
-MAPILLARY_MAX_M = 30  # farther images rarely show the entrance (coverage run 2026-11-09)
-MAPILLARY_MAX_YEARS = 6
+PROVIDER_ORDER = ["organization", "user"]
 
 # Conservative: a false positive only hides photos. Matched against name, type,
 # layer, description and positive access/audience claims.
@@ -72,8 +70,8 @@ def _load(path: Path) -> Any:
 class MediaCatalog:
     """Read the local inputs, re-reading a file only when it changed."""
 
-    def __init__(self, submissions: Path = SUBMISSIONS, mapillary: Path = MAPILLARY):
-        self.paths = {"submissions": submissions, "mapillary": mapillary}
+    def __init__(self, submissions: Path = SUBMISSIONS):
+        self.paths = {"submissions": submissions}
         self.cache: dict[str, tuple[float, Any]] = {}
 
     def get(self, name: str) -> Any:
@@ -90,20 +88,6 @@ class MediaCatalog:
         rows = self.get("submissions") or []
         return [r for r in rows if r.get("service_id") == service_id and r.get("status") == "approved"
                 and r.get("provider") in {"organization", "user"} and r.get("url")]
-
-    def mapillary(self, service_id: str) -> list[dict[str, Any]]:
-        return ((self.get("mapillary") or {}).get("pois") or {}).get(service_id, {}).get("best", [])
-
-
-def mapillary_score(c: dict[str, Any]) -> float | None:
-    """Rank a Mapillary candidate; None when it is unlikely to show the entrance."""
-    distance, age = c.get("distance_m"), c.get("age_years")
-    if distance is None or distance > MAPILLARY_MAX_M or (age is not None and age > MAPILLARY_MAX_YEARS):
-        return None
-    if not (c.get("pano") or c.get("facing")):
-        return None
-    score = 3 * (1 - distance / MAPILLARY_MAX_M) + (1 if age is not None and age < 3 else 0)
-    return score + (3 if c.get("pano") else 0)  # 360° first
 
 
 def _item(provider: str, **fields: Any) -> dict[str, Any]:
@@ -132,16 +116,6 @@ def representation(service: dict[str, Any], catalog: MediaCatalog) -> dict[str, 
         items.append((rank, (3 if s.get("is_360") else 0) + (1 if s.get("primary") else 0), _item(
             s["provider"], url=s["url"], is_360=bool(s.get("is_360")), author=s.get("author"),
             licence=s.get("licence"), caption=s.get("caption"), submitted_at=s.get("submitted_at"))))
-    for c in catalog.mapillary(service["id"]):
-        score = mapillary_score(c)
-        if score is None:
-            continue
-        items.append((PROVIDER_ORDER.index("mapillary"), score, _item(
-            "mapillary", image_id=c["id"], is_360=bool(c.get("pano")), author=c.get("creator"),
-            licence="CC BY-SA 4.0", distance_m=c.get("distance_m"), age_years=c.get("age_years"),
-            camera={"lat": c.get("lat"), "lon": c.get("lon"), "bearing": c.get("bearing")},
-            embed_url=f"https://www.mapillary.com/embed?image_key={c['id']}&style=photo",
-            page_url=f"https://www.mapillary.com/app/?pKey={c['id']}&focus=photo")))
     items.sort(key=lambda t: (t[0], -t[1]))
     ordered = [i for *_, i in items]
     result["primary"] = ordered[0] if ordered else None

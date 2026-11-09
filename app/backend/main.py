@@ -18,7 +18,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .geocoding import search_address
-from .media import MediaCatalog, enabled as media_enabled, representation, sensitivity
+from .media import MediaCatalog, enabled as media_enabled, representation
 from .preview import AREA, LANGUAGES, categories, debug_positions, is_map_row, services, source_list
 from .presentation import coverage
 from .subjects import PostgresSubjectSource, SubjectSource, SubjectSourceUnavailable
@@ -359,36 +359,11 @@ def service_by_id(rows: list[dict[str, Any]], service_id: str) -> dict[str, Any]
 
 @app.get("/api/preview/media")
 def service_media(service: str = Query(min_length=1, max_length=80), rows: list[dict[str, Any]] = Depends(subjects)):
-    """How to represent one service: priority organisation > Mapillary > user; Street View on request."""
+    """How to represent one service: priority organisation > user; Street View on request."""
     card = service_by_id(rows, service)
     if card is None:
         raise HTTPException(404, "Servizio non disponibile")
     return representation(card, MEDIA_CATALOG)
-
-
-MAPILLARY_CANDIDATES = Path(__file__).resolve().parents[3] / ".local/mapillary/candidates.json"
-
-
-@app.get("/api/preview/debug/mapillary")
-def debug_mapillary(rows: list[dict[str, Any]] = Depends(subjects)):
-    """Phase-1 Mapillary test: ranked image candidates for the sampled POIs.
-
-    Metadata only, produced by .scratch/mapillary/coverage.py; images are shown through
-    Mapillary's own embed viewer, never downloaded or stored by EGI.
-    """
-    try:
-        data = json.loads(MAPILLARY_CANDIDATES.read_text())
-    except (OSError, ValueError):
-        return {"available": False, "pois": {}}
-    # Sensitive services are excluded from images everywhere, debug included.
-    kept = {}
-    for poi_id, entry in data.get("pois", {}).items():
-        card = service_by_id(rows, poi_id)
-        if card is None or not sensitivity(card):
-            kept[poi_id] = entry
-    data["excluded_sensitive"] = len(data.get("pois", {})) - len(kept)
-    data["pois"] = kept
-    return {"available": True, **data}
 
 
 @app.get("/api/preview/debug/positions")

@@ -46,8 +46,7 @@ const DebugSources = (() => {
     panel.innerHTML = `<header><strong>Debug fonti</strong><button type="button" class="dbg-collapse" aria-expanded="true">–</button></header>
       <div class="dbg-body"><label>Fonte <select class="dbg-source"><option value="">— servizi normali —</option></select></label>
       <label class="dbg-check"><input type="checkbox" class="dbg-anchor"> Linea verso il centro del CAP</label>
-      <div class="dbg-legend"></div><div class="dbg-missing"></div>
-      <details class="dbg-photos"><summary>Test foto Mapillary</summary><div class="dbg-photo-list">Caricamento…</div></details></div>`;
+      <div class="dbg-legend"></div><div class="dbg-missing"></div></div>`;
     document.body.appendChild(panel);
     const select = panel.querySelector(".dbg-source");
     const legend = panel.querySelector(".dbg-legend");
@@ -108,52 +107,6 @@ const DebugSources = (() => {
       missing.innerHTML = none.length ? `<details><summary>Senza posizione: ${none.length}</summary><ul>${none.map(p => `<li><button type="button" class="dbg-open" data-id="${esc(p.id)}">${esc(p.name)}</button> · ${esc(p.address || "—")}</li>`).join("")}</ul></details>` : "";
     }
 
-    const cameras = L.layerGroup().addTo(map);
-    let photos = {};
-    fetch("/api/preview/debug/mapillary").then(r => r.json()).then(data => {
-      photos = data.pois || {};
-      const list = panel.querySelector(".dbg-photo-list");
-      if (!data.available) { list.textContent = "Nessun test: eseguire .scratch/mapillary/coverage.py"; return; }
-      const rows = Object.entries(photos).sort((a, b) => (b[1].best[0]?.score ?? -1) - (a[1].best[0]?.score ?? -1));
-      const withImages = rows.filter(([, v]) => v.best.length).length;
-      list.innerHTML = `<p class="dbg-note">${rows.length} servizi del campione · ${withImages} con immagini entro ~100 m. Apri la scheda per vedere le candidate.</p><ol>${rows.map(([id, v]) => `<li><button type="button" class="dbg-open" data-id="${esc(id)}">${esc(v.name)}</button> <small>${v.best.length ? `${v.best[0].distance_m} m · ${v.best[0].facing ? "verso il servizio" : "di lato"} · punteggio ${v.best[0].score}` : "nessuna immagine"}</small></li>`).join("")}</ol>`;
-    });
-
-    /** Photo-test section for a service card; draws candidate cameras on the map. */
-    function photoSection(poi) {
-      cameras.clearLayers();
-      const entry = photos[poi.id];
-      if (!entry) return "";
-      if (!entry.best.length) return `<section class="detail-section dbg-photo"><h3>Foto Mapillary (test)</h3><p>Nessuna immagine entro ~100 m.</p></section>`;
-      entry.best.forEach((c, i) => {
-        const color = c.facing ? "#1a9850" : "#888";
-        L.circleMarker([c.lat, c.lon], {pane: "debugPoints", radius: 6, color: "#fff", weight: 1.5, fillColor: color, fillOpacity: 1})
-          .bindTooltip(`${i + 1} · ${c.distance_m} m`).addTo(cameras);
-        if (Number.isFinite(c.bearing) && !c.pano) {
-          const k = 0.00025, rad = c.bearing * Math.PI / 180;
-          L.polyline([[c.lat, c.lon], [c.lat + k * Math.cos(rad), c.lon + k * Math.sin(rad) / Math.cos(c.lat * Math.PI / 180)]],
-            {pane: "debugPoints", color, weight: 3, interactive: false}).addTo(cameras);
-        }
-      });
-      return `<section class="detail-section dbg-photo"><h3>Foto Mapillary (test)</h3>
-        <p class="dbg-note">Candidate ordinate per distanza, direzione della camera, età e panorama. Sulla mappa: punti numerati con la direzione di scatto (verde = rivolta verso il servizio).</p>
-        <ol class="dbg-cands">${entry.best.map((c, i) => `<li><button type="button" class="dbg-cand" data-image="${esc(c.id)}">${i + 1}. ${c.distance_m} m · ${c.pano ? "360°" : c.angle_off == null ? "direzione ignota" : `${c.angle_off}° dal servizio`} · ${c.age_years ?? "?"} anni · ${esc(c.score)}</button></li>`).join("")}</ol>
-        <div class="dbg-viewer"></div>
-        <p class="dbg-attrib">Immagini <a href="https://www.mapillary.com" target="_blank" rel="noopener">Mapillary</a>, CC BY-SA 4.0 · visualizzatore ufficiale, nessuna copia salvata da EGI.</p></section>`;
-    }
-
-    /** Load Mapillary's own viewer only when a candidate is chosen. */
-    function bindPhotoSection(root) {
-      root.querySelectorAll(".dbg-cand").forEach(button => button.addEventListener("click", () => {
-        const id = button.dataset.image;
-        const entry = Object.values(photos).flatMap(v => v.best).find(c => c.id === id);
-        root.querySelectorAll(".dbg-cand").forEach(b => b.classList.toggle("active", b === button));
-        root.querySelector(".dbg-viewer").innerHTML = `<iframe title="Immagine Mapillary ${esc(id)}" src="https://www.mapillary.com/embed?image_key=${encodeURIComponent(id)}&style=photo" loading="lazy" allowfullscreen></iframe>
-          <p class="dbg-note">Autore: ${esc(entry?.creator || "sconosciuto")} · <a href="https://www.mapillary.com/app/?pKey=${encodeURIComponent(id)}&focus=photo" target="_blank" rel="noopener">apri su Mapillary</a></p>`;
-        if (entry) map.panTo([entry.lat, entry.lon]);
-      }));
-    }
-
     select.addEventListener("change", async () => {
       hidden.clear();
       data = null;
@@ -167,7 +120,7 @@ const DebugSources = (() => {
       draw(true);
     });
     anchor.addEventListener("change", () => draw(false));
-    return {panel, photoSection, bindPhotoSection, clearCameras: () => cameras.clearLayers()};
+    return {panel};
   }
 
   return {create, STATUS, popupHtml};
