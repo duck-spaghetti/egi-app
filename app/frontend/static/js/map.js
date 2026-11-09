@@ -291,7 +291,9 @@ async function fetchPublicServices() {
   const params = new URLSearchParams({
     area_id: String(context.cityId),
     language: normalizeLang(state.lang),
-    limit: "2000",
+    // The backend maximum: 2,000 silently dropped services once the guide chapters were loaded
+    // (2,038 placed on 2026-11-09). Pagination is open work if the catalogue nears 5,000.
+    limit: "5000",
   });
   // Services without a map point are hidden; the review view (?debug=1) still lists them.
   if (DEBUG_MODE) params.set("include_unplaced", "true");
