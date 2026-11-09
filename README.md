@@ -320,3 +320,15 @@ line goes to the CAP centroid. Popups show the source address, OSM match, score,
 alternatives, an OpenStreetMap link and the service card. Data comes from
 `GET /api/preview/debug/sources` and `GET /api/preview/debug/positions?source=<code>`;
 these include candidates the normal map hides.
+
+### Mapillary photo test (debug only, 2026-11-09)
+
+Phase-1 test for the Mapillary feasibility study
+([feasibility](../.scratch/mapillary/feasibility.md)). `.scratch/mapillary/coverage.py
+candidates` writes ranked image candidates for the 100 sampled POIs to
+`.local/mapillary/candidates.json` (metadata only). With `/map?debug=1`,
+`GET /api/preview/debug/mapillary` serves that file. The debug panel lists the sample, and
+a sampled service card gets a "Foto Mapillary (test)" section with up to six candidates
+whose camera positions and directions are drawn on the map. Choosing one loads
+Mapillary's own embed viewer (`mapillary.com/embed`). EGI downloads and stores no image,
+and the app holds no token. Not visible without `?debug=1`.

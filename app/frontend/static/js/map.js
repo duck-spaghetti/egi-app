@@ -35,6 +35,7 @@ const settingsBackHead = document.getElementById("settings-back-head");
 let map;
 let markersLayer;
 let transport;
+let debugView = null;
 let userMarker;
 let cityBounds;
 let sheetReturnFocus = null;
@@ -120,7 +121,7 @@ function initMap() {
   });
   // Local position checks: ?debug=1 adds the one-source view (debug-sources.js).
   if (new URLSearchParams(location.search).has("debug") && typeof DebugSources !== "undefined") {
-    DebugSources.create(map, {
+    debugView = DebugSources.create(map, {
       setServicesVisible: visible => visible ? map.addLayer(markersLayer) : map.removeLayer(markersLayer),
       openDetail: id => openDetail(id),
     });
@@ -735,6 +736,11 @@ async function openDetail(id) {
     <section class="detail-section"><h3>Contatti di questo servizio</h3>${renderContacts(poi.contacts || [])}</section>
     ${siblings.length?`<section class="detail-section"><h3>Altri servizi presso ${escapeHtml(raw.facility_name || "questo gruppo")}</h3><p class="source-note">Collegamento provvisorio dal gruppo Helpinet. Ogni scheda mantiene orari, accesso e contatti indipendenti.</p>${siblings.map(serviceButton).join("")}</section>`:""}
     <details class="detail-section"><summary>Provenienza e dati originali</summary>${renderProvenance(poi)}<pre class="source-evidence">${escapeHtml(JSON.stringify({record:raw.source_locator,gruppo:raw.source_group,sintesi:raw.derived_summary,campi_originali:raw.source_values,posizione:raw.position,da_verificare:raw.review_required},null,2))}</pre></details>`;
+  if (debugView) {
+    const body = document.getElementById("detail-body");
+    body.insertAdjacentHTML("beforeend", debugView.photoSection(poi));
+    debugView.bindPhotoSection(body);
+  }
   bindServiceButtons();
   void loadTransitDetail(poi);
   document.querySelector("#sheet-detail .sheet-body").scrollTop=0;

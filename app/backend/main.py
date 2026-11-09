@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import urllib.error
 from pathlib import Path
 from types import SimpleNamespace
@@ -339,6 +340,22 @@ def helpinet_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def debug_sources(rows: list[dict[str, Any]] = Depends(subjects)):
     """List displayed sources for the local position-check view (map ?debug=1)."""
     return source_list(rows)
+
+
+MAPILLARY_CANDIDATES = Path(__file__).resolve().parents[3] / ".local/mapillary/candidates.json"
+
+
+@app.get("/api/preview/debug/mapillary")
+def debug_mapillary():
+    """Phase-1 Mapillary test: ranked image candidates for the sampled POIs.
+
+    Metadata only, produced by .scratch/mapillary/coverage.py; images are shown through
+    Mapillary's own embed viewer, never downloaded or stored by EGI.
+    """
+    try:
+        return {"available": True, **json.loads(MAPILLARY_CANDIDATES.read_text())}
+    except (OSError, ValueError):
+        return {"available": False, "pois": {}}
 
 
 @app.get("/api/preview/debug/positions")
