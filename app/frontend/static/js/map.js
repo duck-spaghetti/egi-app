@@ -775,7 +775,7 @@ async function openDetail(id) {
     <p class="source-note">${escapeHtml(sourceName(poi))} · dati non revisionati.${raw.itinerant_source?" Servizio itinerante: il punto della fonte non è una sede fissa verificata.":""}</p>
     ${renderPositionNote(raw)}
     ${transitSectionShell(poi)}
-    <section class="detail-section"><h3>Descrizione</h3><p>${escapeHtml(description)}</p>${!raw.description && summary?.text?'<span class="derived-label">Sintesi ricavata dai campi della fonte · non descrizione originale</span>':""}</section>
+    <section class="detail-section"><h3>Descrizione</h3><p${raw.sources?.[0]?.source_kind==="document"?' class="source-printed-text"':""}>${escapeHtml(description)}</p>${!raw.description && summary?.text?'<span class="derived-label">Sintesi ricavata dai campi della fonte · non descrizione originale</span>':""}</section>
     <section class="detail-section"><h3>${raw.source_code && raw.source_code!=="helpinet" ? "Temi indicati" : "Prestazioni indicate"}</h3><div class="service-chips">${prestations.map(v=>`<span class="service-chip">${escapeHtml(v.nome)}</span>`).join("") || "Non indicati dalla fonte"}</div></section>
     ${raw.source_code && raw.source_code!=="helpinet" && !raw.access_display?.sections?.length && !raw.access_display?.texts?.length ? "" : `<section class="detail-section"><h3>Accesso e destinatari</h3>${renderSourceAccess(raw.access_display)}</section>`}
     <section class="detail-section"><h3>Orari del servizio</h3>${renderSourceHours(raw.hours_display)}</section>
