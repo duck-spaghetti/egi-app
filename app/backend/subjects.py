@@ -24,7 +24,7 @@ PSQL = os.environ.get("EGI_PSQL", "/Library/PostgreSQL/18/bin/psql")
 PROJECT = Path(__file__).resolve().parents[3]
 
 # One latest succeeded normalization run per displayed source: the preserved
-# Helpinet extract and every map export (Google My Maps). A map run's position
+# Helpinet extract, every map export (Google My Maps) and every open-data CSV source. A map run's position
 # candidates come from its latest succeeded geocode child run, matched by locator.
 LATEST_RUN = """WITH latest AS (
  SELECT DISTINCT ON (r.code) r.code,r.name,r.homepage,r.attribution,d.resource_url,p.run_id,
@@ -32,7 +32,7 @@ LATEST_RUN = """WITH latest AS (
  FROM sources.processing_runs p JOIN sources.captures c USING(capture_id)
  JOIN sources.datasets d USING(dataset_id) JOIN sources.registry r USING(source_id)
  WHERE p.run_kind='normalize' AND p.status='succeeded'
- AND ((r.code='helpinet' AND d.external_key='helpinet-preserved-api-extract') OR r.source_kind='map_export')
+ AND ((r.code='helpinet' AND d.external_key='helpinet-preserved-api-extract') OR r.source_kind IN ('map_export','open_data'))
  ORDER BY r.code,p.started_at DESC,p.finished_at DESC,p.run_id
 ), geo AS (
  SELECT DISTINCT ON (g.parent_run_id) g.parent_run_id,g.run_id

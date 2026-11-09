@@ -415,3 +415,11 @@ Nothing is merged. The existing schema already models identity resolution
 (`governance.match_candidates`, `resolution_decisions`, `subject_bindings`), but against
 canonical `data.entities`, which is a separately approved step. Until then, decisions are
 review evidence only, so no schema change is needed.
+
+### Official consultori source (2026-11-09)
+
+The app also reads `open_data` sources. The first is the Ministry of Health consultori list
+(`ministero-salute-consultori`, shown as "Ministero della Salute"): 126 of 158 Lazio
+consultori placed from the address, under IODL 2.0. Its pairs with GrIS and Programma
+Integra appear on `/revisione/doppioni` (fascia A: 91 pairs), which pilots the consultori
+deduplication.

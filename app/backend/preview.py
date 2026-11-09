@@ -102,6 +102,7 @@ SOURCE_SHORT_NAMES = {
     "gris-lazio-simm": "GrIS Lazio",
     "scuolemigranti": "Scuolemigranti",
     "programma-integra": "Programma Integra",
+    "ministero-salute-consultori": "Ministero della Salute",
 }
 MONTHS = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio",
           "agosto", "settembre", "ottobre", "novembre", "dicembre"]
