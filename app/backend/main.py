@@ -18,6 +18,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .geocoding import search_address
+from .review import overlap_pairs
 from .preview import AREA, LANGUAGES, categories, debug_positions, is_map_row, services, source_list
 from .presentation import coverage
 from .subjects import PostgresSubjectSource, SubjectSource, SubjectSourceUnavailable
@@ -363,6 +364,21 @@ def debug_source_positions(source: str = Query(min_length=1, max_length=80), row
     if not result["total"]:
         raise HTTPException(404, "Fonte non presente nella preview")
     return result
+
+
+@app.get("/api/preview/review/overlaps")
+def review_overlaps(tiers: str = Query(default="A,B,C,D", max_length=10), rows: list[dict[str, Any]] = Depends(subjects)):
+    """Cross-source candidate pairs among shown services, for the duplicate review page."""
+    wanted = {t for t in tiers.split(",") if t in {"A", "B", "C", "D"}}
+    pairs = [p for p in overlap_pairs([c for c in services(rows) if is_placed(c)]) if p["tier"] in wanted]
+    return {"pairs": pairs, "count": len(pairs),
+            "note": "Coppie da fonti diverse; le decisioni restano nel browser finché non vengono registrate dal curatore."}
+
+
+@app.get("/revisione/doppioni", response_class=HTMLResponse)
+def review_page(request: Request):
+    """Local review page: overlapping services side by side, answers kept in the browser."""
+    return templates.TemplateResponse(request=request, name="review_overlaps.html", context={})
 
 
 @app.get("/benchmark", response_class=HTMLResponse)

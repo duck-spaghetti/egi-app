@@ -392,3 +392,26 @@ Also fixed: "Scegli punto" threw `poi is not defined` (a stray line from `3a6bad
   older than 18 months at acquisition are highlighted; Helpinet and undated sources say the
   date is unknown. The banner reads "non sempre aggiornati". Data are imported as is, and
   reviewers enrich, clean, deduplicate and verify with the providers.
+
+### Duplicate review page (2026-11-09)
+
+`/revisione/doppioni` lists cross-source candidate pairs among the services shown on the
+map (`app/backend/review.py`, `GET /api/preview/review/overlaps`):
+
+| Tier | Rule |
+| --- | --- |
+| A | Same street and number, and same service type |
+| B | Within 40 m, same type |
+| C | Same address or within 25 m, with shared name words |
+| D | Within 25 m only; off by default |
+
+Each pair shows a map with A and B, and the two records side by side with differing
+cells highlighted. The answers are: same service, same place but different services,
+different, or not sure; keys 1/2/3/0, with J/K to move between pairs. Answers stay in the
+browser (localStorage), and "Copia decisioni" gives text to paste to the curator, who
+records it in `egi-importer/curation/matches.csv`.
+
+Nothing is merged. The existing schema already models identity resolution
+(`governance.match_candidates`, `resolution_decisions`, `subject_bindings`), but against
+canonical `data.entities`, which is a separately approved step. Until then, decisions are
+review evidence only, so no schema change is needed.
