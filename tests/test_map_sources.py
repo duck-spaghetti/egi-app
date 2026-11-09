@@ -131,5 +131,20 @@ class MapSourceTests(unittest.TestCase):
         self.assertEqual({c["slug"] for c in categories([base, secondary, school])}, {"curarmi"})
 
 
+    def test_position_issue_is_explicit(self):
+        """Strategy 0.3 issues: named places and manual fixes are points; every other record says why not."""
+        poi = map_row("p", "Salute", "matched_poi"); poi["geocode"]["issue"] = "ok"
+        manual = map_row("m", "Salute", "manual"); manual["geocode"]["issue"] = "manual"
+        cap = map_row("c", "Salute", "postcode_area"); cap["geocode"]["issue"] = "postcode_area_only"
+        street = map_row("s", "Salute", "locality_only"); street["geocode"]["issue"] = "no_street"
+        by_id = {x["id"]: x for x in services([poi, manual, cap, street])}
+        self.assertIsNotNone(by_id["p"]["place"]["geometry"])
+        self.assertIn("luogo indicato", by_id["p"]["placement"]["label"])
+        self.assertIn("a mano", by_id["m"]["placement"]["label"])
+        self.assertEqual(by_id["c"]["placement"]["issue"], "postcode_area_only")
+        self.assertIsNone(by_id["c"]["place"]["geometry"])
+        self.assertIn("senza via", by_id["s"]["placement"]["label"])
+
+
 if __name__ == "__main__":
     unittest.main()

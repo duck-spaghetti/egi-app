@@ -11,7 +11,7 @@ const state = {
   cityOptions: [],
   filters: {
     cats: new Set(),
-    q: "", source: "", type: "", prestation: "", access: "", section: "all", order: "name", openNow: false,
+    q: "", source: "", issue: "", type: "", prestation: "", access: "", section: "all", order: "name", openNow: false,
   },
   view: "map",
   userLoc: null,
@@ -168,7 +168,7 @@ async function loadData() {
 function bindUi() {
   document.getElementById("open-now-filter").addEventListener("change",event=>{state.filters.openNow=event.target.checked; refresh();});
   document.getElementById("service-query").addEventListener("input",event=>{state.filters.q=event.target.value; refresh();});
-  for (const [id,key] of [["source-filter","source"],["service-type-filter","type"],["prestation-filter","prestation"],["access-filter","access"],["section-filter","section"],["sort-services","order"]]) {
+  for (const [id,key] of [["source-filter","source"],["issue-filter","issue"],["service-type-filter","type"],["prestation-filter","prestation"],["access-filter","access"],["section-filter","section"],["sort-services","order"]]) {
     document.getElementById(id).addEventListener("change",event=>{
       state.filters[key]=event.target.value;
       if (key==="type" || key==="source") renderSearchOptions();
@@ -185,7 +185,7 @@ function bindUi() {
   document.getElementById("open-emergency").addEventListener("click", () => openSheet("sheet-sos"));
   document.getElementById("open-directory").addEventListener("click", () => {
     state.filters.section="directory";
-    state.filters.q=""; state.filters.source=""; state.filters.type=""; state.filters.prestation=""; state.filters.access="";
+    state.filters.q=""; state.filters.source=""; state.filters.issue=""; state.filters.type=""; state.filters.prestation=""; state.filters.access="";
     state.filters.openNow=false; state.filters.cats=new Set(state.categories.map(c=>c.slug));
     document.getElementById("section-filter").value="directory";
     document.getElementById("service-query").value="";
@@ -612,6 +612,7 @@ function renderActiveFilters() {
     f.q?.trim() ? `“${f.q.trim()}”` : "",
     f.openNow ? "Aperti ora" : "",
     f.source ? selectedLabel("source-filter", f.source) : "",
+    f.issue ? selectedLabel("issue-filter", f.issue) : "",
     f.type,
     f.prestation ? selectedLabel("prestation-filter", "Prestazione") : "",
     f.access ? selectedLabel("access-filter", f.access) : "",
@@ -635,6 +636,7 @@ function facetValues(poi, facet) {
   if (facet === "source") return [sourceCode(poi)];
   if (facet === "type") return raw.native_classifications?.tipologia ? [raw.native_classifications.tipologia] : [];
   if (facet === "prestation") return (raw.native_classifications?.prestazioni || []).map(v => String(v.id));
+  if (facet === "issue") return raw.placement?.issue && raw.placement.issue !== "ok" && raw.placement.issue !== "manual" ? [raw.placement.issue] : [];
   if (facet === "access") return Object.entries(raw.access_raw || {}).filter(([, v]) => v === true).map(([k]) => k);
   return [];
 }
@@ -643,7 +645,7 @@ function facetValues(poi, facet) {
 function passesFilters(p, skip = null, now = new Date(), terms = searchTerms()) {
   const f = state.filters;
   if (skip !== "cats" && !facetValues(p, "cats").some(slug => f.cats.has(slug))) return false;
-  for (const facet of ["source", "type", "prestation", "access"]) {
+  for (const facet of ["source", "issue", "type", "prestation", "access"]) {
     if (skip !== facet && f[facet] && !facetValues(p, facet).includes(f[facet])) return false;
   }
   if (terms.length && !terms.every(term => searchableService(p).includes(term))) return false;
@@ -658,10 +660,10 @@ function passesFilters(p, skip = null, now = new Date(), terms = searchTerms()) 
 /** Per-facet counts: each value counted under all the other active filters. */
 function facetCounts(now = new Date()) {
   const terms = searchTerms();
-  const counts = {cats: new Map(), source: new Map(), type: new Map(), prestation: new Map(), access: new Map(), shown: 0};
+  const counts = {cats: new Map(), source: new Map(), issue: new Map(), type: new Map(), prestation: new Map(), access: new Map(), shown: 0};
   for (const p of state.pois) {
     if (passesFilters(p, null, now, terms)) counts.shown++;
-    for (const facet of ["cats", "source", "type", "prestation", "access"]) {
+    for (const facet of ["cats", "source", "issue", "type", "prestation", "access"]) {
       if (!passesFilters(p, facet, now, terms)) continue;
       for (const v of facetValues(p, facet)) counts[facet].set(v, (counts[facet].get(v) || 0) + 1);
     }
@@ -1679,6 +1681,13 @@ function searchableService(poi) {
     ...(raw.contacts || []).map(c => c.value)].filter(Boolean).join(" "));
 }
 
+/** Why a service has no map point (importer `issue`, see app/backend/preview.py). */
+const POSITION_ISSUES = {
+  no_address: "Indirizzo mancante", no_street: "Via mancante", no_street_unresolved: "Via mancante, non trovata",
+  unresolved: "Indirizzo non trovato", municipality_only: "Trovato solo il comune", postcode_area_only: "Trovato solo il CAP",
+  ambiguous: "Indirizzo ambiguo", no_coordinates: "Coordinate mancanti (Helpinet)",
+};
+
 /** Rebuild one select: values with a count under the other filters, plus the selected one. */
 function fillFacetSelect(select, facet, allLabel, labels) {
   const counts = state.facets?.[facet] || new Map();
@@ -1709,6 +1718,8 @@ function renderSearchOptions() {
   fillFacetSelect(prestations, "prestation", "Tutte le prestazioni", labels.prestation);
   fillFacetSelect(access, "access", "Tutte le indicazioni di accesso", labels.access);
   if (sources) fillFacetSelect(sources, "source", "Tutte le fonti", labels.source);
+  const issues = document.getElementById("issue-filter");
+  if (issues) fillFacetSelect(issues, "issue", "Qualsiasi (anche posizioni presenti)", new Map(Object.entries(POSITION_ISSUES)));
 }
 
 /** Recount facets and update the filter sheet: total, need tiles and selects. */
@@ -1792,8 +1803,6 @@ function chooseReferencePoint() {
   state.choosingReference = true;
   closeSheets();
   if (state.view === "list") toggleView();
-  state.focusSiteKey = sourceSiteKey(poi);
-  refresh();
   document.getElementById("reference-status").textContent = "Tocca un punto sulla mappa come riferimento";
   showToast("Tocca la mappa per scegliere il riferimento");
 }

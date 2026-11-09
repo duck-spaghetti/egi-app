@@ -352,3 +352,29 @@ Cards follow the importer's classification
 - GrIS services at one address are grouped as one site.
 
 Older payloads fall back to the `MAP_LAYER_GROUPS` crosswalk.
+
+### Explicit position issues (2026-11-09)
+
+Every card carries `placement.issue`. For map sources it comes from the importer's
+geocoding strategy 0.3; Helpinet uses `no_coordinates` or `no_address`. Values:
+
+| Issue | Card label | Map point? |
+| --- | --- | --- |
+| `ok` | position estimate | yes |
+| `manual` | corrected by hand | yes |
+| `ambiguous` | address with several matches | no |
+| `postcode_area_only` | only the CAP found | no |
+| `municipality_only` | only the municipality found | no |
+| `no_street`, `no_street_unresolved` | address without a street | no |
+| `unresolved` | address not found | no |
+| `no_address` | source gives no address | no |
+| `no_coordinates` | Helpinet without coordinates | no |
+
+Named-place matches (`matched_poi`) are shown as map points too.
+
+The Filtri sheet has a "Problema di posizione" select with faceted counts. The debug
+view (`/map?debug=1`) colours named places and manual fixes. To fix a position, fill
+`../egi-importer/curation/positions.csv` (the to-do list comes with every importer
+run) and re-run geocoding.
+
+Also fixed: "Scegli punto" threw `poi is not defined` (a stray line from `3a6bad3`).

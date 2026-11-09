@@ -13,6 +13,8 @@ const DebugSources = (() => {
     matched_street: {color: "#2c7bb6", label: "Via"},
     postcode_area: {color: "#f39c12", label: "Area CAP"},
     locality_only: {color: "#d7191c", label: "Solo comune"},
+    matched_poi: {color: "#00a6a6", label: "Luogo noto (es. consultorio)"},
+    manual: {color: "#000000", label: "Correzione manuale"},
     source_point: {color: "#7b3294", label: "Coordinate della fonte"},
     unresolved: {color: "#777", label: "Non trovato"},
     no_address: {color: "#777", label: "Senza indirizzo"},
@@ -29,7 +31,7 @@ const DebugSources = (() => {
     const alternatives = (p.alternatives || []).slice(1).map(a => `<li>${esc(a.level)} · ${esc(a.score)} · ${esc(a.display_name)}</li>`).join("");
     return `<div class="dbg-popup"><strong>${esc(p.name)}</strong><br><small>${esc(p.layer || "")}</small>
       <p><b>Indirizzo fonte:</b> ${esc(p.address || "—")}</p>
-      <p><b>Stato:</b> ${esc(STATUS[p.status]?.label || p.status)}${p.ambiguous ? " · <b>ambiguo</b>" : ""}${p.shown_on_map ? " · sulla mappa" : " · solo lista"}${p.score != null ? ` · punteggio ${esc(p.score)}` : ""}${p.step ? ` · ${esc(p.step)}` : ""}</p>
+      <p><b>Stato:</b> ${esc(STATUS[p.status]?.label || p.status)}${p.issue && p.issue !== "ok" ? ` · problema: ${esc(p.issue)}` : ""}${p.provider ? ` · ${esc(p.provider)}` : ""}${p.ambiguous ? " · <b>ambiguo</b>" : ""}${p.shown_on_map ? " · sulla mappa" : " · solo lista"}${p.score != null ? ` · punteggio ${esc(p.score)}` : ""}${p.step ? ` · ${esc(p.step)}` : ""}</p>
       ${p.match ? `<p><b>OSM:</b> ${esc(p.match)}</p>` : ""}
       ${(p.reasons || []).length ? `<p><small>${esc(p.reasons.join(", "))}</small></p>` : ""}
       ${alternatives ? `<details><summary>Alternative</summary><ul>${alternatives}</ul></details>` : ""}

@@ -97,7 +97,7 @@ MAP_LAYER_GROUPS = {
     },
 }
 # Geocoded candidates shown as map points; coarser or ambiguous ones stay in the list.
-MAP_POINT_STATUSES = {"matched_house", "matched_street"}
+MAP_POINT_STATUSES = {"matched_house", "matched_street", "matched_poi", "manual"}
 SOURCE_SHORT_NAMES = {
     "gris-lazio-simm": "GrIS Lazio",
     "scuolemigranti": "Scuolemigranti",
@@ -257,26 +257,52 @@ def services(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return result
 
 
+POINT_LABELS = {
+    "matched_house": "Posizione stimata dal civico (OpenStreetMap) · da verificare",
+    "matched_street": "Posizione stimata sulla via, civico non trovato · da verificare",
+    "matched_poi": "Posizione del luogo indicato trovata su OpenStreetMap · da verificare",
+    "manual": "Posizione corretta a mano · da verificare",
+}
+# Why a service has no map point: one explicit reason per record (importer `issue`).
+ISSUE_LABELS = {
+    "ambiguous": "Indirizzo con più corrispondenze · posizione non mostrata",
+    "postcode_area_only": "Trovato solo il CAP · posizione non mostrata",
+    "municipality_only": "Trovato solo il comune · posizione non mostrata",
+    "no_street": "Indirizzo senza via · posizione da completare",
+    "no_street_unresolved": "Indirizzo senza via · posizione da completare",
+    "unresolved": "Indirizzo non trovato · posizione da completare",
+    "no_address": "Indirizzo non indicato dalla fonte",
+    "no_coordinates": "Coordinate non indicate dalla fonte · posizione da completare",
+}
+ISSUE_NAMES = {
+    "ambiguous": "Indirizzo ambiguo", "postcode_area_only": "Solo CAP", "municipality_only": "Solo comune",
+    "no_street": "Via mancante", "no_street_unresolved": "Via mancante", "unresolved": "Indirizzo non trovato",
+    "no_address": "Indirizzo mancante", "no_coordinates": "Coordinate mancanti",
+}
+
+
+def geocode_issue(geocode: dict[str, Any] | None) -> str:
+    """The importer's issue, or the same classification for bundles older than strategy 0.3."""
+    g = geocode or {}
+    if g.get("issue"):
+        return g["issue"]
+    status = g.get("status") or "unresolved"
+    if status in MAP_POINT_STATUSES:
+        return "ambiguous" if g.get("ambiguous") else "ok"
+    return {"postcode_area": "postcode_area_only", "locality_only": "municipality_only", "no_address": "no_address"}.get(status, "unresolved")
+
+
 def map_position(geocode: dict[str, Any] | None) -> tuple[dict[str, Any] | None, dict[str, str]]:
-    """Show only confident street/house candidates as points; label all as estimates."""
+    """Show confident candidates (house, street, named place, manual) as points; others list-only with a reason."""
     status = (geocode or {}).get("status") or "unresolved"
     chosen = (geocode or {}).get("chosen") or {}
-    if status in MAP_POINT_STATUSES and not geocode.get("ambiguous"):
+    issue = geocode_issue(geocode)
+    if issue in {"ok", "manual"} and status in POINT_LABELS:
         point = source_point({"coordinate": {"lat": chosen.get("lat"), "lng": chosen.get("lon")}})
         if point:
-            label = ("Posizione stimata dal civico (OpenStreetMap) · da verificare"
-                     if status == "matched_house"
-                     else "Posizione stimata sulla via, civico non trovato · da verificare")
-            return point, {"section": "services", "status": f"geocoded_{status}", "label": label}
-    if status in MAP_POINT_STATUSES:
-        label = "Indirizzo con più corrispondenze · posizione non mostrata sulla mappa"
-    elif status in {"postcode_area", "locality_only"}:
-        label = "Posizione nota solo per CAP o comune · non mostrata sulla mappa"
-    elif status == "no_address":
-        label = "Indirizzo non indicato dalla fonte"
-    else:
-        label = "Indirizzo presente · posizione da completare"
-    return None, {"section": "services", "status": f"geocode_{status}", "label": label}
+            return point, {"section": "services", "status": f"geocoded_{status}", "label": POINT_LABELS[status], "issue": issue}
+    issue = issue if issue in ISSUE_LABELS else "unresolved"
+    return None, {"section": "services", "status": f"geocode_{status}", "label": ISSUE_LABELS[issue], "issue": issue}
 
 
 def text_hours(raw: Any, source_name: str) -> dict[str, Any]:
@@ -440,7 +466,7 @@ def debug_positions(rows: list[dict[str, Any]], source_code: str) -> dict[str, A
     points = []
     for row in rows:
         code = row.get("source_code", "helpinet")
-        if code != source_code:
+        if code != source_code or not is_visible(row):
             continue
         p = row["payload"]
         if is_map_row(row):
@@ -457,6 +483,8 @@ def debug_positions(rows: list[dict[str, Any]], source_code: str) -> dict[str, A
                 "ambiguous": bool(geocode.get("ambiguous")),
                 "alternatives": geocode.get("alternatives", []),
                 "postcode_anchor": geocode.get("postcode_anchor"),
+                "issue": geocode_issue(geocode),
+                "provider": chosen.get("provider") or geocode.get("provider"),
             }
             layer = p.get("layer")
         else:

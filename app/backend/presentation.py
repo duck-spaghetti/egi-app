@@ -189,17 +189,20 @@ def placement(payload: dict[str, Any], point: dict[str, Any] | None) -> dict[str
             "section": "services",
             "status": "source_point",
             "label": "Coordinate della fonte da verificare",
+            "issue": "ok",
         }
     if payload.get("location", {}).get("address_raw"):
         return {
             "section": "services",
             "status": "needs_geocoding",
-            "label": "Indirizzo presente · posizione da completare",
+            "label": "Coordinate non indicate dalla fonte · posizione da completare",
+            "issue": "no_coordinates",
         }
     return {
         "section": "services",
         "status": "unresolved",
         "label": "Modalità e posizione da verificare",
+        "issue": "no_address",
     }
 
 
