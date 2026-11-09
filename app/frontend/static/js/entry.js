@@ -128,10 +128,8 @@ function renderLanguages() {
       </span>
     `;
     button.addEventListener("click", async () => {
-      await applyLanguage(language.code);
-      renderLanguages();
-      renderCities();
-      updateStep();
+      state.lang = language.code;  // an explicit choice stops the title cycler, which switches languages globally
+      await freezeCyclerOnSelectedLanguage();
     });
     elements.langList.append(button);
   });
@@ -166,22 +164,29 @@ function renderCities() {
   });
 }
 
+// The cycle step in flight, so freezing waits for it instead of racing it: a step that
+// finished after the freeze used to leave the title (and translations) in another language.
+let cycleTask = null;
+
 function startCycler() {
-  cycleInterval = window.setInterval(async () => {
-    if (cycleLocked) return;
-    state.cycleIdx = (state.cycleIdx + 1) % LANG_CYCLE_ORDER.length;
-    const code = LANG_CYCLE_ORDER[state.cycleIdx];
-    await window.EGI_I18N.setLanguage(code);
-    transitionCycler(t("entry.language_title"), code === "ar");
-    elements.langSubtitle.textContent = t("entry.language_subtitle");
+  cycleInterval = window.setInterval(() => {
+    if (cycleLocked || cycleTask) return;
+    cycleTask = (async () => {
+      state.cycleIdx = (state.cycleIdx + 1) % LANG_CYCLE_ORDER.length;
+      const code = LANG_CYCLE_ORDER[state.cycleIdx];
+      await window.EGI_I18N.setLanguage(code);
+      if (cycleLocked) return;
+      transitionCycler(t("entry.language_title"), code === "ar");
+      elements.langSubtitle.textContent = t("entry.language_subtitle");
+    })().finally(() => { cycleTask = null; });
   }, 2400);
 }
 
 function transitionCycler(text, rtl) {
   elements.langTitleWrap.classList.add("cycling");
   window.setTimeout(() => {
-    setCyclerText(text, rtl);
     elements.langTitleWrap.classList.remove("cycling");
+    if (!cycleLocked) setCyclerText(text, rtl);
   }, 200);
 }
 
@@ -231,6 +236,7 @@ async function freezeCyclerOnSelectedLanguage() {
     window.clearInterval(cycleInterval);
     cycleInterval = null;
   }
+  if (cycleTask) await cycleTask;
   await applyLanguage(state.lang);
   renderLanguages();
   renderCities();

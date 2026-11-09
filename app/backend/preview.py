@@ -121,14 +121,16 @@ def is_visible(row: dict[str, Any]) -> bool:
     """Hide records the normalizer excluded and same-source copies of one entity.
 
     Normalizer 0.3 marks excluded records (e.g. state schools) and, for sources that
-    repeat a placemark per layer, keeps one primary record per entity; the others stay
-    in the database as evidence. Older payloads without these fields are all visible.
+    repeat a placemark per layer or have a user-confirmed duplicate, keeps one primary
+    record per entity; the others stay in the database as evidence. Older payloads
+    without these fields are all visible.
     """
     p = row["payload"]
     if (p.get("classification") or {}).get("display") == "excluded":
         return False
     entity = p.get("entity") or {}
-    return not (entity.get("mode") == "name_address" and entity.get("primary") is False)
+    # name_address: one placemark per layer; source_declared: a duplicate the source review confirmed
+    return not (entity.get("mode") in {"name_address", "source_declared"} and entity.get("primary") is False)
 
 
 def group_code(row: dict[str, Any]) -> str:
@@ -355,6 +357,61 @@ def claim_sections(claims: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def source_access_texts(facts: dict[str, Any]) -> list[dict[str, str]]:
+    """Printed audience, access and heading-organization text of a reviewed source entry.
+
+    Shown as the source wrote it (no interpretation); referral numbers stay apart from
+    the service's own contacts. Empty for sources without `source_facts`.
+    """
+    payload = facts.get("payload") or {}
+    access = payload.get("access") or {}
+    texts = []
+    def add(title: str, text: Any) -> None:
+        if isinstance(text, str) and text.strip():
+            texts.append({"title": title, "text": text.strip()})
+    add("Destinatari", (payload.get("audience") or {}).get("raw_text"))
+    add("Modalità di accesso", access.get("raw_notes"))
+    for context in access.get("shared_contexts") or []:
+        add("Modalità di accesso (indicazione comune della sezione)", context.get("raw_text"))
+    add("Numeri per l'accesso (SOS o invio, non del servizio)",
+        "\n".join(c.get("raw_value") or c.get("value") or "" for c in access.get("referral_contacts") or []))
+    add("Prestazioni", (payload.get("offerings") or {}).get("raw_text"))
+    add("Organizzazione indicata nell'intestazione (ruolo da verificare)",
+        "\n".join(o["name"] for o in payload.get("source_organizations") or [] if o.get("name")))
+    return texts
+
+
+SCHEDULE_SCOPES = {  # egi_sources schedule scopes -> card headings; unspecified scopes get none
+    "dependency_treatment_schedule": "Orario del servizio per le dipendenze",
+    "hygiene_service": "Servizio igiene", "laundry_service": "Lavanderia", "clothing_service": "Guardaroba",
+    "contact_availability": "Disponibilità per contatti", "orientation_office_schedule": "Sportello di orientamento",
+    "admission_interview": "Colloquio di ammissione",
+    "admission_interview_at_referral_office": "Colloquio di ammissione presso l'ufficio che invia",
+    "admission_interview_at_shelter": "Colloquio di ammissione presso la struttura",
+    "entry": "Ingresso", "exit": "Uscita", "ticket_distribution": "Distribuzione dei biglietti",
+    "overnight_accommodation": "Accoglienza notturna", "accommodation": "Accoglienza",
+    "accommodation_with_seasonal_limits": "Accoglienza con limiti stagionali",
+    "unspecified_24_hour_availability": "Disponibilità continua (da verificare)",
+}
+SCHEDULE_LABEL_KINDS = {"audience": "Destinatari", "prestation": "Prestazione", "availability": "Disponibilità",
+                        "access": "Accesso", "capacity": "Capienza"}
+
+
+def scoped_schedules(facts: dict[str, Any]) -> list[dict[str, Any]]:
+    """Printed schedule blocks with the scope and labels the source review assigned.
+
+    Labels from the user's review are marked, so they stay distinguishable from
+    printed facts. Nothing becomes an opening interval here.
+    """
+    hours = (facts.get("payload") or {}).get("hours") or {}
+    blocks = []
+    for item in hours.get("scoped_schedules") or []:
+        labels = [{"kind": SCHEDULE_LABEL_KINDS.get(lab.get("kind"), lab.get("kind") or ""), "text": lab.get("text") or "",
+                   "interpreted": lab.get("basis") == "user_interpretation"} for lab in item.get("labels") or []]
+        blocks.append({"title": SCHEDULE_SCOPES.get(item.get("scope") or ""), "text": (item.get("raw_text") or "").strip(), "labels": labels})
+    return [b for b in blocks if b["text"]]
+
+
 def source_hours(weekly: dict[str, Any] | None, raw: Any, source_name: str) -> dict[str, Any]:
     """Weekly hours when the source text parsed completely, otherwise the text as is."""
     if weekly:
@@ -394,6 +451,10 @@ def map_service(row: dict[str, Any], category: dict[str, Any]) -> dict[str, Any]
     source_name = SOURCE_SHORT_NAMES.get(row["source_code"]) or row.get("source_name") or row["source_code"]
     geocode = row.get("geocode")
     point, place_status = map_position(geocode)
+    facts = p.get("source_facts") or {}  # reviewed upstream facts (Sant'Egidio guide); absent for map exports
+    delivery = facts.get("delivery_mode")
+    if delivery in {"telephone", "online"}:  # remote by the source's own statement, as for Helpinet
+        place_status = {"section": "directory", "status": delivery, "label": "Servizio a distanza"}
     location = p.get("location") or {}
     classification = p.get("classification") or {}
     entity = p.get("entity") or {}
@@ -415,10 +476,10 @@ def map_service(row: dict[str, Any], category: dict[str, Any]) -> dict[str, Any]
         "source_group": site_group,
         "derived_summary": None,
         "source_values": p.get("source_values", {}),
-        "access_display": claim_sections(claims),
-        "hours_display": source_hours(weekly, (p.get("hours") or {}).get("raw_value"), source_name),
+        "access_display": {**claim_sections(claims), "texts": source_access_texts(facts)},
+        "hours_display": {**source_hours(weekly, (p.get("hours") or {}).get("raw_value"), source_name), "scoped": scoped_schedules(facts)},
         "placement": place_status,
-        "delivery_mode": None,
+        "delivery_mode": delivery,
         "name": p.get("name"),
         "description": p.get("description") or p.get("offer_text"),
         "offer_text": p.get("offer_text"),
@@ -464,6 +525,7 @@ def map_service(row: dict[str, Any], category: dict[str, Any]) -> dict[str, Any]
             "source_title": row.get("source_name"),
             "source_url": row.get("dataset_url") or row.get("source_homepage"),
             "attribution": row.get("source_attribution"),
+            "source_kind": row.get("source_kind"),
             "is_primary": True,
         }],
         "access_raw": {c["code"]: True for c in claims},

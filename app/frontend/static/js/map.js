@@ -777,7 +777,7 @@ async function openDetail(id) {
     ${transitSectionShell(poi)}
     <section class="detail-section"><h3>Descrizione</h3><p>${escapeHtml(description)}</p>${!raw.description && summary?.text?'<span class="derived-label">Sintesi ricavata dai campi della fonte · non descrizione originale</span>':""}</section>
     <section class="detail-section"><h3>${raw.source_code && raw.source_code!=="helpinet" ? "Temi indicati" : "Prestazioni indicate"}</h3><div class="service-chips">${prestations.map(v=>`<span class="service-chip">${escapeHtml(v.nome)}</span>`).join("") || "Non indicati dalla fonte"}</div></section>
-    ${raw.source_code && raw.source_code!=="helpinet" && !raw.access_display?.sections?.length ? "" : `<section class="detail-section"><h3>Accesso e destinatari</h3>${renderSourceAccess(raw.access_display)}</section>`}
+    ${raw.source_code && raw.source_code!=="helpinet" && !raw.access_display?.sections?.length && !raw.access_display?.texts?.length ? "" : `<section class="detail-section"><h3>Accesso e destinatari</h3>${renderSourceAccess(raw.access_display)}</section>`}
     <section class="detail-section"><h3>Orari del servizio</h3>${renderSourceHours(raw.hours_display)}</section>
     <section class="detail-section"><h3>Contatti di questo servizio</h3>${renderContacts(poi.contacts || [])}</section>
     ${siblings.length?`<section class="detail-section"><h3>Altri servizi presso ${escapeHtml(raw.facility_name || "questo gruppo")}</h3><p class="source-note">Collegamento provvisorio dal gruppo Helpinet. Ogni scheda mantiene orari, accesso e contatti indipendenti.</p>${siblings.map(serviceButton).join("")}</section>`:""}
@@ -1763,23 +1763,36 @@ function renderPositionNote(raw) {
   return `<p class="source-note">Posizione ricavata dall’indirizzo della fonte con Nominatim (© OpenStreetMap contributors).${match}</p>`;
 }
 
+
+// Provenance wording by registry source kind; map exports stay the default.
+const SOURCE_KIND_TEXT = {
+  map_export: {link: "mappa originale", acquired: "Esportazione KML acquisita il"},
+  open_data: {link: "file originale", acquired: "File open data acquisito il"},
+  web_pages: {link: "pagine originali", acquired: "Pagine web acquisite il"},
+  document: {link: "guida originale", acquired: "Estratto dalla guida (PDF, revisione egi_sources) il"},
+};
+
 function renderProvenance(poi) {
   const raw = poi.raw || {};
   const src = raw.sources?.[0] || {};
   if (sourceCode(poi) === "helpinet") return `<p>Osservazione locale: ${escapeHtml(raw.observed_at || "—")}. Acquisizione originale sconosciuta.</p>`;
-  const link = src.source_url ? ` · <a href="${escapeHtml(src.source_url)}" target="_blank" rel="noopener">mappa originale</a>` : "";
-  return `<p>${escapeHtml(src.source_title || src.source_name || "Fonte")}${link}. Esportazione KML acquisita il ${escapeHtml(raw.original_retrieved_at || "—")}.</p>${src.attribution?`<p class="source-note">${escapeHtml(src.attribution)}. Licenza di riuso non stabilita: solo preview locale.</p>`:""}`;
+  const kind = SOURCE_KIND_TEXT[src.source_kind] || SOURCE_KIND_TEXT.map_export;
+  const link = src.source_url ? ` · <a href="${escapeHtml(src.source_url)}" target="_blank" rel="noopener">${kind.link}</a>` : "";
+  return `<p>${escapeHtml(src.source_title || src.source_name || "Fonte")}${link}. ${kind.acquired} ${escapeHtml(raw.original_retrieved_at || "—")}.</p>${src.attribution?`<p class="source-note">${escapeHtml(src.attribution)}. Licenza di riuso non stabilita: solo preview locale.</p>`:""}`;
 }
 
 function renderSourceHours(display) {
   if (!display) return '<p>Orari non indicati.</p>';
+  if ("raw_text" in display && display.scoped?.length) return `<p class="source-note">${escapeHtml(display.note)}</p>${display.scoped.map(b=>`<div class="access-section">${b.title?`<h4>${escapeHtml(b.title)}</h4>`:""}${b.labels.length?`<div class="service-chips">${b.labels.map(l=>`<span class="service-chip">${escapeHtml(l.kind)}: ${escapeHtml(l.text)}${l.interpreted?" (interpretazione in revisione)":""}</span>`).join("")}</div>`:""}<p class="source-hours-text">${escapeHtml(b.text)}</p></div>`).join("")}`;
   if ("raw_text" in display) return `<p class="source-note">${escapeHtml(display.note)}</p>${display.raw_text?`<p class="source-hours-text">${escapeHtml(display.raw_text)}</p>`:""}`;
   return `<p class="source-note">${escapeHtml(display.note)}</p><div class="source-week">${display.days.map(day=>`<div class="source-day"><strong>${escapeHtml(day.label)}</strong><span>${day.intervals.length ? day.intervals.map(v=>`<span>${escapeHtml(v.label)}${v.review_note ? ` <small>${escapeHtml(v.review_note)}</small>`:""}</span>`).join("<br>") : '<span class="unknown-value">Non indicato</span>'}${day.issues.length && !day.intervals.length ? `<small>${escapeHtml(day.issues.join("; "))}</small>`:""}</span></div>`).join("")}</div>${(display.warnings || []).map(w=>`<p class="source-note">${escapeHtml(w)}</p>`).join("")}`;
 }
 
 function renderSourceAccess(display) {
   if (!display) return '<p>Indicazioni non disponibili.</p>';
-  return `${display.sections.length ? display.sections.map(section=>`<div class="access-section"><h4>${escapeHtml(section.title)}</h4><div class="service-chips">${section.entries.map(e=>`<span class="service-chip"${e.basis?` title="${escapeHtml(e.basis)}"`:""}>${escapeHtml(e.label)}${e.status==="derived"?" *":""}</span>`).join("")}</div></div>`).join("") : '<p>Nessuna indicazione positiva nella fonte.</p>'}<p class="source-note">${escapeHtml(display.note)}</p>`;
+  const texts=(display.texts || []).map(t=>`<div class="access-section"><h4>${escapeHtml(t.title)}</h4><p class="source-hours-text">${escapeHtml(t.text)}</p></div>`).join("");
+  if (texts && !display.sections.length) return `${texts}<p class="source-note">${escapeHtml(display.note)}</p>`;
+  return `${texts}${display.sections.length ? display.sections.map(section=>`<div class="access-section"><h4>${escapeHtml(section.title)}</h4><div class="service-chips">${section.entries.map(e=>`<span class="service-chip"${e.basis?` title="${escapeHtml(e.basis)}"`:""}>${escapeHtml(e.label)}${e.status==="derived"?" *":""}</span>`).join("")}</div></div>`).join("") : '<p>Nessuna indicazione positiva nella fonte.</p>'}<p class="source-note">${escapeHtml(display.note)}</p>`;
 }
 
 function sameSourceGroup(poi) {

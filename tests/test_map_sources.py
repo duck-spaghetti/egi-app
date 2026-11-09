@@ -157,5 +157,59 @@ class MapSourceTests(unittest.TestCase):
         self.assertIn("non indica", services([row])[0]["freshness"]["label"])
 
 
+def guide_row(identifier: str, status: str = "matched_house", **facts) -> dict:
+    """A Sant'Egidio guide service carrying the reviewed egi_sources payload as source_facts."""
+    row = map_row(identifier, "Ostelli a Roma", status)
+    row.update(source_code="sant-egidio", source_kind="document")
+    source = {
+        "audience": {"raw_text": "per uomini"},
+        "access": {"raw_notes": "si accede con un colloquio", "shared_contexts": [{"raw_text": "tramite la Sala operativa sociale"}],
+                   "referral_contacts": [{"raw_value": "800.440.022"}]},
+        "source_organizations": [{"name": "Vaticano - Elemosineria apostolica"}, {"name": "Suore Missionarie della Carità"}],
+        "hours": {"scoped_schedules": [
+            {"scope": "admission_interview_at_shelter", "raw_text": "martedì\\nore 8.00 - 10.30", "labels": []},
+            {"scope": "unspecified_service_or_contact", "raw_text": "sabato\\nore 15.00-18.30\\nitaliani",
+             "labels": [{"kind": "audience", "text": "italiani", "basis": "source_text"},
+                        {"kind": "prestation", "text": "Doccia", "basis": "user_interpretation"}]}]},
+    }
+    row["payload"]["source_facts"] = {"delivery_mode": "in_person", "payload": source, **facts}
+    return row
+
+
+class GuideSourceTests(unittest.TestCase):
+    """Reviewed document-guide entries (Sant'Egidio): directory, access text, scoped hours, aliases."""
+
+    def test_telephone_services_go_to_the_directory_even_without_a_place(self):
+        card = services([guide_row("tel", status="no_address", delivery_mode="telephone")])[0]
+        self.assertEqual(card["placement"]["section"], "directory")
+        self.assertEqual(card["delivery_mode"], "telephone")
+        from app.backend.main import is_placed
+        self.assertTrue(is_placed(card))
+        self.assertFalse(is_placed(services([guide_row("none", status="no_address")])[0]))
+
+    def test_printed_audience_access_referrals_and_organizations_are_shown(self):
+        texts = {t["title"]: t["text"] for t in services([guide_row("a")])[0]["access_display"]["texts"]}
+        self.assertEqual(texts["Destinatari"], "per uomini")
+        self.assertEqual(texts["Modalità di accesso"], "si accede con un colloquio")
+        self.assertEqual(texts["Numeri per l'accesso (SOS o invio, non del servizio)"], "800.440.022")
+        self.assertIn("Suore Missionarie della Carità", texts["Organizzazione indicata nell'intestazione (ruolo da verificare)"])
+        self.assertEqual(services([map_row("m", "Salute", "matched_house")])[0]["access_display"]["texts"], [])
+
+    def test_scoped_hours_keep_scope_and_marked_interpretations(self):
+        blocks = services([guide_row("h")])[0]["hours_display"]["scoped"]
+        self.assertEqual(blocks[0]["title"], "Colloquio di ammissione presso la struttura")
+        self.assertIsNone(blocks[1]["title"])
+        self.assertEqual([(l["kind"], l["interpreted"]) for l in blocks[1]["labels"]], [("Destinatari", False), ("Prestazione", True)])
+
+    def test_source_kind_reaches_the_provenance(self):
+        self.assertEqual(services([guide_row("k")])[0]["sources"][0]["source_kind"], "document")
+
+    def test_confirmed_duplicate_is_hidden_but_primary_shown(self):
+        primary, duplicate = guide_row("p"), guide_row("d")
+        primary["payload"]["entity"] = {"mode": "source_declared", "primary": True, "members": ["p", "d"]}
+        duplicate["payload"]["entity"] = {"mode": "source_declared", "primary": False, "members": ["p", "d"]}
+        self.assertEqual([c["id"] for c in services([primary, duplicate])], ["p"])
+
+
 if __name__ == "__main__":
     unittest.main()

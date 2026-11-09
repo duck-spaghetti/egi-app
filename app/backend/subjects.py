@@ -30,7 +30,7 @@ PROJECT = Path(__file__).resolve().parents[3]
 # latest run. A map run's position candidates come from its latest succeeded geocode
 # child run, matched by locator.
 LATEST_RUN = """WITH latest AS (
- SELECT DISTINCT ON (r.code,d.dataset_id) r.code,r.name,r.homepage,r.attribution,d.resource_url,p.run_id,
+ SELECT DISTINCT ON (r.code,d.dataset_id) r.code,r.name,r.homepage,r.attribution,r.source_kind,d.resource_url,p.run_id,
   c.retrieved_at,c.retrieval_status,c.source_metadata_snapshot
  FROM sources.processing_runs p JOIN sources.captures c USING(capture_id)
  JOIN sources.datasets d USING(dataset_id) JOIN sources.registry r USING(source_id)
@@ -54,7 +54,7 @@ SELECT json_build_object('run_id',NULLIF((SELECT id FROM snapshot),''),'subjects
  'run_id',s.run_id,'source_locator',s.subject_locator,'observed_at',l.retrieved_at,
  'retrieval_status',l.retrieval_status,'metadata',l.source_metadata_snapshot,
  'source_code',l.code,'source_name',l.name,'source_homepage',l.homepage,
- 'source_attribution',l.attribution,'dataset_url',l.resource_url,'geocode',gs.normalized_payload)
+ 'source_attribution',l.attribution,'source_kind',l.source_kind,'dataset_url',l.resource_url,'geocode',gs.normalized_payload)
  ORDER BY l.code,l.run_id,s.subject_locator),'[]'::json))
 FROM sources.normalized_subjects s JOIN latest l USING(run_id)
 LEFT JOIN geo g ON g.parent_run_id=l.run_id

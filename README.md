@@ -452,7 +452,7 @@ The app also reads `web_pages` and `document` sources from the importer:
 | `1522` | 1522 Antiviolenza | 38 of 48 | Lazio centres; source update 27/10/2026; access hints from the definition of an anti-violence centre (marked as derived) |
 | `caritas-roma` | Caritas Roma | 42 of 56 | 7 "Servizi e opere" pages |
 | `roma-solidarieta` | Roma Solidarietà | 20 of 33 | the cooperative that runs most Caritas structures; hours and how to get there |
-| `sant-egidio` | Sant'Egidio · DOVE 2026 | 30 of 32 | "Dove mangiare" chapter of the printed guide |
+| `sant-egidio` | Sant'Egidio · DOVE 2026 | 652 of 771 | nine chapters of the printed guide (PDF pp. 9–202), one dataset each; telephone lines in the directory; printed audience/access/heading organizations and scoped hours from the reviewed egi_sources payload (`source_facts`); confirmed duplicate (Oratorio) shown once |
 
 Services without an address-based position stay hidden from the map and list, as for the
 other sources (`?debug=1` shows them).
