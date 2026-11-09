@@ -90,6 +90,16 @@ class PostgresSubjectSourceTests(unittest.TestCase):
         self.db.run_id, self.db.rows = "", []
         self.assertEqual(self.source.latest(), [])
 
+    def test_latest_run_is_chosen_per_source_dataset(self):
+        """A source with several datasets (Sant'Egidio chapters) keeps one run per dataset.
+
+        Choosing one run per source code hid every chapter but the last loaded one.
+        """
+        for query in (RUN_PROBE, SUBJECTS):
+            self.assertIn("DISTINCT ON (r.code,d.dataset_id)", query)
+            self.assertIn("ORDER BY r.code,d.dataset_id,p.started_at DESC", query)
+            self.assertNotIn("DISTINCT ON (r.code) ", query)
+
 
 class FailingSource:
     """Simulate an unavailable subject store at the route seam."""

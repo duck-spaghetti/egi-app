@@ -83,7 +83,7 @@ history. The loader commits its complete import unit or rolls back. Imported sou
 subjects remain separate from canonical publication.
 
 The app reads the latest succeeded normalization for the selected Helpinet dataset,
-and for every `map_export` source, through `app/backend/subjects.py` (see
+and for every dataset of each importer source (the Sant'Egidio guide has one per chapter), through `app/backend/subjects.py` (see
 [Map sources](#map-sources-my-maps-2026-11-09)). The snapshot is cached in-process: for 60 seconds
 no query is made, then a cheap `run_id` probe decides whether to reload. An accepted
 new load is therefore visible within about a minute, without restarting the app or

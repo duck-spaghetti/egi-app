@@ -23,25 +23,27 @@ from typing import Any, Protocol
 PSQL = os.environ.get("EGI_PSQL", "/Library/PostgreSQL/18/bin/psql")
 PROJECT = Path(__file__).resolve().parents[3]
 
-# One latest succeeded normalization run per displayed source: the preserved
+# One latest succeeded normalization run per displayed source *dataset*: the preserved
 # Helpinet extract and every importer source: map exports (Google My Maps), open-data CSV,
-# public web pages and document guides (via egi_sources bundles). A map run's position
-# candidates come from its latest succeeded geocode child run, matched by locator.
+# public web pages and document guides (via egi_sources bundles). A source can publish
+# several datasets (the Sant'Egidio guide has one per chapter), each shown with its own
+# latest run. A map run's position candidates come from its latest succeeded geocode
+# child run, matched by locator.
 LATEST_RUN = """WITH latest AS (
- SELECT DISTINCT ON (r.code) r.code,r.name,r.homepage,r.attribution,d.resource_url,p.run_id,
+ SELECT DISTINCT ON (r.code,d.dataset_id) r.code,r.name,r.homepage,r.attribution,d.resource_url,p.run_id,
   c.retrieved_at,c.retrieval_status,c.source_metadata_snapshot
  FROM sources.processing_runs p JOIN sources.captures c USING(capture_id)
  JOIN sources.datasets d USING(dataset_id) JOIN sources.registry r USING(source_id)
  WHERE p.run_kind='normalize' AND p.status='succeeded'
  AND ((r.code='helpinet' AND d.external_key='helpinet-preserved-api-extract') OR r.source_kind IN ('map_export','open_data','web_pages','document'))
- ORDER BY r.code,p.started_at DESC,p.finished_at DESC,p.run_id
+ ORDER BY r.code,d.dataset_id,p.started_at DESC,p.finished_at DESC,p.run_id
 ), geo AS (
  SELECT DISTINCT ON (g.parent_run_id) g.parent_run_id,g.run_id
  FROM sources.processing_runs g JOIN latest l ON g.parent_run_id=l.run_id
  WHERE g.run_kind='geocode' AND g.status='succeeded'
  ORDER BY g.parent_run_id,g.started_at DESC,g.finished_at DESC,g.run_id
 ), snapshot AS (
- SELECT COALESCE(string_agg(l.run_id::text||COALESCE('+'||g.run_id::text,''),',' ORDER BY l.code),'') AS id
+ SELECT COALESCE(string_agg(l.run_id::text||COALESCE('+'||g.run_id::text,''),',' ORDER BY l.code,l.run_id),'') AS id
  FROM latest l LEFT JOIN geo g ON g.parent_run_id=l.run_id
 )"""
 RUN_PROBE = f"{LATEST_RUN}\nSELECT id FROM snapshot;"
@@ -53,7 +55,7 @@ SELECT json_build_object('run_id',NULLIF((SELECT id FROM snapshot),''),'subjects
  'retrieval_status',l.retrieval_status,'metadata',l.source_metadata_snapshot,
  'source_code',l.code,'source_name',l.name,'source_homepage',l.homepage,
  'source_attribution',l.attribution,'dataset_url',l.resource_url,'geocode',gs.normalized_payload)
- ORDER BY l.code,s.subject_locator),'[]'::json))
+ ORDER BY l.code,l.run_id,s.subject_locator),'[]'::json))
 FROM sources.normalized_subjects s JOIN latest l USING(run_id)
 LEFT JOIN geo g ON g.parent_run_id=l.run_id
 LEFT JOIN sources.normalized_subjects gs ON gs.run_id=g.run_id
