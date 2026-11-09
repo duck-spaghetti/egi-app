@@ -631,7 +631,7 @@ function searchTerms() {
 /** Values a POI contributes to one filter facet (for counts and matching). */
 function facetValues(poi, facet) {
   const raw = poi.raw || {};
-  if (facet === "cats") return [resolveCategory(poi)?.slug || "other"];
+  if (facet === "cats") return raw.needs?.length ? raw.needs : [resolveCategory(poi)?.slug || "other"];
   if (facet === "source") return [sourceCode(poi)];
   if (facet === "type") return raw.native_classifications?.tipologia ? [raw.native_classifications.tipologia] : [];
   if (facet === "prestation") return (raw.native_classifications?.prestazioni || []).map(v => String(v.id));
@@ -642,7 +642,7 @@ function facetValues(poi, facet) {
 /** Does a POI pass every active filter, optionally ignoring one facet (faceted counts)? */
 function passesFilters(p, skip = null, now = new Date(), terms = searchTerms()) {
   const f = state.filters;
-  if (skip !== "cats" && !f.cats.has(facetValues(p, "cats")[0])) return false;
+  if (skip !== "cats" && !facetValues(p, "cats").some(slug => f.cats.has(slug))) return false;
   for (const facet of ["source", "type", "prestation", "access"]) {
     if (skip !== facet && f[facet] && !facetValues(p, facet).includes(f[facet])) return false;
   }
@@ -771,7 +771,7 @@ async function openDetail(id) {
     ${transitSectionShell(poi)}
     <section class="detail-section"><h3>Descrizione</h3><p>${escapeHtml(description)}</p>${!raw.description && summary?.text?'<span class="derived-label">Sintesi ricavata dai campi della fonte · non descrizione originale</span>':""}</section>
     <section class="detail-section"><h3>${raw.source_code && raw.source_code!=="helpinet" ? "Temi indicati" : "Prestazioni indicate"}</h3><div class="service-chips">${prestations.map(v=>`<span class="service-chip">${escapeHtml(v.nome)}</span>`).join("") || "Non indicati dalla fonte"}</div></section>
-    ${raw.source_code && raw.source_code!=="helpinet" ? "" : `<section class="detail-section"><h3>Accesso e destinatari</h3>${renderSourceAccess(raw.access_display)}</section>`}
+    ${raw.source_code && raw.source_code!=="helpinet" && !raw.access_display?.sections?.length ? "" : `<section class="detail-section"><h3>Accesso e destinatari</h3>${renderSourceAccess(raw.access_display)}</section>`}
     <section class="detail-section"><h3>Orari del servizio</h3>${renderSourceHours(raw.hours_display)}</section>
     <section class="detail-section"><h3>Contatti di questo servizio</h3>${renderContacts(poi.contacts || [])}</section>
     ${siblings.length?`<section class="detail-section"><h3>Altri servizi presso ${escapeHtml(raw.facility_name || "questo gruppo")}</h3><p class="source-note">Collegamento provvisorio dal gruppo Helpinet. Ogni scheda mantiene orari, accesso e contatti indipendenti.</p>${siblings.map(serviceButton).join("")}</section>`:""}
@@ -1763,7 +1763,7 @@ function renderSourceHours(display) {
 
 function renderSourceAccess(display) {
   if (!display) return '<p>Indicazioni non disponibili.</p>';
-  return `${display.sections.length ? display.sections.map(section=>`<div class="access-section"><h4>${escapeHtml(section.title)}</h4><div class="service-chips">${section.entries.map(e=>`<span class="service-chip">${escapeHtml(e.label)}</span>`).join("")}</div></div>`).join("") : '<p>Nessuna indicazione positiva nella fonte.</p>'}<p class="source-note">${escapeHtml(display.note)}</p>`;
+  return `${display.sections.length ? display.sections.map(section=>`<div class="access-section"><h4>${escapeHtml(section.title)}</h4><div class="service-chips">${section.entries.map(e=>`<span class="service-chip"${e.basis?` title="${escapeHtml(e.basis)}"`:""}>${escapeHtml(e.label)}${e.status==="derived"?" *":""}</span>`).join("")}</div></div>`).join("") : '<p>Nessuna indicazione positiva nella fonte.</p>'}<p class="source-note">${escapeHtml(display.note)}</p>`;
 }
 
 function sameSourceGroup(poi) {

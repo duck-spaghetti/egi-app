@@ -8,6 +8,7 @@ keys are presentation groups, not an adopted EGI taxonomy.
 from __future__ import annotations
 
 import math
+import re
 from typing import Any
 
 from .presentation import access_sections, weekly_hours, placement
@@ -111,9 +112,25 @@ def is_map_row(row: dict[str, Any]) -> bool:
     return row.get("source_code", "helpinet") != "helpinet"
 
 
+def is_visible(row: dict[str, Any]) -> bool:
+    """Hide records the normalizer excluded and same-source copies of one entity.
+
+    Normalizer 0.3 marks excluded records (e.g. state schools) and, for sources that
+    repeat a placemark per layer, keeps one primary record per entity; the others stay
+    in the database as evidence. Older payloads without these fields are all visible.
+    """
+    p = row["payload"]
+    if (p.get("classification") or {}).get("display") == "excluded":
+        return False
+    entity = p.get("entity") or {}
+    return not (entity.get("mode") == "name_address" and entity.get("primary") is False)
+
+
 def group_code(row: dict[str, Any]) -> str:
     """Return the presentation need group of a subject row."""
     p = row["payload"]
+    if (p.get("classification") or {}).get("need"):
+        return p["classification"]["need"]
     if is_map_row(row):
         groups = MAP_LAYER_GROUPS.get(row["source_code"], {})
         return groups.get(p.get("layer") or "", groups.get("*", "non_classificato"))
@@ -122,7 +139,7 @@ def group_code(row: dict[str, Any]) -> str:
 
 def categories(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Expose source-native needs as legacy UI groups, without canonical taxonomy writes."""
-    codes = sorted({group_code(r) for r in rows})
+    codes = sorted({group_code(r) for r in rows if is_visible(r)})
     return [
         {
             "id": i,
@@ -161,6 +178,8 @@ def services(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     by_code = {c["slug"]: c for c in categories(rows)}
     result = []
     for row in rows:
+        if not is_visible(row):
+            continue
         if is_map_row(row):
             result.append(map_service(row, by_code[group_code(row)]))
             continue
@@ -282,6 +301,39 @@ def declared_update_label(update: dict[str, Any] | None) -> str | None:
     return text or None
 
 
+GENERIC_NAME = re.compile(r"^(rilascio stp/eni|ambulatorio( di)? (medicina generale|pediatria|malattie infettive))\s*$", re.I)
+CLAIM_GROUPS = {"audience": "Destinatari indicati", "cost": "Costo indicato", "procedure": "Come accedere"}
+
+
+def claim_sections(claims: list[dict[str, Any]]) -> dict[str, Any]:
+    """Access claims from the normalizer, grouped like Helpinet's, each with its basis."""
+    sections = []
+    for group, title in CLAIM_GROUPS.items():
+        entries = [{"code": c["code"], "label": c["label"], "value": True, "status": c.get("certainty"), "basis": c.get("basis")}
+                   for c in claims if c.get("group") == group]
+        if entries:
+            sections.append({"code": group, "title": title, "entries": entries})
+    derived = any(c.get("certainty") == "derived" for c in claims)
+    return {
+        "sections": sections,
+        "unselected_count": 0,
+        "note": ("Le indicazioni con * sono dedotte dal tipo di servizio (es. STP/ENI), non scritte dalla fonte: da verificare."
+                 if derived else "Indicazioni della fonte da verificare."),
+        "cost_state": "source_claim" if any(c.get("group") == "cost" for c in claims) else "unknown",
+    }
+
+
+def source_hours(weekly: dict[str, Any] | None, raw: Any, source_name: str) -> dict[str, Any]:
+    """Weekly hours when the source text parsed completely, otherwise the text as is."""
+    if weekly:
+        display = weekly_hours(weekly)
+        display["note"] = f"Orari dichiarati da {source_name}, letti dal testo originale; giorni non indicati: orario sconosciuto."
+        display["raw_text_original"] = raw
+        display["opening_note"] = f"Orari {source_name} non revisionati · fuso Europe/Rome"
+        return display
+    return text_hours(raw, source_name)
+
+
 def map_service(row: dict[str, Any], category: dict[str, Any]) -> dict[str, Any]:
     """Adapt a map-export service and its geocoded candidate to the card shape."""
     p = row["payload"]
@@ -289,19 +341,28 @@ def map_service(row: dict[str, Any], category: dict[str, Any]) -> dict[str, Any]
     geocode = row.get("geocode")
     point, place_status = map_position(geocode)
     location = p.get("location") or {}
-    topics = (p.get("source_classifications") or {}).get("help_topics") or []
+    classification = p.get("classification") or {}
+    entity = p.get("entity") or {}
+    topics = entity.get("topics") or (p.get("source_classifications") or {}).get("help_topics") or []
+    levels = (p.get("course_facts") or {}).get("levels") or []
     layer = p.get("layer")
+    service_type = classification.get("service_type") or layer
     chosen = (geocode or {}).get("chosen") or {}
+    claims = classification.get("access_claims") or []
+    weekly = (p.get("hours") or {}).get("weekly")
+    site_group = ({"external_key": entity["key"], "name": p.get("name"), "raw_fields": {}, "service_count": len(entity.get("members") or [])}
+                  if entity.get("mode") == "site_address" and len(entity.get("members") or []) > 1 else None)
     return {
         "id": row["id"],
         "place_id": row["id"],
-        "service_title": p.get("name") or layer or "Servizio",
-        "facility_name": p.get("name"),
-        "source_group": None,
+        "service_title": classification.get("display_name") or p.get("name") or layer or "Servizio",
+        # Generic source names ("Rilascio STP/ENI") give way to the site the normalizer found.
+        "facility_name": (classification.get("site_hint") if GENERIC_NAME.match(p.get("name") or "") else None) or p.get("name"),
+        "source_group": site_group,
         "derived_summary": None,
         "source_values": p.get("source_values", {}),
-        "access_display": access_sections({}),
-        "hours_display": text_hours((p.get("hours") or {}).get("raw_value"), source_name),
+        "access_display": claim_sections(claims),
+        "hours_display": source_hours(weekly, (p.get("hours") or {}).get("raw_value"), source_name),
         "placement": place_status,
         "delivery_mode": None,
         "name": p.get("name"),
@@ -350,11 +411,17 @@ def map_service(row: dict[str, Any], category: dict[str, Any]) -> dict[str, Any]
             "attribution": row.get("source_attribution"),
             "is_primary": True,
         }],
-        "access_raw": {},
+        "access_raw": {c["code"]: True for c in claims},
         "organization_raw": (p.get("organization_claim") or {}).get("name_raw"),
+        "needs": entity.get("needs") or [category["slug"]],
+        "sector": classification.get("sector"),
+        "entity_kind": classification.get("entity_kind"),
+        "entity_members": len(entity.get("members") or [1]),
+        "course_facts": p.get("course_facts"),
         "native_classifications": {
-            "tipologia": layer,
-            "prestazioni": [{"id": f"topic:{t}", "nome": t} for t in topics],
+            "tipologia": service_type,
+            "layer": layer,
+            "prestazioni": [{"id": f"topic:{t}", "nome": t} for t in topics] + [{"id": f"level:{lv}", "nome": f"Livello {lv}" if lv[0].isalpha() and len(lv) == 2 else lv.capitalize()} for lv in levels],
             "layer_path": (p.get("source_classifications") or {}).get("layer_path"),
         },
         "review_required": p.get("review_required", []),

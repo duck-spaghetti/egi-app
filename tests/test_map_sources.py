@@ -107,5 +107,29 @@ class MapSourceTests(unittest.TestCase):
             app.dependency_overrides.clear()
 
 
+    def test_normalizer_classification_drives_cards(self):
+        """0.3 payloads: excluded and secondary records hidden; need, type, claims and hours used."""
+        base = map_row("a", "Salute", "matched_house")
+        base["payload"]["classification"] = {"display": "shown", "need": "curarmi", "service_type": "Rilascio STP/ENI",
+                                             "display_name": "Rilascio STP/ENI · Ospedale", "sector": "public",
+                                             "access_claims": [{"code": "stp", "group": "audience", "label": "STP", "certainty": "derived", "basis": "definition"}]}
+        base["payload"]["hours"] = {"raw_value": "Lunedì: 9:00-12:00", "weekly": {"lun": [{"inizio": "09:00", "fine": "12:00"}]}}
+        base["payload"]["entity"] = {"mode": "name_address", "primary": True, "key": "k", "members": ["a", "b"], "needs": ["curarmi", "lavoro"], "topics": ["Salute", "Lavoro"]}
+        secondary = map_row("b", "Lavoro", "matched_house")
+        secondary["payload"]["classification"] = {"display": "shown", "need": "lavoro"}
+        secondary["payload"]["entity"] = {"mode": "name_address", "primary": False, "key": "k", "members": ["a", "b"]}
+        school = map_row("c", "Formazione / Scuole migranti", "matched_house")
+        school["payload"]["classification"] = {"display": "excluded", "exclusion_reason": "state_school_without_migrant_service"}
+        cards = services([base, secondary, school])
+        self.assertEqual([c["id"] for c in cards], ["a"])
+        card = cards[0]
+        self.assertEqual((card["category"]["slug"], card["service_title"]), ("curarmi", "Rilascio STP/ENI · Ospedale"))
+        self.assertEqual(card["needs"], ["curarmi", "lavoro"])
+        self.assertEqual(card["native_classifications"]["tipologia"], "Rilascio STP/ENI")
+        self.assertEqual(card["access_raw"], {"stp": True})
+        self.assertEqual(card["hours_display"]["days"][0]["intervals"][0]["label"], "09:00 – 12:00")
+        self.assertEqual({c["slug"] for c in categories([base, secondary, school])}, {"curarmi"})
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -336,3 +336,19 @@ claims and sources show faceted counts: each value is counted under all the *oth
 active filters (`facetCounts` / `passesFilters` in `map.js`), so a count is the number of
 results that choosing that value would give. Values with no results are hidden from the
 selects, and need tiles with no results are dimmed.
+
+### Map sources after normalizer 0.3 (2026-11-09)
+
+Cards follow the importer's classification
+([pipeline](../egi-importer/docs/mymaps-pipeline.md#3b-classification-processor-030-egi_importerclassifypy)):
+
+- Excluded records (state schools, courts) and secondary per-layer copies are hidden
+  (`is_visible`). The preview now shows 1,199 services instead of 1,398.
+- The need comes from the classification, and an entity can count in several needs
+  (`needs`, used by the need filter).
+- Service types are shared across sources.
+- Access claims show their basis; derived ones are marked with *.
+- GrIS hours that parse feed the weekly table and "Aperti ora".
+- GrIS services at one address are grouped as one site.
+
+Older payloads fall back to the `MAP_LAYER_GROUPS` crosswalk.
