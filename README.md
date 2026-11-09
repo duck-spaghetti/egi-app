@@ -332,3 +332,24 @@ a sampled service card gets a "Foto Mapillary (test)" section with up to six can
 whose camera positions and directions are drawn on the map. Choosing one loads
 Mapillary's own embed viewer (`mapillary.com/embed`). EGI downloads and stores no image,
 and the app holds no token. Not visible without `?debug=1`.
+
+### Service photos module (2026-11-09)
+
+User decisions: exclude sensitive services, prefer 360° images, and use this provider
+priority: organisation submission → Mapillary → user submission, with Google Street
+View on request only. Implemented in `app/backend/media.py` (`GET /api/preview/media?service=<id>`)
+and `app/frontend/static/js/media-panel.js` (card section "Foto", fetched only when a card opens).
+
+- **Excluded:** protected addresses, positive `vittima_di_violenza`/`vittima_di_tortura`
+  claims, and a conservative keyword match (`SENSITIVE`: antiviolenza, CAV, violenza,
+  tratta, casa rifugio, …). These services get no image and no Street View link, debug
+  included. Remote and itinerant services get no image.
+- **Mapillary:** candidates from the phase-1 file, kept only within 30 m, at most 6 years
+  old and facing the service or 360°; 360° images rank first. Shown through Mapillary's
+  embed viewer after a click, with author, CC BY-SA 4.0 and a link.
+- **Organisation/user:** approved entries in `.local/media/submissions.json`
+  (`service_id`, `provider`, `url`, `status: approved`, `author`, `licence`, `is_360`).
+  This is an interim store until the `media.*` schema is approved; it is empty today.
+- **Street View:** a Google Maps link (`map_action=pano`) opened by the user. Google
+  imagery is never embedded, fetched or stored, and no key is needed.
+- **Switch:** `EGI_MEDIA_ENABLED=0` removes the endpoint output and the card section.
