@@ -103,6 +103,10 @@ SOURCE_SHORT_NAMES = {
     "scuolemigranti": "Scuolemigranti",
     "programma-integra": "Programma Integra",
     "ministero-salute-consultori": "Ministero della Salute",
+    "1522": "1522 Antiviolenza",
+    "caritas-roma": "Caritas Roma",
+    "roma-solidarieta": "Roma Solidarietà",
+    "sant-egidio": "Sant'Egidio · DOVE 2026",
 }
 MONTHS = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio",
           "agosto", "settembre", "ottobre", "novembre", "dicembre"]

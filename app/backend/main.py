@@ -368,10 +368,12 @@ def debug_source_positions(source: str = Query(min_length=1, max_length=80), row
 
 @app.get("/api/preview/review/overlaps")
 def review_overlaps(tiers: str = Query(default="A,B,C,D", max_length=10), rows: list[dict[str, Any]] = Depends(subjects)):
-    """Cross-source candidate pairs among shown services, for the duplicate review page."""
+    """Cross-source candidate pairs among visible services (placed or not), for the duplicate review page."""
     wanted = {t for t in tiers.split(",") if t in {"A", "B", "C", "D"}}
-    pairs = [p for p in overlap_pairs([c for c in services(rows) if is_placed(c)]) if p["tier"] in wanted]
-    return {"pairs": pairs, "count": len(pairs),
+    pairs = [p for p in overlap_pairs(services(rows)) if p["tier"] in wanted]
+    groups = {p["group"]["id"]: p["group"] for p in pairs if p.get("group")}
+    return {"pairs": pairs, "count": len(pairs), "groups": len(groups),
+            "groups_over_two_sources": sum(1 for g in groups.values() if len(g["sources"]) > 2),
             "note": "Coppie da fonti diverse; le decisioni restano nel browser finché non vengono registrate dal curatore."}
 
 

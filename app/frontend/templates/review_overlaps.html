@@ -39,6 +39,10 @@
   .actions .same { border-color:var(--ok); color:var(--ok); } .actions .place { border-color:var(--mid); color:var(--mid); } .actions .diff-b { color:var(--no); }
   textarea { width:100%; min-height:120px; font:12px ui-monospace, monospace; }
   .hint { color:var(--soft); font-size:12px; }
+  .group-table { width:100%; border-collapse:collapse; font-size:12.5px; margin-top:10px; background:var(--card); }
+  .group-table th, .group-table td { border:1px solid var(--line); padding:5px 7px; text-align:left; vertical-align:top; overflow-wrap:anywhere; }
+  .group-table th { background:#f1ece0; font-weight:600; }
+  .group-wrap { overflow-x:auto; }
   @media (max-width: 760px) {
     .layout { grid-template-columns:1fr; height:auto; }
     aside { max-height:38vh; border-right:0; border-bottom:1px solid var(--line); }
@@ -55,11 +59,14 @@
 <div class="layout">
   <aside>
     <div class="filters">
-      <label><input type="checkbox" data-tier="A" checked> A stesso indirizzo e tipo</label>
-      <label><input type="checkbox" data-tier="B" checked> B &lt;40 m, stesso tipo</label>
-      <label><input type="checkbox" data-tier="C" checked> C stesso luogo, nomi simili</label>
-      <label><input type="checkbox" data-tier="D"> D solo vicini</label>
+      <label title="punteggio 8 o più"><input type="checkbox" data-tier="A" checked> A molto probabile</label>
+      <label title="punteggio 6–7"><input type="checkbox" data-tier="B" checked> B probabile</label>
+      <label title="punteggio 4–5"><input type="checkbox" data-tier="C" checked> C da valutare</label>
+      <label title="stesso indirizzo o entro 25 m, pochi altri segnali"><input type="checkbox" data-tier="D"> D solo vicini</label>
       <label><input type="checkbox" id="open-only"> solo da decidere</label>
+      <label><input type="checkbox" id="multi-only"> gruppi con 3+ fonti</label>
+      <select id="source-filter" aria-label="Fonte"><option value="">Tutte le fonti</option></select>
+      <span class="hint" id="group-filter"></span>
     </div>
     <div id="list"></div>
   </aside>
@@ -78,7 +85,7 @@
 const LABELS = {same_service: "Stesso servizio", same_place: "Stesso luogo, servizi diversi", different: "Diversi", unsure: "Non so"};
 const TAG = {same_service: "d-same", same_place: "d-place", different: "d-diff", unsure: ""};
 const KEY = "egi-review-overlaps-v1";
-let pairs = [], current = null, decisions = {};
+let pairs = [], current = null, decisions = {}, groupOnly = null;
 try { decisions = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (_e) { decisions = {}; }
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(decisions)); } catch (_e) {} };
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -91,7 +98,12 @@ const layer = L.layerGroup().addTo(map);
 function visible() {
   const tiers = new Set([...document.querySelectorAll("[data-tier]:checked")].map(x => x.dataset.tier));
   const openOnly = document.getElementById("open-only").checked;
-  return pairs.filter(p => tiers.has(p.tier) && (!openOnly || !decisions[p.pair_id]));
+  const multi = document.getElementById("multi-only").checked;
+  const source = document.getElementById("source-filter").value;
+  return pairs.filter(p => tiers.has(p.tier) && (!openOnly || !decisions[p.pair_id])
+    && (!multi || (p.group && p.group.sources.length > 2))
+    && (!source || p.a.source_code === source || p.b.source_code === source)
+    && (!groupOnly || (p.group && p.group.id === groupOnly)));
 }
 
 function renderList() {
@@ -100,7 +112,7 @@ function renderList() {
     const d = decisions[p.pair_id];
     return `<button class="item${current && current.pair_id === p.pair_id ? " active" : ""}" data-id="${p.pair_id}">
       <span class="tag">${p.tier}</span>${d ? `<span class="tag ${TAG[d.decision]}">${esc(LABELS[d.decision])}</span>` : ""}
-      #${p.number} · ${p.distance_m} m<small>${esc(p.a.source)}: ${esc(p.a.title)}</small><small>${esc(p.b.source)}: ${esc(p.b.title)}</small></button>`;
+      #${p.number} · ${p.score} pt · ${p.distance_m == null ? "senza posizione" : p.distance_m + " m"}${p.group && p.group.sources.length > 2 ? ` · gruppo ${p.group.sources.length} fonti` : ""}<small>${esc(p.a.source)}: ${esc(p.a.title)}</small><small>${esc(p.b.source)}: ${esc(p.b.title)}</small></button>`;
   }).join("") || '<p class="hint" style="padding:12px">Nessuna coppia con questi filtri.</p>';
   document.querySelectorAll(".item").forEach(b => b.addEventListener("click", () => show(b.dataset.id)));
   const done = pairs.filter(p => decisions[p.pair_id]).length;
@@ -128,13 +140,15 @@ function show(id) {
   if (!current) return;
   const p = current, d = decisions[p.pair_id]?.decision;
   layer.clearLayers();
-  const a = L.circleMarker([p.a.lat, p.a.lon], {radius: 9, color: "#fff", weight: 2, fillColor: "#c0392b", fillOpacity: .9}).bindTooltip("A").addTo(layer);
-  const b = L.circleMarker([p.b.lat, p.b.lon], {radius: 7, color: "#fff", weight: 2, fillColor: "#1f6fb2", fillOpacity: .9}).bindTooltip("B").addTo(layer);
-  map.fitBounds(L.latLngBounds([a.getLatLng(), b.getLatLng()]).pad(.6), {maxZoom: 18});
-  const why = [p.same_address ? "stesso indirizzo" : null, p.same_type ? "stesso tipo di servizio" : null,
-               p.shared_words.length ? `parole in comune: ${p.shared_words.join(", ")}` : null].filter(Boolean).join(" · ");
+  const points = [];
+  if (p.a.lat != null) points.push(L.circleMarker([p.a.lat, p.a.lon], {radius: 9, color: "#fff", weight: 2, fillColor: "#c0392b", fillOpacity: .9}).bindTooltip("A").addTo(layer).getLatLng());
+  if (p.b.lat != null) points.push(L.circleMarker([p.b.lat, p.b.lon], {radius: 7, color: "#fff", weight: 2, fillColor: "#1f6fb2", fillOpacity: .9}).bindTooltip("B").addTo(layer).getLatLng());
+  if (points.length) map.fitBounds(L.latLngBounds(points).pad(.6), {maxZoom: 18});
+  const group = p.group ? `<p class="hint">Gruppo di ${p.group.size} schede da ${p.group.sources.length} fonti (${esc(p.group.sources.join(", "))}).
+    <button type="button" id="group-btn">${groupOnly ? "Mostra tutte le coppie" : "Mostra solo questo gruppo"}</button>
+    <button type="button" id="group-view">Confronta tutto il gruppo</button></p><div id="group-box"></div>` : "";
   document.getElementById("detail").innerHTML = `
-    <p class="why"><strong>#${p.number} · fascia ${p.tier}</strong> · ${p.distance_m} m di distanza${why ? " · " + esc(why) : ""}. Le celle evidenziate differiscono.</p>
+    <p class="why"><strong>#${p.number} · fascia ${p.tier} · ${p.score} punti</strong> · ${esc(p.evidence.join(" · "))}${points.length < 2 ? " · una scheda è senza posizione" : ""}. Le celle evidenziate differiscono.</p>${group}
     <div class="actions">
       <button class="same${d === "same_service" ? " on" : ""}" data-d="same_service">1 · Stesso servizio</button>
       <button class="place${d === "same_place" ? " on" : ""}" data-d="same_place">2 · Stesso luogo, servizi diversi</button>
@@ -143,7 +157,37 @@ function show(id) {
     </div>
     <div class="compare">${side(p, "a")}${side(p, "b")}</div>`;
   document.querySelectorAll("[data-d]").forEach(btn => btn.addEventListener("click", () => decide(btn.dataset.d)));
+  const gv = document.getElementById("group-view");
+  if (gv) gv.addEventListener("click", () => renderGroup(p.group.id));
+  const gb = document.getElementById("group-btn");
+  if (gb) gb.addEventListener("click", () => { groupOnly = groupOnly ? null : p.group.id;
+    document.getElementById("group-filter").textContent = groupOnly ? "Filtro: un gruppo" : ""; show(p.pair_id); });
   renderList();
+}
+
+function renderGroup(groupId) {
+  const inGroup = pairs.filter(x => x.group && x.group.id === groupId);
+  const members = {};
+  inGroup.forEach(x => { members[x.a.id] = x.a; members[x.b.id] = x.b; });
+  const list = Object.values(members).sort((x, y) => (x.source || "").localeCompare(y.source || ""));
+  const fields = [["Fonte", "source"], ["Nome", "title"], ["Struttura", "facility"], ["Tipo", "type"], ["Bisogno", "need"],
+                  ["Indirizzo", "address"], ["Contatti", "contacts"], ["Orari", "hours"], ["Posizione", "position"], ["Descrizione", "description"]];
+  const text = v => Array.isArray(v) ? v.join(" · ") : (v || "");
+  const rows = fields.map(([label, key]) => {
+    const values = list.map(m => text(m[key]));
+    const differ = new Set(values.filter(Boolean)).size > 1;
+    return `<tr><th>${label}</th>${values.map(v => `<td class="${differ ? "diff" : ""}">${esc(v || "—")}</td>`).join("")}</tr>`;
+  }).join("");
+  const strong = inGroup.filter(x => x.tier === "A" || x.tier === "B");
+  document.getElementById("group-box").innerHTML = `<div class="group-wrap"><table class="group-table">${rows}</table></div>
+    <p class="hint">${list.length} schede, ${inGroup.length} coppie nel gruppo (${strong.length} in fascia A/B). Tutti i valori restano: la scheda unica li mostrerà fonte per fonte.</p>
+    <p><button type="button" id="group-same">Tutte le coppie A/B del gruppo: stesso servizio</button></p>`;
+  document.getElementById("group-same").addEventListener("click", () => {
+    strong.forEach(x => { decisions[x.pair_id] = {decision: "same_service", a: x.a.locator, b: x.b.locator, a_source: x.a.source_code, b_source: x.b.source_code, at: new Date().toISOString(), via: "group"}; });
+    save(); renderList(); renderGroup(groupId);
+  });
+  const layerPoints = list.filter(m => m.lat != null).map(m => L.circleMarker([m.lat, m.lon], {radius: 7, color: "#fff", weight: 2, fillColor: "#7a4fa0", fillOpacity: .85}).bindTooltip(m.source).addTo(layer).getLatLng());
+  if (layerPoints.length) map.fitBounds(L.latLngBounds(layerPoints).pad(.6), {maxZoom: 18});
 }
 
 function decide(decision) {
@@ -173,7 +217,7 @@ document.getElementById("copy").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(text); document.getElementById("copied").textContent = "Copiato."; }
   catch (_e) { document.getElementById("export").select(); document.getElementById("copied").textContent = "Seleziona e copia a mano."; }
 });
-document.querySelectorAll(".filters input").forEach(x => x.addEventListener("change", renderList));
+document.querySelectorAll(".filters input, .filters select").forEach(x => x.addEventListener("change", renderList));
 document.addEventListener("keydown", e => {
   if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return;
   const map = {"1": "same_service", "2": "same_place", "3": "different", "0": "unsure"};
@@ -184,6 +228,10 @@ document.addEventListener("keydown", e => {
 
 fetch("/api/preview/review/overlaps").then(r => r.json()).then(data => {
   pairs = data.pairs;
+  const names = {};
+  pairs.forEach(p => { names[p.a.source_code] = p.a.source; names[p.b.source_code] = p.b.source; });
+  document.getElementById("source-filter").insertAdjacentHTML("beforeend",
+    Object.entries(names).sort((x, y) => x[1].localeCompare(y[1])).map(([c, n]) => `<option value="${esc(c)}">${esc(n)}</option>`).join(""));
   renderList();
   const first = visible().find(p => !decisions[p.pair_id]) || visible()[0];
   if (first) show(first.pair_id);

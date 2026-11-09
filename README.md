@@ -395,15 +395,34 @@ Also fixed: "Scegli punto" threw `poi is not defined` (a stray line from `3a6bad
 
 ### Duplicate review page (2026-11-09)
 
-`/revisione/doppioni` lists cross-source candidate pairs among the services shown on the
-map (`app/backend/review.py`, `GET /api/preview/review/overlaps`):
+`/revisione/doppioni` lists cross-source candidate pairs among all visible services,
+placed or not (`app/backend/review.py`, `GET /api/preview/review/overlaps`). Candidates
+come from the same normalized address, a shared phone or email, or a 40 m grid. Each pair
+gets a score from independent signals, shown as evidence:
 
-| Tier | Rule |
+| Signal | Points |
+| --- | ---: |
+| Same street and house number (abbreviations, CAP and articles normalized) | 3 |
+| Same street, other or no number, within 150 m | 1 |
+| Within 25 m / within 60 m | 2 / 1 |
+| Shared phone or shared email (each) | 3 |
+| Shared contact that a source lists for 3+ of its places (the organisation's) | 1 |
+| Shared website domain (generic hosts excluded) | 1 |
+| Same or equivalent service type / same need / different needs | 2 / 1 / −2 |
+| Name similarity ≥ 0.5 / ≥ 0.25 ("CAV" read as "centro antiviolenza"; generic words ignored); shared quoted name | 2 / 1; 2 |
+
+| Tier | Score |
 | --- | --- |
-| A | Same street and number, and same service type |
-| B | Within 40 m, same type |
-| C | Same address or within 25 m, with shared name words |
-| D | Within 25 m only; off by default |
+| A, very likely | 8 or more |
+| B, likely | 6–7 |
+| C, to assess | 4–5 |
+| D, neighbours only | same address or within 25 m; off by default |
+
+A/B pairs of the same (or equivalent) type form **groups**: one service described by
+several sources (the Colle Oppio canteen is in five). Different services at one address
+stay pairs, so they never chain into one group. Filters: tier, still open, groups with
+3+ sources, one source. "Confronta tutto il gruppo" shows every member side by side
+and can mark all its A/B pairs as the same service.
 
 Each pair shows a map with A and B, and the two records side by side with differing
 cells highlighted. The answers are: same service, same place but different services,
@@ -423,3 +442,17 @@ The app also reads `open_data` sources. The first is the Ministry of Health cons
 consultori placed from the address, under IODL 2.0. Its pairs with GrIS and Programma
 Integra appear on `/revisione/doppioni` (fascia A: 91 pairs), which pilots the consultori
 deduplication.
+
+### Web pages and guide sources (2026-11-09)
+
+The app also reads `web_pages` and `document` sources from the importer:
+
+| Source | Shown as | Shown services | Notes |
+| --- | --- | ---: | --- |
+| `1522` | 1522 Antiviolenza | 38 of 48 | Lazio centres; source update 27/10/2026; access hints from the definition of an anti-violence centre (marked as derived) |
+| `caritas-roma` | Caritas Roma | 42 of 56 | 7 "Servizi e opere" pages |
+| `roma-solidarieta` | Roma Solidarietà | 20 of 33 | the cooperative that runs most Caritas structures; hours and how to get there |
+| `sant-egidio` | Sant'Egidio · DOVE 2026 | 30 of 32 | "Dove mangiare" chapter of the printed guide |
+
+Services without an address-based position stay hidden from the map and list, as for the
+other sources (`?debug=1` shows them).

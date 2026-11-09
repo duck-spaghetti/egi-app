@@ -19,6 +19,8 @@ def card(i, source, title, address, lat, lon, kind):
 class ReviewTests(unittest.TestCase):
     def test_street_key_ignores_case_and_tail(self):
         self.assertEqual(street_key("Consultorio - X Via Duilio Cambellotti, 7 - 00133 Roma"), "via duilio cambellotti 7")
+        self.assertEqual(street_key("V. delle Sette Sale, 30, 00184 Roma"), street_key("Via delle Sette Sale 30 – Roma"))
+        self.assertEqual(street_key("P.zza S. Calisto 16"), "piazza san calisto 16")
 
     def test_tiers_and_same_source_excluded(self):
         cards = [
@@ -32,6 +34,27 @@ class ReviewTests(unittest.TestCase):
         self.assertNotIn(("a", "d"), pairs, "same source is never paired")
         self.assertIn(pairs[("d", "b")]["tier"] if ("d", "b") in pairs else pairs[("b", "d")]["tier"], {"C", "D"})
         self.assertTrue(all(p["a"]["source_code"] != p["b"]["source_code"] for p in pairs.values()))
+
+    def test_shared_contacts_match_without_position_and_groups_join_sources(self):
+        def unplaced(i, source, title, address, phone, email, kind="Mensa sociale"):
+            c = card(i, source, title, address, 0, 0, kind)
+            c["place"]["geometry"] = None
+            c["contacts"] = [{"type": "phone", "value": phone}, {"type": "email", "value": email}]
+            return c
+        cards = [
+            unplaced("m1", "caritas-roma", "MENSA “GIOVANNI PAOLO II” a Colle Oppio", "Via delle Sette Sale 30 – Roma", "06.88815230", "colle.oppio@caritasroma.it"),
+            unplaced("m2", "roma-solidarieta", "Mensa diurna “Giovanni Paolo II” a Colle Oppio", "Via delle Sette Sale 30, 00184 Roma", "06 88815230", "x@y.it"),
+            unplaced("m3", "helpinet", "Mensa Colle Oppio", "Via delle Sette Sale, 30", "0688815230", "colle.oppio@caritasroma.it"),
+            unplaced("o", "programma-integra", "Altro", "Via Uno 1", "06 9999999", "o@o.it", kind="Corsi linguistici"),
+        ]
+        pairs = overlap_pairs(cards)
+        self.assertEqual({(p["a"]["id"], p["b"]["id"]) for p in pairs}, {("m1", "m2"), ("m1", "m3"), ("m2", "m3")})
+        strongest = next(p for p in pairs if {p["a"]["id"], p["b"]["id"]} == {"m1", "m3"})
+        self.assertEqual(strongest["tier"], "A")
+        self.assertIn("stesso telefono", strongest["evidence"])
+        self.assertIn("stessa email", strongest["evidence"])
+        self.assertIsNone(strongest["distance_m"])
+        self.assertEqual(strongest["group"]["sources"], ["caritas-roma", "helpinet", "roma-solidarieta"])
 
     def test_routes(self):
         rows = [map_row("x", "Salute", "matched_house")]
