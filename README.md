@@ -378,3 +378,17 @@ view (`/map?debug=1`) colours named places and manual fixes. To fix a position, 
 run) and re-run geocoding.
 
 Also fixed: "Scegli punto" threw `poi is not defined` (a stray line from `3a6bad3`).
+
+### User decisions applied (2026-11-09, second round)
+
+- **Basemap:** OSM tiles desaturated in CSS (`.leaflet-tile-pane` filter), as chosen
+  from the r2 comparison.
+- **Unplaced services:** services without a map point are no longer served
+  (`is_placed` in `main.py`). Remote directory services are kept. `/map?debug=1` requests
+  `include_unplaced=true` and shows the "Problema di posizione" filter for review.
+- **Positions:** they come only from the address (importer rule); CAP-only and
+  municipality-only results are never shown.
+- **Freshness:** every card says how current the source declares itself to be. Declarations
+  older than 18 months at acquisition are highlighted; Helpinet and undated sources say the
+  date is unknown. The banner reads "non sempre aggiornati". Data are imported as is, and
+  reviewers enrich, clean, deduplicate and verify with the providers.

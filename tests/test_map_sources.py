@@ -82,7 +82,8 @@ class MapSourceTests(unittest.TestCase):
         try:
             client = TestClient(app)
             self.assertEqual(client.get("/api/preview/coverage").json()["services"], 1)
-            self.assertEqual(len(client.get("/api/preview/services").json()), 2)
+            self.assertEqual(len(client.get("/api/preview/services").json()), 1, "the Helpinet fixture has no coordinates")
+            self.assertEqual(len(client.get("/api/preview/services?include_unplaced=true").json()), 2)
         finally:
             app.dependency_overrides.clear()
 
@@ -144,6 +145,16 @@ class MapSourceTests(unittest.TestCase):
         self.assertEqual(by_id["c"]["placement"]["issue"], "postcode_area_only")
         self.assertIsNone(by_id["c"]["place"]["geometry"])
         self.assertIn("senza via", by_id["s"]["placement"]["label"])
+
+
+    def test_freshness_flags_old_declarations(self):
+        row = map_row("a", "Salute", "matched_house")
+        row["payload"]["declared_update"] = {"text": "Regione Lazio marzo 2022", "year": 2022, "month": 3}
+        card = services([row])[0]
+        self.assertTrue(card["freshness"]["stale"])
+        self.assertIn("potrebbero non essere aggiornate", card["freshness"]["label"])
+        row["payload"]["declared_update"] = None
+        self.assertIn("non indica", services([row])[0]["freshness"]["label"])
 
 
 if __name__ == "__main__":

@@ -102,11 +102,11 @@
       <label for="service-query">Cerca servizio, struttura, prestazione o indirizzo</label>
       <input id="service-query" type="search" placeholder="Es. doccia, italiano, appuntamento…" autocomplete="off">
       <label for="section-filter">Sezione</label>
-      <select id="section-filter"><option value="all">Tutti i servizi</option><option value="services">Servizi territoriali e da verificare</option><option value="directory">Rubrica · servizi a distanza</option><option value="needs_position">Posizione da completare</option></select>
+      <select id="section-filter"><option value="all">Tutti i servizi</option><option value="services">Servizi territoriali e da verificare</option><option value="directory">Rubrica · servizi a distanza</option><option value="needs_position" class="debug-only">Posizione da completare (revisione)</option></select>
       <label for="source-filter">Fonte</label>
       <select id="source-filter"><option value="">Tutte le fonti</option></select>
-      <label for="issue-filter">Problema di posizione</label>
-      <select id="issue-filter"><option value="">Qualsiasi (anche posizioni presenti)</option></select>
+      <div class="issue-filter-wrap" hidden><label for="issue-filter">Problema di posizione</label>
+      <select id="issue-filter"><option value="">Qualsiasi (anche posizioni presenti)</option></select></div>
     </div>
     <fieldset class="discovery-path">
       <legend>Trova il servizio</legend>

@@ -209,6 +209,7 @@ def services(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "run_id": row["run_id"],
                 "observed_at": row["observed_at"],
                 "original_retrieved_at": None,
+                "freshness": freshness(None, row.get("observed_at")),
                 "category": by_code[code],
                 "category_id": by_code[code]["id"],
                 "subcategory": None,
@@ -360,6 +361,28 @@ def source_hours(weekly: dict[str, Any] | None, raw: Any, source_name: str) -> d
     return text_hours(raw, source_name)
 
 
+def freshness(update: dict[str, Any] | None, observed_at: str | None) -> dict[str, Any]:
+    """How current the source says its data is. EGI has not verified any of it.
+
+    Imported as is; a reviewer enriches, cleans and verifies with the providers
+    (user decision, 2026-11-09). Here we only make the age visible.
+    """
+    acquired = (observed_at or "")[:10] or None
+    if not update or not update.get("year"):
+        return {"declared": None, "months_old": None, "acquired": acquired, "stale": None,
+                "label": f"La fonte non indica quando è stata aggiornata; dati acquisiti il {acquired or '—'}. Da verificare con chi eroga il servizio."}
+    year, month = update["year"], update.get("month") or 6
+    ref_year, ref_month = (int(acquired[:4]), int(acquired[5:7])) if acquired else (year, month)
+    months = (ref_year - year) * 12 + (ref_month - month)
+    when = declared_update_label(update) or str(year)
+    stale = months >= 18
+    text = f"Aggiornamento dichiarato dalla fonte: {when}"
+    if stale:
+        age = f"{months} mesi" if months < 24 else f"circa {months // 12} anni"
+        text += f" ({age} prima dell'acquisizione): le informazioni potrebbero non essere aggiornate."
+    return {"declared": when, "months_old": months, "acquired": acquired, "stale": stale, "label": text + " Da verificare con chi eroga il servizio."}
+
+
 def map_service(row: dict[str, Any], category: dict[str, Any]) -> dict[str, Any]:
     """Adapt a map-export service and its geocoded candidate to the card shape."""
     p = row["payload"]
@@ -401,6 +424,7 @@ def map_service(row: dict[str, Any], category: dict[str, Any]) -> dict[str, Any]
         "observed_at": row["observed_at"],
         "original_retrieved_at": row["observed_at"],
         "declared_update": declared_update_label(p.get("declared_update")),
+        "freshness": freshness(p.get("declared_update"), row.get("observed_at")),
         "position": {
             "status": (geocode or {}).get("status") or "unresolved",
             "ambiguous": bool((geocode or {}).get("ambiguous")),

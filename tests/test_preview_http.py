@@ -71,7 +71,7 @@ class PreviewHttpTests(unittest.TestCase):
         for path in ["/", "/map?city_id=1&lang=it", "/map?city_id=1&lang=ar"]:
             with self.get(path) as response:
                 body = response.read().decode()
-                self.assertIn("Dati delle fonti non revisionati", body)
+                self.assertIn("Dati delle fonti non revisionati e non sempre aggiornati", body)
                 self.assertEqual(response.headers["Cache-Control"], "no-store")
         self.assertEqual(len(self.payload("/api/preview/categories")), 9)
         self.assertEqual(len(self.payload("/api/preview/languages")), 4)

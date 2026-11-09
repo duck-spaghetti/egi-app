@@ -1482,3 +1482,11 @@ html[dir="rtl"] .sheet-back-head .arrow,
 .cat-tile { position:relative; }
 .cat-count { position:absolute;top:-6px;right:-6px;min-width:22px;padding:1px 6px;border-radius:999px;background:var(--ink);color:#fff;font:700 11px/18px system-ui;text-align:center; }
 .cat-tile.empty { opacity:.45; }
+
+/* Basemap (r2d, user choice 2026-11-09): standard OSM tiles desaturated in CSS so the
+   coloured service markers and transport lines stand out. Same provider and attribution. */
+.leaflet-tile-pane { filter: grayscale(.85) contrast(1.05) brightness(1.03); }
+
+/* Source freshness on service cards (user decision 2026-11-09: say when data may be old). */
+.freshness-note { font-size:12px;line-height:1.45;margin:6px 0;padding:6px 9px;border-radius:8px;background:#f2efe6;color:var(--ink-soft); }
+.freshness-note.stale { background:#fff3d6;color:#6b4b00; }

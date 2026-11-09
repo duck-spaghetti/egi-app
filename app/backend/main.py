@@ -107,12 +107,26 @@ def preview_services(
     area_id: int = 1,
     language: str = "it",
     limit: int = Query(default=2000, ge=1, le=5000),
+    include_unplaced: bool = False,
     rows: list[dict[str, Any]] = Depends(subjects),
 ):
-    """Return imported subjects only, never claim canonical approval or live availability."""
+    """Return imported subjects only, never claim canonical approval or live availability.
+
+    Services without a map point are left out (user decision, 2026-11-09) unless
+    include_unplaced is set, which the review/debug view uses. Remote directory
+    services (telephone/online) have no place by nature and are always kept.
+    """
     if area_id != 1:
         raise HTTPException(404, "Area non disponibile nella preview")
-    return services(rows)[:limit]
+    cards = services(rows)
+    if not include_unplaced:
+        cards = [c for c in cards if is_placed(c)]
+    return cards[:limit]
+
+
+def is_placed(card: dict[str, Any]) -> bool:
+    """A card is shown when it has a map point or is a remote directory service."""
+    return bool((card.get("place") or {}).get("geometry")) or (card.get("placement") or {}).get("section") == "directory"
 
 
 @app.get("/api/preview/categories")

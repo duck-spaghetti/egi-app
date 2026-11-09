@@ -117,7 +117,8 @@ class InProcessRouteTests(unittest.TestCase):
 
     def test_services_health_and_preview_header(self):
         """Routes serve fixture subjects and keep the preview labelling."""
-        response = self.client.get("/api/preview/services?area_id=1")
+        self.assertEqual(self.client.get("/api/preview/services?area_id=1").json(), [], "fixture services have no coordinates and are hidden")
+        response = self.client.get("/api/preview/services?area_id=1&include_unplaced=true")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.headers["X-EGI-Data-Status"], "unreviewed-source-preview"

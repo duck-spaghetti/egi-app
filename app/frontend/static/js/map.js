@@ -1,4 +1,5 @@
 const context = window.EGI_MAP_CONTEXT;
+const DEBUG_MODE = typeof location !== "undefined" && new URLSearchParams(location.search).has("debug");
 
 const state = {
   categories: [],
@@ -119,7 +120,7 @@ function initMap() {
     },
   });
   // Local position checks: ?debug=1 adds the one-source view (debug-sources.js).
-  if (new URLSearchParams(location.search).has("debug") && typeof DebugSources !== "undefined") {
+  if (DEBUG_MODE && typeof DebugSources !== "undefined") {
     DebugSources.create(map, {
       setServicesVisible: visible => visible ? map.addLayer(markersLayer) : map.removeLayer(markersLayer),
       openDetail: id => openDetail(id),
@@ -292,6 +293,8 @@ async function fetchPublicServices() {
     language: normalizeLang(state.lang),
     limit: "2000",
   });
+  // Services without a map point are hidden; the review view (?debug=1) still lists them.
+  if (DEBUG_MODE) params.set("include_unplaced", "true");
   const response = await fetch(`/api/preview/services?${params.toString()}`);
   return readJson(response, "servizi");
 }
@@ -768,7 +771,8 @@ async function openDetail(id) {
     <p class="source-note">${escapeHtml(raw.placement?.label || "Posizione da verificare")}${sourceCode(poi) === "helpinet" ? " · Ruolo dell’organizzazione da verificare." : ""}</p>
     ${openingBadge(poi)}
     ${renderDetailHeaderActions(poi)}
-    <p class="source-note">${escapeHtml(sourceName(poi))} · dati non revisionati.${raw.declared_update?` Aggiornamento dichiarato dalla fonte: ${escapeHtml(raw.declared_update)}.`:""}${raw.itinerant_source?" Servizio itinerante: il punto della fonte non è una sede fissa verificata.":""}</p>
+    ${raw.freshness ? `<p class="freshness-note${raw.freshness.stale ? " stale" : ""}">${escapeHtml(raw.freshness.label)}</p>` : ""}
+    <p class="source-note">${escapeHtml(sourceName(poi))} · dati non revisionati.${raw.itinerant_source?" Servizio itinerante: il punto della fonte non è una sede fissa verificata.":""}</p>
     ${renderPositionNote(raw)}
     ${transitSectionShell(poi)}
     <section class="detail-section"><h3>Descrizione</h3><p>${escapeHtml(description)}</p>${!raw.description && summary?.text?'<span class="derived-label">Sintesi ricavata dai campi della fonte · non descrizione originale</span>':""}</section>
@@ -1719,7 +1723,8 @@ function renderSearchOptions() {
   fillFacetSelect(access, "access", "Tutte le indicazioni di accesso", labels.access);
   if (sources) fillFacetSelect(sources, "source", "Tutte le fonti", labels.source);
   const issues = document.getElementById("issue-filter");
-  if (issues) fillFacetSelect(issues, "issue", "Qualsiasi (anche posizioni presenti)", new Map(Object.entries(POSITION_ISSUES)));
+  if (issues) issues.closest?.(".issue-filter-wrap")?.toggleAttribute("hidden", !DEBUG_MODE);
+  if (issues && DEBUG_MODE) fillFacetSelect(issues, "issue", "Qualsiasi (anche posizioni presenti)", new Map(Object.entries(POSITION_ISSUES)));
 }
 
 /** Recount facets and update the filter sheet: total, need tiles and selects. */
