@@ -17,7 +17,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .geocoding import search_address
-from .preview import AREA, LANGUAGES, categories, services
+from .preview import AREA, LANGUAGES, categories, is_map_row, services
 from .presentation import coverage
 from .subjects import PostgresSubjectSource, SubjectSource, SubjectSourceUnavailable
 from .transport import ROOTS as TRANSPORT_ROOTS, transport_view_all
@@ -327,14 +327,19 @@ def contribute():
 @app.get("/api/preview/coverage")
 def source_coverage(rows: list[dict[str, Any]] = Depends(subjects)):
     """Report native field conservation and use without confusing completeness with accuracy."""
-    return coverage(rows)
+    return coverage(helpinet_rows(rows))
+
+
+def helpinet_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The coverage benchmark measures Helpinet's native fields only."""
+    return [r for r in rows if not is_map_row(r)]
 
 
 @app.get("/benchmark", response_class=HTMLResponse)
 def benchmark_page(request: Request, rows: list[dict[str, Any]] = Depends(subjects)):
     """Render the inspectable Helpinet field coverage and unresolved source gaps."""
     return templates.TemplateResponse(
-        request=request, name="benchmark.html", context={"report": coverage(rows)}
+        request=request, name="benchmark.html", context={"report": coverage(helpinet_rows(rows))}
     )
 
 

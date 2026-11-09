@@ -1230,6 +1230,7 @@ html[dir="rtl"] .sheet-back-head .arrow,
 .service-search input,.service-search select { width:100%;padding:11px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink);font:inherit; }
 .service-search button { padding:10px 12px;margin:10px 6px 0 0;border:1px solid var(--line);border-radius:9px;background:var(--paper);font:inherit;cursor:pointer; }
 .source-note { color:var(--ink-soft);font-size:12px;line-height:1.55;display:block; }
+.source-hours-text { white-space:pre-line;margin:6px 0 0; }
 .facility-name { display:block;color:var(--ink-soft);font-size:14px;margin:6px 0 10px; }
 .poi-item { width:100%;text-align:left;font:inherit;background:transparent;border:0;border-bottom:1px solid var(--line);cursor:pointer; }
 .poi-item .meta { display:flex;margin:8px 0; }

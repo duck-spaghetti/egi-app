@@ -1,4 +1,7 @@
-"""Supply the latest succeeded Helpinet interpretation to the preview routes.
+"""Supply the latest succeeded source interpretations to the preview routes.
+
+Sources: the preserved Helpinet extract and every map export (My Maps) with its
+latest geocoding run.
 
 SubjectSource is the single seam for imported service subjects. PostgresSubjectSource
 reads the restricted preview database through psql and caches one snapshot per
@@ -20,23 +23,42 @@ from typing import Any, Protocol
 PSQL = os.environ.get("EGI_PSQL", "/Library/PostgreSQL/18/bin/psql")
 PROJECT = Path(__file__).resolve().parents[3]
 
+# One latest succeeded normalization run per displayed source: the preserved
+# Helpinet extract and every map export (Google My Maps). A map run's position
+# candidates come from its latest succeeded geocode child run, matched by locator.
 LATEST_RUN = """WITH latest AS (
- SELECT p.run_id,c.retrieved_at,c.retrieval_status,c.source_metadata_snapshot
+ SELECT DISTINCT ON (r.code) r.code,r.name,r.homepage,r.attribution,d.resource_url,p.run_id,
+  c.retrieved_at,c.retrieval_status,c.source_metadata_snapshot
  FROM sources.processing_runs p JOIN sources.captures c USING(capture_id)
  JOIN sources.datasets d USING(dataset_id) JOIN sources.registry r USING(source_id)
- WHERE r.code='helpinet' AND d.external_key='helpinet-preserved-api-extract'
- AND p.run_kind='normalize' AND p.status='succeeded'
- ORDER BY p.started_at DESC,p.finished_at DESC,p.run_id LIMIT 1
+ WHERE p.run_kind='normalize' AND p.status='succeeded'
+ AND ((r.code='helpinet' AND d.external_key='helpinet-preserved-api-extract') OR r.source_kind='map_export')
+ ORDER BY r.code,p.started_at DESC,p.finished_at DESC,p.run_id
+), geo AS (
+ SELECT DISTINCT ON (g.parent_run_id) g.parent_run_id,g.run_id
+ FROM sources.processing_runs g JOIN latest l ON g.parent_run_id=l.run_id
+ WHERE g.run_kind='geocode' AND g.status='succeeded'
+ ORDER BY g.parent_run_id,g.started_at DESC,g.finished_at DESC,g.run_id
+), snapshot AS (
+ SELECT COALESCE(string_agg(l.run_id::text||COALESCE('+'||g.run_id::text,''),',' ORDER BY l.code),'') AS id
+ FROM latest l LEFT JOIN geo g ON g.parent_run_id=l.run_id
 )"""
-RUN_PROBE = f"{LATEST_RUN}\nSELECT COALESCE((SELECT run_id::text FROM latest),'');"
+RUN_PROBE = f"{LATEST_RUN}\nSELECT id FROM snapshot;"
 SUBJECTS = f"""BEGIN READ ONLY;
 {LATEST_RUN}
-SELECT json_build_object('run_id',(SELECT run_id::text FROM latest),'subjects',
+SELECT json_build_object('run_id',NULLIF((SELECT id FROM snapshot),''),'subjects',
  COALESCE(json_agg(json_build_object('id',s.subject_id,'payload',s.normalized_payload,
  'run_id',s.run_id,'source_locator',s.subject_locator,'observed_at',l.retrieved_at,
- 'retrieval_status',l.retrieval_status,'metadata',l.source_metadata_snapshot)
- ORDER BY s.subject_locator),'[]'::json))
-FROM sources.normalized_subjects s JOIN latest l USING(run_id) WHERE s.subject_kind='service';
+ 'retrieval_status',l.retrieval_status,'metadata',l.source_metadata_snapshot,
+ 'source_code',l.code,'source_name',l.name,'source_homepage',l.homepage,
+ 'source_attribution',l.attribution,'dataset_url',l.resource_url,'geocode',gs.normalized_payload)
+ ORDER BY l.code,s.subject_locator),'[]'::json))
+FROM sources.normalized_subjects s JOIN latest l USING(run_id)
+LEFT JOIN geo g ON g.parent_run_id=l.run_id
+LEFT JOIN sources.normalized_subjects gs ON gs.run_id=g.run_id
+ AND gs.subject_kind='location_candidate'
+ AND gs.subject_locator=regexp_replace(s.subject_locator,':service$',':geocode')
+WHERE s.subject_kind='service';
 COMMIT;"""
 
 

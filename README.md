@@ -5,7 +5,8 @@ Recovered frontend from the original egi-app draft at
 evidence. The original checkout is untouched. Map/list, source-need filters, service
 details and Italian/English/French/Arabic UI catalogs are retained.
 
-This is a local preview of unreviewed Helpinet data, not the approved public directory.
+This is a local preview of unreviewed Helpinet and map-export data (GrIS Lazio,
+Scuolemigranti, Programma Integra), not the approved public directory.
 Routes use `/api/preview`. No canonical entity, editorial approval or publication is
 created. Blank descriptions remain blank; source hours have a separately labelled preview status; coordinates are source claims. Missing coordinates stay in the list.
 
@@ -81,8 +82,9 @@ Source/record IDs are reused; repeated content is not duplicated. A new capture 
 history. The loader commits its complete import unit or rolls back. Imported source
 subjects remain separate from canonical publication.
 
-The app reads the latest succeeded normalization for the selected Helpinet dataset
-through `app/backend/subjects.py`. The snapshot is cached in-process: for 60 seconds
+The app reads the latest succeeded normalization for the selected Helpinet dataset,
+and for every `map_export` source, through `app/backend/subjects.py` (see
+[Map sources](#map-sources-my-maps-2026-11-09)). The snapshot is cached in-process: for 60 seconds
 no query is made, then a cheap `run_id` probe decides whether to reload. An accepted
 new load is therefore visible within about a minute, without restarting the app or
 rebuilding static JSON. Database availability is likewise observed at most once a
@@ -193,6 +195,7 @@ change. See sibling [importer instructions](../egi-importer/README.md) and
 [execution evidence](../egi-importer/docs/tpl-execution.md).
 
 - Category groups are Helpinet's native needs for browsing, not an adopted EGI taxonomy.
+  Map layers join these groups through a presentation crosswalk (`MAP_LAYER_GROUPS`).
 - Existing itinerant positions are flagged, not treated as verified fixed delivery sites.
 - UI catalogs are recovered; service content remains source-original Italian with no
   fabricated translations. Preview labels currently use Italian.
@@ -279,3 +282,25 @@ single services, service-weighted multi sites and geographic clusters. See
 [discovery UX and Nominatim configuration](docs/discovery-ux.md). Verification preview
 for this change runs separately on `http://127.0.0.1:8002/map?city_id=1&lang=it`;
 the existing 8001 server was left running after process-control approval was denied.
+
+### Map sources (My Maps, 2026-11-09)
+
+The three Google My Maps sources loaded by `egi-importer` (`python3 -m
+egi_importer.mymaps`, see [its pipeline doc](../egi-importer/docs/mymaps-pipeline.md))
+appear next to Helpinet. `subjects.py` reads the latest succeeded `normalize` run of
+each `map_export` source and joins each service to its `location_candidate` from the
+latest succeeded child `geocode` run; the cache probe covers all those run IDs.
+
+- **Grouping:** `MAP_LAYER_GROUPS` in `app/backend/preview.py` places each layer in a
+  need group (GrIS → Curarmi; Scuolemigranti → Istruzione; Programma Integra by layer,
+  adding the groups Istituzioni and Socialità). This is presentation only; the original
+  layer is the service type and help topics are the listed themes.
+- **Positions:** only non-ambiguous `matched_house`/`matched_street` candidates are map
+  points, labelled as estimates from the address (Nominatim, © OpenStreetMap
+  contributors). CAP-area, municipality-only, ambiguous and unresolved candidates are
+  list-only ("Posizione da completare"), with the reason on the card.
+- **Hours** stay the source's free text and never feed "Aperti ora".
+- **Source filter** "Fonte" in Filtri; cards name the source, its declared update note
+  and a link to the original map. `/benchmark` still measures Helpinet only.
+- No cross-source deduplication: the same organization may appear once per source.
+  No reuse licence is established for these maps, so they stay in the local preview.

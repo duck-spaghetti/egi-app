@@ -75,17 +75,54 @@ PRESENTATION = {
     "lavoro": ("#466b70", "office"),
     "istruzione": ("#526f33", "building"),
     "abiti_e_coperte": ("#8b587b", "shirt"),
+    "istituzioni": ("#3d4f63", "report"),
+    "socialita": ("#a0522d", "listen"),
 }
+# Presentation crosswalk from map layers to the preview's need groups. It only
+# decides where a map service appears in the existing filters; it is not an adopted
+# EGI taxonomy and the original layer stays visible as the service type.
+MAP_LAYER_GROUPS = {
+    "gris-lazio-simm": {"*": "curarmi"},
+    "scuolemigranti": {"*": "istruzione"},
+    "programma-integra": {
+        "Casa": "dormire",
+        "Formazione / Scuole migranti": "istruzione",
+        "Istituzioni / Enti pubblici": "istituzioni",
+        "Lavoro": "lavoro",
+        "Mense": "cibo",
+        "Salute": "curarmi",
+        "Socialità volontariato e tempo libero": "socialita",
+        "Sportelli legali": "documenti",
+    },
+}
+# Geocoded candidates shown as map points; coarser or ambiguous ones stay in the list.
+MAP_POINT_STATUSES = {"matched_house", "matched_street"}
+SOURCE_SHORT_NAMES = {
+    "gris-lazio-simm": "GrIS Lazio",
+    "scuolemigranti": "Scuolemigranti",
+    "programma-integra": "Programma Integra",
+}
+MONTHS = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio",
+          "agosto", "settembre", "ottobre", "novembre", "dicembre"]
+
+
+def is_map_row(row: dict[str, Any]) -> bool:
+    """Map-export rows carry their source code; Helpinet fixtures may omit it."""
+    return row.get("source_code", "helpinet") != "helpinet"
+
+
+def group_code(row: dict[str, Any]) -> str:
+    """Return the presentation need group of a subject row."""
+    p = row["payload"]
+    if is_map_row(row):
+        groups = MAP_LAYER_GROUPS.get(row["source_code"], {})
+        return groups.get(p.get("layer") or "", groups.get("*", "non_classificato"))
+    return p["source_classifications"].get("bisogno") or "non_classificato"
 
 
 def categories(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Expose source-native needs as legacy UI groups, without canonical taxonomy writes."""
-    codes = sorted(
-        {
-            r["payload"]["source_classifications"].get("bisogno") or "non_classificato"
-            for r in rows
-        }
-    )
+    codes = sorted({group_code(r) for r in rows})
     return [
         {
             "id": i,
@@ -124,8 +161,11 @@ def services(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     by_code = {c["slug"]: c for c in categories(rows)}
     result = []
     for row in rows:
+        if is_map_row(row):
+            result.append(map_service(row, by_code[group_code(row)]))
+            continue
         p = row["payload"]
-        code = p["source_classifications"].get("bisogno") or "non_classificato"
+        code = group_code(row)
         position = p["location"]["source_position"]
         result.append(
             {
@@ -177,9 +217,11 @@ def services(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     "contacts": [],
                     "is_protected_address": False,
                 },
+                "source_code": "helpinet",
                 "sources": [
                     {
                         "source_name": "Helpinet",
+                        "source_title": "Helpinet",
                         "source_url": "https://helpinet.app/app/",
                         "is_primary": True,
                     }
@@ -194,3 +236,129 @@ def services(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             }
         )
     return result
+
+
+def map_position(geocode: dict[str, Any] | None) -> tuple[dict[str, Any] | None, dict[str, str]]:
+    """Show only confident street/house candidates as points; label all as estimates."""
+    status = (geocode or {}).get("status") or "unresolved"
+    chosen = (geocode or {}).get("chosen") or {}
+    if status in MAP_POINT_STATUSES and not geocode.get("ambiguous"):
+        point = source_point({"coordinate": {"lat": chosen.get("lat"), "lng": chosen.get("lon")}})
+        if point:
+            label = ("Posizione stimata dal civico (OpenStreetMap) · da verificare"
+                     if status == "matched_house"
+                     else "Posizione stimata sulla via, civico non trovato · da verificare")
+            return point, {"section": "services", "status": f"geocoded_{status}", "label": label}
+    if status in MAP_POINT_STATUSES:
+        label = "Indirizzo con più corrispondenze · posizione non mostrata sulla mappa"
+    elif status in {"postcode_area", "locality_only"}:
+        label = "Posizione nota solo per CAP o comune · non mostrata sulla mappa"
+    elif status == "no_address":
+        label = "Indirizzo non indicato dalla fonte"
+    else:
+        label = "Indirizzo presente · posizione da completare"
+    return None, {"section": "services", "status": f"geocode_{status}", "label": label}
+
+
+def text_hours(raw: Any, source_name: str) -> dict[str, Any]:
+    """Keep free-text source hours readable without parsing them into intervals."""
+    display = weekly_hours({})
+    display["raw_text"] = raw if isinstance(raw, str) and raw.strip() else None
+    display["note"] = (f"Orari come testo originale di {source_name}; non interpretati, da verificare."
+                       if display["raw_text"] else f"{source_name} non indica orari.")
+    display["opening_note"] = (f"Orari {source_name} solo come testo" if display["raw_text"]
+                               else f"{source_name} non indica orari")
+    return display
+
+
+def declared_update_label(update: dict[str, Any] | None) -> str | None:
+    """Render the source's own update note, e.g. 'maggio 2024 (GrIS Lazio)'."""
+    if not update:
+        return None
+    month, year = update.get("month"), update.get("year")
+    when = " ".join(str(v) for v in [MONTHS[month - 1] if isinstance(month, int) and 1 <= month <= 12 else None, year] if v)
+    who = update.get("curator_named")
+    text = " ".join(filter(None, [when, f"({who})" if who else None])) or update.get("text")
+    return text or None
+
+
+def map_service(row: dict[str, Any], category: dict[str, Any]) -> dict[str, Any]:
+    """Adapt a map-export service and its geocoded candidate to the card shape."""
+    p = row["payload"]
+    source_name = SOURCE_SHORT_NAMES.get(row["source_code"]) or row.get("source_name") or row["source_code"]
+    geocode = row.get("geocode")
+    point, place_status = map_position(geocode)
+    location = p.get("location") or {}
+    topics = (p.get("source_classifications") or {}).get("help_topics") or []
+    layer = p.get("layer")
+    chosen = (geocode or {}).get("chosen") or {}
+    return {
+        "id": row["id"],
+        "place_id": row["id"],
+        "service_title": p.get("name") or layer or "Servizio",
+        "facility_name": p.get("name"),
+        "source_group": None,
+        "derived_summary": None,
+        "source_values": p.get("source_values", {}),
+        "access_display": access_sections({}),
+        "hours_display": text_hours((p.get("hours") or {}).get("raw_value"), source_name),
+        "placement": place_status,
+        "delivery_mode": None,
+        "name": p.get("name"),
+        "description": p.get("description") or p.get("offer_text"),
+        "offer_text": p.get("offer_text"),
+        "data_status": "unreviewed_source_preview",
+        "source_code": row["source_code"],
+        "source_locator": row["source_locator"],
+        "run_id": row["run_id"],
+        "observed_at": row["observed_at"],
+        "original_retrieved_at": row["observed_at"],
+        "declared_update": declared_update_label(p.get("declared_update")),
+        "position": {
+            "status": (geocode or {}).get("status") or "unresolved",
+            "ambiguous": bool((geocode or {}).get("ambiguous")),
+            "match": chosen.get("display_name"),
+            "provider": (geocode or {}).get("provider"),
+            "attribution": (geocode or {}).get("attribution"),
+        },
+        "category": category,
+        "category_id": category["id"],
+        "subcategory": None,
+        "subcategories": [],
+        "tags": [],
+        "cost_tag": None,
+        "cost_note": None,
+        "hours": [],
+        "hours_raw": (p.get("hours") or {}).get("raw_value"),
+        "contacts": [
+            {"type": c["channel"], "value": c.get("normalized") if c["channel"] == "website" and c.get("normalized") else c["value"],
+             "label": None, "is_active": True}
+            for c in p.get("contacts", [])
+        ],
+        "place": {
+            "id": row["id"],
+            "name": p.get("name"),
+            "address": location.get("address_raw"),
+            "geometry": point,
+            "contacts": [],
+            "is_protected_address": False,
+        },
+        "sources": [{
+            "source_name": source_name,
+            "source_title": row.get("source_name"),
+            "source_url": row.get("dataset_url") or row.get("source_homepage"),
+            "attribution": row.get("source_attribution"),
+            "is_primary": True,
+        }],
+        "access_raw": {},
+        "organization_raw": (p.get("organization_claim") or {}).get("name_raw"),
+        "native_classifications": {
+            "tipologia": layer,
+            "prestazioni": [{"id": f"topic:{t}", "nome": t} for t in topics],
+            "layer_path": (p.get("source_classifications") or {}).get("layer_path"),
+        },
+        "review_required": p.get("review_required", []),
+        "itinerant_source": False,
+        "coordinate_status": "geocoded_candidate_unverified" if point else "not_positioned",
+        "is_active": True,
+    }

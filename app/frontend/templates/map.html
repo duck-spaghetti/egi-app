@@ -102,11 +102,13 @@
       <input id="service-query" type="search" placeholder="Es. doccia, italiano, appuntamento…" autocomplete="off">
       <label for="section-filter">Sezione</label>
       <select id="section-filter"><option value="all">Tutti i servizi</option><option value="services">Servizi territoriali e da verificare</option><option value="directory">Rubrica · servizi a distanza</option><option value="needs_position">Posizione da completare</option></select>
+      <label for="source-filter">Fonte</label>
+      <select id="source-filter"><option value="">Tutte le fonti</option></select>
     </div>
     <fieldset class="discovery-path">
       <legend>Trova il servizio</legend>
       <label class="open-now-filter" style="display:flex;align-items:center;gap:9px;margin:0 0 14px;font-weight:600;cursor:pointer"><input id="open-now-filter" type="checkbox" style="width:18px;height:18px;margin:0"> Aperti ora</label>
-      <p class="source-note">Secondo gli orari Helpinet. Con il filtro attivo, gli orari sconosciuti o ambigui sono esclusi.</p>
+      <p class="source-note">Secondo gli orari strutturati di Helpinet. Con il filtro attivo, gli orari sconosciuti, testuali o ambigui sono esclusi.</p>
       <div class="discovery-step"><h3>1 · Bisogno</h3><div class="cat-grid" id="cat-grid"></div></div>
       <div class="discovery-refine">
         <div><label for="service-type-filter">2 · Tipo di servizio</label><select id="service-type-filter"></select></div>

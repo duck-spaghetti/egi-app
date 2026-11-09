@@ -11,7 +11,7 @@ const state = {
   cityOptions: [],
   filters: {
     cats: new Set(),
-    q: "", type: "", prestation: "", access: "", section: "all", order: "name", openNow: false,
+    q: "", source: "", type: "", prestation: "", access: "", section: "all", order: "name", openNow: false,
   },
   view: "map",
   userLoc: null,
@@ -161,10 +161,10 @@ async function loadData() {
 function bindUi() {
   document.getElementById("open-now-filter").addEventListener("change",event=>{state.filters.openNow=event.target.checked; refresh();});
   document.getElementById("service-query").addEventListener("input",event=>{state.filters.q=event.target.value; refresh();});
-  for (const [id,key] of [["service-type-filter","type"],["prestation-filter","prestation"],["access-filter","access"],["section-filter","section"],["sort-services","order"]]) {
+  for (const [id,key] of [["source-filter","source"],["service-type-filter","type"],["prestation-filter","prestation"],["access-filter","access"],["section-filter","section"],["sort-services","order"]]) {
     document.getElementById(id).addEventListener("change",event=>{
       state.filters[key]=event.target.value;
-      if (key==="type") renderSearchOptions();
+      if (key==="type" || key==="source") renderSearchOptions();
       if (key==="order" && event.target.value==="distance" && !state.userLoc) openSheet("sheet-location");
       refresh();
     });
@@ -178,7 +178,7 @@ function bindUi() {
   document.getElementById("open-emergency").addEventListener("click", () => openSheet("sheet-sos"));
   document.getElementById("open-directory").addEventListener("click", () => {
     state.filters.section="directory";
-    state.filters.q=""; state.filters.type=""; state.filters.prestation=""; state.filters.access="";
+    state.filters.q=""; state.filters.source=""; state.filters.type=""; state.filters.prestation=""; state.filters.access="";
     state.filters.openNow=false; state.filters.cats=new Set(state.categories.map(c=>c.slug));
     document.getElementById("section-filter").value="directory";
     document.getElementById("service-query").value="";
@@ -596,6 +596,7 @@ function renderActiveFilters() {
     allCats ? "" : `${f.cats.size} bisogni`,
     f.q?.trim() ? `“${f.q.trim()}”` : "",
     f.openNow ? "Aperti ora" : "",
+    f.source ? (document.getElementById("source-filter").selectedOptions?.[0]?.textContent || f.source).replace(/ \(\d+\)$/,"") : "",
     f.type,
     f.prestation ? document.getElementById("prestation-filter").selectedOptions?.[0]?.textContent || "Prestazione" : "",
     f.access ? document.getElementById("access-filter").selectedOptions?.[0]?.textContent || f.access : "",
@@ -615,6 +616,7 @@ function filteredPois(now = new Date()) {
     category_label: resolveCategory(poi)?.label || "Altro",
     category_icon_path: resolveCategory(poi)?.icon_path || null}));
   list=list.filter(p=>state.filters.cats.has(p.category_slug));
+  if (state.filters.source) list=list.filter(p=>sourceCode(p)===state.filters.source);
   if (state.filters.type) list=list.filter(p=>p.raw?.native_classifications?.tipologia===state.filters.type);
   if (state.filters.prestation) list=list.filter(p=>(p.raw?.native_classifications?.prestazioni || []).some(v=>String(v.id)===state.filters.prestation));
   if (state.filters.access) list=list.filter(p=>p.raw?.access_raw?.[state.filters.access]===true);
@@ -680,14 +682,14 @@ function renderList(list) {
     const siblings=sameSourceGroup(poi).length;
     const distance=state.userLoc ? (poi._dist==null ? "Distanza non disponibile" : poi._dist<1?`${Math.round(poi._dist*1000)} m`:`${poi._dist.toFixed(1)} km`) : "";
     const icon=normalizeCategoryIconPath(poi.category_icon_path);
-    return `<button type="button" class="poi-item" data-id="${escapeHtml(poi.id)}"><span class="marker-stripe" style="background:${poi.category_color}"></span><span class="info"><span class="service-list-title"><span class="name">${escapeHtml(poi.title)}</span></span><span class="facility-name">${escapeHtml(raw.facility_name || raw.name || "")}${siblings>1?` · ${siblings} servizi`:""}</span><span class="meta">${categoryBadge(resolveCategory(poi))}${distance?`<span class="dist">${escapeHtml(distance)}</span>`:""}</span>${openingBadge(poi)}${transitBadge(poi)}<span class="source-note">${escapeHtml(raw.placement?.label || "Posizione da verificare")}${raw.itinerant_source?" · Itinerante":""}</span></span></button>`;
+    return `<button type="button" class="poi-item" data-id="${escapeHtml(poi.id)}"><span class="marker-stripe" style="background:${poi.category_color}"></span><span class="info"><span class="service-list-title"><span class="name">${escapeHtml(poi.title)}</span></span><span class="facility-name">${escapeHtml(facilityLine(poi))}${siblings>1?` · ${siblings} servizi`:""}</span><span class="meta">${categoryBadge(resolveCategory(poi))}${distance?`<span class="dist">${escapeHtml(distance)}</span>`:""}</span>${openingBadge(poi)}${transitBadge(poi)}<span class="source-note">${escapeHtml(sourceName(poi))} · ${escapeHtml(raw.placement?.label || "Posizione da verificare")}${raw.itinerant_source?" · Itinerante":""}</span></span></button>`;
   }).join("");
   wrap.querySelectorAll(".poi-item").forEach(el=>el.addEventListener("click",()=>openDetail(el.dataset.id)));
 }
 
 function listOpeningStatus(poi) {
   if (poi.raw?.data_status === "unreviewed_source_preview") {
-    return { isOpen: null, label: "Da verificare", detail: "Orari originali Helpinet, non revisionati" };
+    return { isOpen: null, label: "Da verificare", detail: `Orari originali ${sourceName(poi)}, non revisionati` };
   }
   const status = currentOpeningStatus(buildWeeklySchedule(poi.hours || []), new Date());
   return {
@@ -710,21 +712,22 @@ async function openDetail(id) {
   document.getElementById("detail-body").innerHTML=`
     ${categoryBadge(cat)}
     <h2 class="detail-name">${escapeHtml(poi.title)}</h2>
-    <p class="facility-name">Presso ${escapeHtml(raw.facility_name || raw.name || "Gruppo da verificare")}</p>
+    ${(raw.facility_name || raw.name) === poi.title ? "" : `<p class="facility-name">Presso ${escapeHtml(raw.facility_name || raw.name || "Gruppo da verificare")}</p>`}
     <p class="detail-address">${escapeHtml(poi.address || raw.placement?.label || "Indirizzo non indicato")}</p>
-    <p class="detail-organization"><strong>Organizzazione indicata:</strong> ${escapeHtml(raw.organization_raw || "Non indicata")}</p>
-    <p class="source-note">${escapeHtml(raw.placement?.label || "Posizione da verificare")} · Ruolo dell’organizzazione da verificare.</p>
+    ${sourceCode(poi) === "helpinet" || raw.organization_raw ? `<p class="detail-organization"><strong>Organizzazione indicata:</strong> ${escapeHtml(raw.organization_raw || "Non indicata")}</p>` : ""}
+    <p class="source-note">${escapeHtml(raw.placement?.label || "Posizione da verificare")}${sourceCode(poi) === "helpinet" ? " · Ruolo dell’organizzazione da verificare." : ""}</p>
     ${openingBadge(poi)}
     ${renderDetailHeaderActions(poi)}
-    <p class="source-note">Helpinet · dati non revisionati.${raw.itinerant_source?" Servizio itinerante: il punto della fonte non è una sede fissa verificata.":""}</p>
+    <p class="source-note">${escapeHtml(sourceName(poi))} · dati non revisionati.${raw.declared_update?` Aggiornamento dichiarato dalla fonte: ${escapeHtml(raw.declared_update)}.`:""}${raw.itinerant_source?" Servizio itinerante: il punto della fonte non è una sede fissa verificata.":""}</p>
+    ${renderPositionNote(raw)}
     ${transitSectionShell(poi)}
     <section class="detail-section"><h3>Descrizione</h3><p>${escapeHtml(description)}</p>${!raw.description && summary?.text?'<span class="derived-label">Sintesi ricavata dai campi della fonte · non descrizione originale</span>':""}</section>
-    <section class="detail-section"><h3>Prestazioni indicate</h3><div class="service-chips">${prestations.map(v=>`<span class="service-chip">${escapeHtml(v.nome)}</span>`).join("") || "Non indicate"}</div></section>
-    <section class="detail-section"><h3>Accesso e destinatari</h3>${renderSourceAccess(raw.access_display)}</section>
+    <section class="detail-section"><h3>${raw.source_code && raw.source_code!=="helpinet" ? "Temi indicati" : "Prestazioni indicate"}</h3><div class="service-chips">${prestations.map(v=>`<span class="service-chip">${escapeHtml(v.nome)}</span>`).join("") || "Non indicati dalla fonte"}</div></section>
+    ${raw.source_code && raw.source_code!=="helpinet" ? "" : `<section class="detail-section"><h3>Accesso e destinatari</h3>${renderSourceAccess(raw.access_display)}</section>`}
     <section class="detail-section"><h3>Orari del servizio</h3>${renderSourceHours(raw.hours_display)}</section>
     <section class="detail-section"><h3>Contatti di questo servizio</h3>${renderContacts(poi.contacts || [])}</section>
     ${siblings.length?`<section class="detail-section"><h3>Altri servizi presso ${escapeHtml(raw.facility_name || "questo gruppo")}</h3><p class="source-note">Collegamento provvisorio dal gruppo Helpinet. Ogni scheda mantiene orari, accesso e contatti indipendenti.</p>${siblings.map(serviceButton).join("")}</section>`:""}
-    <details class="detail-section"><summary>Provenienza e dati originali</summary><p>Osservazione locale: ${escapeHtml(raw.observed_at || "—")}. Acquisizione originale sconosciuta.</p><pre class="source-evidence">${escapeHtml(JSON.stringify({record:raw.source_locator,gruppo:raw.source_group,sintesi:raw.derived_summary,campi_originali:raw.source_values,da_verificare:raw.review_required},null,2))}</pre></details>`;
+    <details class="detail-section"><summary>Provenienza e dati originali</summary>${renderProvenance(poi)}<pre class="source-evidence">${escapeHtml(JSON.stringify({record:raw.source_locator,gruppo:raw.source_group,sintesi:raw.derived_summary,campi_originali:raw.source_values,posizione:raw.position,da_verificare:raw.review_required},null,2))}</pre></details>`;
   bindServiceButtons();
   void loadTransitDetail(poi);
   document.querySelector("#sheet-detail .sheet-body").scrollTop=0;
@@ -1623,7 +1626,7 @@ function searchableService(poi) {
     raw.native_classifications?.tipologia,
     ...(raw.native_classifications?.prestazioni || []).map(p => p.nome),
     ...(raw.access_display?.sections || []).flatMap(s => s.entries.map(e => e.label)),
-    raw.itinerant_source ? "itinerante" : "",
+    raw.itinerant_source ? "itinerante" : "", sourceName(poi), raw.hours_display?.raw_text,
     ...(raw.hours_display?.days || []).filter(d=>d.intervals.length).flatMap(d=>[d.label,...d.intervals.map(v=>v.label)]),
     ...(raw.contacts || []).map(c => c.value)].filter(Boolean).join(" "));
 }
@@ -1633,7 +1636,8 @@ function renderSearchOptions() {
   const prestations = document.getElementById("prestation-filter");
   const access = document.getElementById("access-filter");
   if (!types || !prestations || !access) return;
-  const base = state.pois.filter(p => state.filters.cats.has(p.category?.slug));
+  renderSourceOptions();
+  const base = state.pois.filter(p => state.filters.cats.has(p.category?.slug) && (!state.filters.source || sourceCode(p) === state.filters.source));
   const typeNames = [...new Set(base.map(p => p.raw?.native_classifications?.tipologia).filter(Boolean))].sort((a,b) => a.localeCompare(b,"it"));
   if (!typeNames.includes(state.filters.type)) state.filters.type = "";
   types.innerHTML = '<option value="">Tutte le tipologie</option>' + typeNames.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("");
@@ -1649,8 +1653,51 @@ function renderSearchOptions() {
   access.value = state.filters.access;
 }
 
+/** Source of a service row: Helpinet or one of the map exports (see app/backend/preview.py). */
+function sourceCode(poi) {
+  return poi.raw?.source_code || "helpinet";
+}
+
+/** Second list line: the facility, or the address when the facility repeats the title. */
+function facilityLine(poi) {
+  const raw = poi.raw || {};
+  const facility = raw.facility_name || raw.name || "";
+  return facility && facility !== poi.title ? facility : (poi.address || facility);
+}
+
+function sourceName(poi) {
+  return poi.raw?.sources?.[0]?.source_name || "Helpinet";
+}
+
+function renderSourceOptions() {
+  const select = document.getElementById("source-filter");
+  if (!select) return;
+  const counts = new Map();
+  state.pois.forEach(p => counts.set(sourceCode(p), {name: sourceName(p), n: (counts.get(sourceCode(p))?.n || 0) + 1}));
+  if (!counts.has(state.filters.source)) state.filters.source = "";
+  select.innerHTML = '<option value="">Tutte le fonti</option>' + [...counts].sort((a,b)=>a[1].name.localeCompare(b[1].name,"it")).map(([code,v])=>`<option value="${escapeHtml(code)}">${escapeHtml(v.name)} (${v.n})</option>`).join("");
+  select.value = state.filters.source;
+}
+
+/** Map-export positions are geocoded estimates; say how they were found. */
+function renderPositionNote(raw) {
+  const pos = raw.position;
+  if (!pos) return "";
+  const match = pos.match ? ` Corrispondenza: ${escapeHtml(pos.match)}.` : "";
+  return `<p class="source-note">Posizione ricavata dall’indirizzo della fonte con Nominatim (© OpenStreetMap contributors).${match}</p>`;
+}
+
+function renderProvenance(poi) {
+  const raw = poi.raw || {};
+  const src = raw.sources?.[0] || {};
+  if (sourceCode(poi) === "helpinet") return `<p>Osservazione locale: ${escapeHtml(raw.observed_at || "—")}. Acquisizione originale sconosciuta.</p>`;
+  const link = src.source_url ? ` · <a href="${escapeHtml(src.source_url)}" target="_blank" rel="noopener">mappa originale</a>` : "";
+  return `<p>${escapeHtml(src.source_title || src.source_name || "Fonte")}${link}. Esportazione KML acquisita il ${escapeHtml(raw.original_retrieved_at || "—")}.</p>${src.attribution?`<p class="source-note">${escapeHtml(src.attribution)}. Licenza di riuso non stabilita: solo preview locale.</p>`:""}`;
+}
+
 function renderSourceHours(display) {
   if (!display) return '<p>Orari non indicati.</p>';
+  if ("raw_text" in display) return `<p class="source-note">${escapeHtml(display.note)}</p>${display.raw_text?`<p class="source-hours-text">${escapeHtml(display.raw_text)}</p>`:""}`;
   return `<p class="source-note">${escapeHtml(display.note)}</p><div class="source-week">${display.days.map(day=>`<div class="source-day"><strong>${escapeHtml(day.label)}</strong><span>${day.intervals.length ? day.intervals.map(v=>`<span>${escapeHtml(v.label)}${v.review_note ? ` <small>${escapeHtml(v.review_note)}</small>`:""}</span>`).join("<br>") : '<span class="unknown-value">Non indicato</span>'}${day.issues.length && !day.intervals.length ? `<small>${escapeHtml(day.issues.join("; "))}</small>`:""}</span></div>`).join("")}</div>${(display.warnings || []).map(w=>`<p class="source-note">${escapeHtml(w)}</p>`).join("")}`;
 }
 
@@ -1675,7 +1722,7 @@ function bindServiceButtons() {
 function openServiceChooser(items, matched = new Set(items.map(p=>p.id))) {
   if (items.length === 1) return openDetail(items[0].id);
   document.querySelector("#sheet-detail .sheet-head h2").textContent = "Scegli il servizio";
-  document.getElementById("detail-body").innerHTML = `<h2>${escapeHtml(items[0].raw?.facility_name || "Gruppo della fonte")}</h2><p>${items.length} servizi con questa posizione. Scegli una scheda.</p>${items.map(p=>serviceButton(p,matched.has(p.id))).join("")}<p class="source-note">Collegamento provvisorio dal gruppo Helpinet; ogni servizio mantiene le proprie caratteristiche.</p>`;
+  document.getElementById("detail-body").innerHTML = `<h2>${escapeHtml(items[0].raw?.facility_name || "Gruppo della fonte")}</h2><p>${items.length} servizi con questa posizione. Scegli una scheda.</p>${items.map(p=>serviceButton(p,matched.has(p.id))).join("")}<p class="source-note">Servizi nella stessa posizione secondo le fonti; ogni servizio mantiene le proprie caratteristiche.</p>`;
   bindServiceButtons();
   document.querySelector("#sheet-detail .sheet-body").scrollTop=0;
   openSheet("sheet-detail");
@@ -1703,7 +1750,7 @@ function categoryBadge(category) {
 
 function sourceOpeningStatus(display, now = new Date()) {
   // Calculated from source intervals in Rome time, without asserting completeness.
-  const unknown={kind:"unknown",label:"Orario non disponibile",note:"Orari Helpinet non revisionati · fuso Europe/Rome"};
+  const unknown={kind:"unknown",label:"Orario non disponibile",note:display?.opening_note || "Orari Helpinet non revisionati · fuso Europe/Rome"};
   if (!display?.days || !Number.isFinite(now.getTime())) return unknown;
   const parts=Object.fromEntries(new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Rome",weekday:"short",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(now).map(p=>[p.type,p.value]));
   const dayIndex=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].indexOf(parts.weekday);
