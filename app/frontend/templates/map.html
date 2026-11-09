@@ -17,17 +17,21 @@
       <div class="list-header">
         <h2 data-i18n="map.nearby_places">Luoghi vicini</h2>
         <div class="sub"><span id="list-count">0</span> <span data-i18n="map.results_count_label">risultati</span></div>
-        <div class="list-sort"><label for="sort-services">Ordina per</label><select id="sort-services"><option value="name">Nome del servizio</option><option value="distance">Distanza in linea d’aria</option></select><button type="button" id="pick-reference">Scegli punto sulla mappa</button></div>
+        <div class="list-toolbar" role="toolbar" aria-label="Filtri e ordinamento">
+          <button type="button" class="list-filter-btn" data-sheet-open="filters" aria-controls="sheet-filters"><img src="/static/assets/icons/ui/filters.svg" alt="" aria-hidden="true" /><span data-i18n="map.filters">Filtri</span><span class="list-filter-count" id="list-filter-count" hidden></span></button>
+          <label class="list-order"><span>Ordina</span><select id="sort-services"><option value="name">Nome</option><option value="distance">Distanza</option></select></label>
+          <button type="button" id="pick-reference" class="list-pick">Scegli punto</button>
+        </div>
         <p class="source-note" id="reference-status">Scegli una posizione per ordinare per distanza</p>
+        <p id="active-filter-summary" class="active-filter-summary" role="status"></p>
       </div>
-      <p id="active-filter-summary" class="active-filter-summary" role="status"></p>
-      <div class="list-content"><aside id="list-filter-host" aria-label="Filtri servizi"></aside><div id="poi-list"></div></div>
+      <div class="list-content"><div id="poi-list"></div></div>
     </div>
 
     <div class="map-brand" aria-label="EGI">
       <img src="/static/assets/icons/egi-logo.svg" alt="EGI" class="brand-logo" />
     </div>
-    <button type="button" class="nav-btn layers-trigger" data-sheet="layers" aria-label="Livelli della mappa"><span class="control-icon">▱</span><span class="control-label">Livelli</span></button>
+    <button type="button" class="nav-btn layers-trigger" data-sheet="layers" aria-label="Livelli della mappa"><span class="control-icon"><img src="/static/assets/icons/ui/layers.svg" alt="" aria-hidden="true" /></span><span class="control-label">Livelli</span></button>
     <span class="map-city-tag" id="city-label">{{ city.name if city else "Roma" }}</span>
 
     <div class="floating-actions" aria-label="Controlli mappa">
@@ -134,9 +138,9 @@
         <label><input type="checkbox" id="transport-bus"> Autobus</label>
       </div>
       <ul class="transport-legend" aria-label="Legenda trasporti">
-        <li><span class="tl-station"><span class="tl-roundel">M</span><span class="tl-chip" style="--line-color:#E27439">A</span><span class="tl-chip" style="--line-color:#0570B5">B</span><span class="tl-chip" style="--line-color:#008456">C</span></span> Stazione metro e linee</li>
-        <li><span class="tl-station tl-rail"><span class="tl-roundel tl-train">FS</span><span class="tl-chip" style="--line-color:#00704A">REG</span></span> Stazioni dei treni regionali e metropolitani</li>
-        <li><span class="tl-stop tl-tram">T</span> Fermata tram (da zoom 14; linee da zoom 12)</li>
+        <li><span class="tl-station"><span class="tl-roundel">M</span><span class="tl-chip" style="--line-color:#E27439">A</span><span class="tl-chip" style="--line-color:#0570B5">B</span><span class="tl-chip" style="--line-color:#008456">C</span></span> Stazione metro da zoom 14; sigle delle linee da zoom 16 o al passaggio del mouse</li>
+        <li><span class="tl-station tl-rail"><span class="tl-roundel tl-train">FS</span><span class="tl-chip" style="--line-color:#00704A">REG</span></span> Stazioni dei treni regionali e metropolitani da zoom 14</li>
+        <li><span class="tl-stop tl-tram">T</span> Fermata tram da zoom 15; linee da zoom 12</li>
         <li><span class="tl-stop tl-bus"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M4 1.5h8a2 2 0 0 1 2 2V12a1 1 0 0 1-1 1v1.25a.75.75 0 0 1-1.5 0V13h-7v1.25a.75.75 0 0 1-1.5 0V13a1 1 0 0 1-1-1V3.5a2 2 0 0 1 2-2Zm0 2v4h8v-4Zm.75 6.25a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm6.5 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/></svg></span> Fermata autobus da zoom 16; percorsi solo selezionando una linea</li>
       </ul>
       <p id="transport-status" class="source-note" role="status">Verifica dati trasporti…</p>

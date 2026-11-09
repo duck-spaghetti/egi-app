@@ -110,7 +110,7 @@ def intersects(a: list, b: list) -> bool:
 
 
 LINE_MIN_ZOOM = {"metro": 0, "rail": 0, "tram": 12, "bus": 13}
-STOP_MIN_ZOOM = {"metro": 13, "rail": 12, "tram": 14, "bus": 16}
+STOP_MIN_ZOOM = {"metro": 14, "rail": 14, "tram": 15, "bus": 16}
 MODE_ORDER = {"metro": 0, "rail": 1, "tram": 2, "bus": 3}
 STATION_RADIUS_M = 150
 

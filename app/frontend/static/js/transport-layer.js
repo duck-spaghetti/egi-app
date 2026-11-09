@@ -17,6 +17,8 @@ const TransportLayer = (() => {
   const METRO_FALLBACK = "#355c7d";
   // Distinct, dark enough for white text; used when single lines are focused (F2).
   const LINE_PALETTE = ["#b2182b", "#2166ac", "#1b7837", "#762a83", "#b35806", "#01665e", "#8c510a", "#c51b7d", "#4d4d4d", "#35978f"];
+  /** Zoom from which stations show their line codes next to the mode symbol. */
+  const DETAIL_ZOOM = 16;
   const TRAIN_GLYPH = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M5 1h6a3 3 0 0 1 3 3v6a2.5 2.5 0 0 1-1.6 2.33l1.3 1.94a.75.75 0 1 1-1.25.83L10.95 13h-5.9l-1.5 2.1a.75.75 0 1 1-1.25-.83l1.3-1.94A2.5 2.5 0 0 1 2 10V4a3 3 0 0 1 3-3Zm-1 3v3h8V4a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1Zm1 5.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm6 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/></svg>';
   const BUS_GLYPH = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M4 1.5h8a2 2 0 0 1 2 2V12a1 1 0 0 1-1 1v1.25a.75.75 0 0 1-1.5 0V13h-7v1.25a.75.75 0 0 1-1.5 0V13a1 1 0 0 1-1-1V3.5a2 2 0 0 1 2-2Zm0 2v4h8v-4Zm.75 6.25a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm6.5 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/></svg>';
 
@@ -38,12 +40,12 @@ const TransportLayer = (() => {
     return LINE_PALETTE[hash % LINE_PALETTE.length];
   }
 
-  /** Leaflet path options: metro bold and coloured, tram medium, bus thin and muted. */
+  /** Leaflet path options: thin, semi-transparent network lines that stay under services. */
   function lineStyle(mode, color) {
-    if (mode === "metro") return {color: lineColor(mode, color), weight: 5, opacity: 0.9};
-    if (mode === "tram") return {color: lineColor(mode, color), weight: 3.5, opacity: 0.8};
-    if (mode === "rail") return {color: lineColor(mode, color), weight: 4, opacity: 0.7, dashArray: "10 4"};
-    return {color: BUS_COLOR, weight: 2, opacity: 0.4};
+    if (mode === "metro") return {color: lineColor(mode, color), weight: 3, opacity: 0.6};
+    if (mode === "tram") return {color: lineColor(mode, color), weight: 2, opacity: 0.55};
+    if (mode === "rail") return {color: lineColor(mode, color), weight: 2.5, opacity: 0.5, dashArray: "8 4"};
+    return {color: BUS_COLOR, weight: 1.5, opacity: 0.35};
   }
 
   /** Focus view: every line strong; bus lines get distinct palette colours. */
@@ -75,14 +77,15 @@ const TransportLayer = (() => {
     }).join("");
   }
 
-  /** Marker HTML: M roundel with line letters for stations, glyph squares for stops. */
+  /** Marker HTML: one mode symbol per stop/station; line codes sit in .tl-codes,
+   * which CSS shows only at detail zoom (DETAIL_ZOOM), in focus or on hover/focus. */
   function stopIconHtml(props, highlighted = false) {
     const near = highlighted ? " tl-near" : "";
     if (props.transport_type === "rail") {
-      return `<span class="tl-station tl-rail${near}"><span class="tl-roundel tl-train">${TRAIN_GLYPH}</span>${props.untimed ? "" : lineChips((props.routes || []).slice(0,3))}</span>`;
+      return `<span class="tl-station tl-rail${near}"><span class="tl-roundel tl-train">${TRAIN_GLYPH}</span>${props.untimed ? "" : `<span class="tl-codes">${lineChips((props.routes || []).slice(0,3))}</span>`}</span>`;
     }
     if (props.kind === "station" || props.transport_type === "metro") {
-      return `<span class="tl-station${near}"><span class="tl-roundel">M</span>${lineChips(props.routes)}</span>`;
+      return `<span class="tl-station${near}"><span class="tl-roundel">M</span><span class="tl-codes">${lineChips(props.routes)}</span></span>`;
     }
     if (props.transport_type === "tram") return `<span class="tl-stop tl-tram${near}">T</span>`;
     return `<span class="tl-stop tl-bus${near}">${BUS_GLYPH}</span>`;
@@ -190,7 +193,12 @@ const TransportLayer = (() => {
   }
 
   function create(map, elements) {
+    // Services (markerPane, z 600) stay above the network: lines z 350, stops z 450.
+    if (!map.getPane("transportLines")) map.createPane("transportLines").style.zIndex = 350;
+    if (!map.getPane("transportStops")) map.createPane("transportStops").style.zIndex = 450;
     const layer = L.layerGroup().addTo(map);
+    const syncDetail = () => map.getContainer().classList.toggle("tl-detail", map.getZoom() >= DETAIL_ZOOM || Boolean(focused));
+    map.on("zoomend", syncDetail);
     const modes = new Set(elements.modes ? MODES.filter(mode=>elements.modes[mode]?.checked) : MODES);
     let visible = false;
     let features = [];
@@ -215,6 +223,7 @@ const TransportLayer = (() => {
       popupOpen = false;
       held = null;
       layer.clearLayers();
+      syncDetail();
       if (!visible) return;
       const labelled = new Set();
       for (const feature of features) {
@@ -230,6 +239,7 @@ const TransportLayer = (() => {
             keyboard: true,
             title: props.name,
             zIndexOffset: near ? 1000 : station ? 500 : 0,
+            pane: "transportStops",
           }).bindPopup(popupHtml(props), {maxWidth: 280})
             .on("popupopen", event => {
               popupOpen = true;
@@ -243,9 +253,9 @@ const TransportLayer = (() => {
             labelled.add(props.route_id);
             const at = lineLabelPoint(geometry, focused.center);
             if (at) L.marker(at, {interactive: false, keyboard: false, icon: L.divIcon({className: "tl-icon", iconSize: null,
-              html: `<span class="tl-line-label" style="--line-color:${escapeHtml(style.color)}">${escapeHtml(props.code || props.name)}</span>`})}).addTo(layer);
+              html: `<span class="tl-line-label" style="--line-color:${escapeHtml(style.color)}">${escapeHtml(props.code || props.name)}</span>`}), pane: "transportStops"}).addTo(layer);
           }
-          L.geoJSON(geometry, {style, interactive: true})
+          L.geoJSON(geometry, {style, interactive: true, pane: "transportLines"})
             .bindPopup(routePopupHtml(props))
             .on("popupopen", () => { popupOpen = true; })
             .on("popupclose", releasePopup)
@@ -375,5 +385,5 @@ const TransportLayer = (() => {
     return {setVisible, isVisible: () => visible, reload: load, focus, clearFocus, focusedRoutes: () => focused?.routeIds || null};
   }
 
-  return {TRAIN_GLYPH, UNTIMED_NOTE, routePopupHtml, directionTimes, realtimeText, alertsHtml, realtimeNote, create, statusText, viewportQuery, lineStyle, focusLineStyle, lineLabelPoint, colorForLine, stopIconHtml, popupHtml, lineColor, departuresHtml, timeText, wheelchairText};
+  return {DETAIL_ZOOM, TRAIN_GLYPH, UNTIMED_NOTE, routePopupHtml, directionTimes, realtimeText, alertsHtml, realtimeNote, create, statusText, viewportQuery, lineStyle, focusLineStyle, lineLabelPoint, colorForLine, stopIconHtml, popupHtml, lineColor, departuresHtml, timeText, wheelchairText};
 })();

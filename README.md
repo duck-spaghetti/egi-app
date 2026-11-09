@@ -239,7 +239,7 @@ Rome dataset was found; the data is not verified by EGI.
 `.local/rail` (override `EGI_RAIL_ROOT`) is a second runtime in the same format,
 built from Trenitalia's NeTEx; `transport.ROOTS` lists both and the `*_all` helpers
 merge them (features, nearby lines, departures). Rail shows as mode `rail`: dashed
-green lines by train category (REG, RV, FR, IC…), FS station markers from zoom 12,
+green lines by train category (REG, RV, FR, IC…), FS station markers from zoom 14,
 "Stazione ferroviaria" groups in "Vicino a" (800 m), and the "Treni" checkbox. Only regional/metropolitan source categories are shown; origin departures and
 stop popups prioritize destinations with trips left. Scheduled times only; no FL codes in the source.
 
@@ -247,7 +247,7 @@ stop popups prioritize destinations with trips left. Scheduled times only; no FL
 
 `.local/osm-rail` (override `EGI_OSM_RAIL_ROOT`) adds OSM COTRAL routes/stations to
 the existing rail layer and route focus, independently of timed-feed availability.
-Stations appear from zoom 12; nearby-service rows use the 800 m rail radius.
+Stations appear from zoom 14; nearby-service rows use the 800 m rail radius.
 Metromare, Roma–Viterbo urban and extraurban are explicitly `untimed`: cards and
 popups explain that times are unavailable as open data, and popup opening does not
 request departures. Current-day service is not verified. Source: © OpenStreetMap

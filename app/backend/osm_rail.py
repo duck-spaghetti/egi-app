@@ -43,6 +43,9 @@ def load_active(root: Path) -> tuple[dict, dict]:
     return manifest, read_network(str(root), manifest["version"])
 
 
+# Matches transport.STOP_MIN_ZOOM['rail']: stations only once the map is close enough.
+STATION_MIN_ZOOM = 14
+
 def rail_view(bbox: list, zoom: int, modes: set, routes: set | None = None, root: Path = ROOT) -> dict:
     """OSM rail in the viewport, or complete focused routes with their stations."""
     result = {"features": [], "availability": "unavailable", "source_url": SOURCE_URL, "attribution": ATTRIBUTION, "untimed": True}
@@ -65,7 +68,7 @@ def rail_view(bbox: list, zoom: int, modes: set, routes: set | None = None, root
                     geometry = {"type": "MultiLineString", "coordinates": levels[str(max(usable))]}
             else:
                 memberships = [r for r in props["routes"] if routes is None or r["route_id"] in routes]
-                if not memberships or (routes is None and zoom < 12):
+                if not memberships or (routes is None and zoom < STATION_MIN_ZOOM):
                     continue
                 props = {**props, "routes": memberships}
                 geometry = feature["geometry"]

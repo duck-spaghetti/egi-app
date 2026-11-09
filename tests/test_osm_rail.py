@@ -32,7 +32,9 @@ class OsmRailTests(unittest.TestCase):
         self.assertEqual(len(low["features"]), 2)
         self.assertEqual(low["features"][0]["geometry"]["type"], "MultiLineString")
         self.assertEqual(len(low["features"][0]["geometry"]["coordinates"]), 2)
-        self.assertEqual(len(rail_view(bbox, 12, {"rail"}, root=FIXTURE)["features"]), 4)
+        # r2: stations join the lines from STATION_MIN_ZOOM (14), not before.
+        self.assertEqual(len(rail_view(bbox, 13, {"rail"}, root=FIXTURE)["features"]), 2)
+        self.assertEqual(len(rail_view(bbox, 14, {"rail"}, root=FIXTURE)["features"]), 4)
         self.assertEqual(rail_view(bbox, 15, {"bus"}, root=FIXTURE)["features"], [])
         self.assertEqual(rail_view([0, 0, 1, 1], 15, {"rail"}, root=FIXTURE)["features"], [])
         focused = rail_view([0, 0, 1, 1], 3, {"bus"}, {"osm:Roma Viterbo (Urbana)"}, FIXTURE)

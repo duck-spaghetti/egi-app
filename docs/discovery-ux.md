@@ -5,10 +5,9 @@ This is a local unreviewed-source preview; no importer/database edits or deploym
 
 ## Navigation and shared filters
 
-Filtri uses one DOM control tree and one filter state. On a list viewport >=960 px,
-the tree moves into the list sidebar; otherwise it stays in the Filtri sheet.
-Changing view or crossing the breakpoint preserves values and listeners. The list
-shows a filter summary. Menu contains Rubrica links to emergency numbers and the
+Filtri uses one DOM control tree and one filter state, always in the Filtri sheet
+(map control or list toolbar, see "List toolbar (r2)"). Changing view preserves
+values and listeners. The list shows active filters as chips. Menu contains Rubrica links to emergency numbers and the
 existing remote-service list section. Emergency numbers retain their telephone links.
 
 Livelli is a separate map control, hidden in list view, with independent transport
@@ -43,7 +42,11 @@ nearby rows and departures. Long-distance categories are excluded even in explic
 focus. Approximate NeTEx rail polylines are never drawn; genuine OSM local rail
 geometry remains available. Ordinary bus views contain stops from zoom 16 and no
 route polylines; selecting a bus line restores its route/stops at any zoom.
-Metro/tram thresholds remain unchanged. OSM station markers omit long route-name
+Residual review r2 raised stop thresholds: metro and rail stations (timed and
+OSM) from zoom 14, tram stops from 15, bus stops from 16. Each stop shows one mode
+symbol; line codes appear from zoom 16, in a line focus or on hover/keyboard focus.
+Network lines are thinner and semi-transparent and render in panes below service
+markers (`transportLines` z350, `transportStops` z450, services z600). OSM station markers omit long route-name
 stacks. All original runtime data remains retained, without filtering the importer.
 
 ## Opening state and map symbols
@@ -102,3 +105,12 @@ cache/rate/bounds/errors, regional stations and real SQLite departures, destinat
 no-countdown behavior, origin separation, distance order and selected bus geometry.
 Node tests cover opening thresholds/unknown days, filter membership, collapsed
 transport/absence of destination countdowns and the existing popup lifecycle.
+
+## List toolbar (r2)
+
+The list header shows one toolbar at every width: Filtri (opens the shared filter
+sheet, with an active-filter count), a compact Ordina select (Nome/Distanza) and
+Scegli punto. Active filters render as chips below it. The former desktop inline
+sidebar is removed; on desktop the filter sheet opens as a left panel. The
+floating Filtri control is hidden in list mode. The Livelli trigger uses
+`icons/ui/layers.svg`.

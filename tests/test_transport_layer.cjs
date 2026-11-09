@@ -8,7 +8,7 @@ async function main() {
   const requests = [], markers = [];
   const element = () => ({hidden:false, classList:{toggle(){}}, setAttribute(){}, addEventListener(){}, appendChild(){}, querySelector:()=>element()});
   const bounds = {getWest:()=>12, getSouth:()=>41, getEast:()=>13, getNorth:()=>43};
-  const map = {getContainer:()=>element(), on(){}, once(){}, getSize:()=>({x:800,y:600}), getBounds:()=>bounds, getZoom:()=>14};
+  const map = {getContainer:()=>element(), getPane:()=>null, createPane:()=>({style:{}}), on(){}, once(){}, getSize:()=>({x:800,y:600}), getBounds:()=>bounds, getZoom:()=>14};
   const feature = {type:'Feature',geometry:{type:'Point',coordinates:[12.5,41.9]},properties:{kind:'stop',transport_type:'rail',stop_id:'osm:node:1',name:'Roma',untimed:true,routes:[{route_id:'osm:Metromare',code:'Metromare',mode:'rail'}]}};
   const sandbox = {
     document:{createElement:()=>element()}, URLSearchParams, AbortController,

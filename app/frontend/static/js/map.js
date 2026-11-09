@@ -56,7 +56,6 @@ async function init() {
   initMap();
   bindUi();
   syncFilterLayout();
-  window.matchMedia("(min-width: 960px)").addEventListener("change", syncFilterLayout);
   applyInitialUserLocation();
   await loadData();
   renderFilters();
@@ -214,6 +213,9 @@ function bindUi() {
   document.querySelectorAll(".nav-btn").forEach((button) => {
     button.addEventListener("click", () => openSheet(`sheet-${button.dataset.sheet}`));
   });
+  document.querySelectorAll("[data-sheet-open]").forEach((button) => {
+    button.addEventListener("click", () => openSheet(`sheet-${button.dataset.sheetOpen}`));
+  });
   document.querySelectorAll("[data-close]").forEach((button) => {
     button.addEventListener("click", closeSheets);
   });
@@ -244,9 +246,6 @@ function bindUi() {
 }
 
 function openSheet(id) {
-  if (id === "sheet-filters" && state.view === "list" && window.matchMedia("(min-width: 960px)").matches) {
-    document.getElementById("service-query").focus(); return;
-  }
   sheetReturnFocus = document.activeElement;
   document.querySelectorAll(".sheet").forEach((sheet) => sheet.classList.remove("shown"));
   const sheet = document.getElementById(id);
@@ -309,13 +308,8 @@ function toggleView() {
 }
 
 function syncFilterLayout() {
-  const inline = state.view === "list" && window.matchMedia("(min-width: 960px)").matches;
-  const host = document.getElementById(inline ? "list-filter-host" : "filter-sheet-host");
-  host.appendChild(document.getElementById("filter-controls"));
-  stage.classList.toggle("inline-filters", inline);
-  if (inline && document.getElementById("sheet-filters").classList.contains("shown")) {
-    closeSheets(); document.getElementById("service-query").focus();
-  }
+  // One filter tree for map and list; the list toolbar opens the same sheet.
+  document.getElementById("filter-sheet-host").appendChild(document.getElementById("filter-controls"));
 }
 
 function updateViewToggle() {
@@ -585,12 +579,33 @@ function applyShellTranslations() {
 }
 
 function refresh() {
-  const summary = document.getElementById("active-filter-summary");
-  if (summary) summary.textContent = `Filtri: ${state.filters.cats.size} bisogni${state.filters.q ? ` · “${state.filters.q}”` : ""}${state.filters.openNow ? " · aperti ora" : ""}${[state.filters.type,state.filters.prestation ? "prestazione selezionata" : "",state.filters.access,state.filters.section!=="all" ? document.getElementById("section-filter").selectedOptions?.[0]?.textContent : ""].filter(Boolean).map(v=>` · ${v}`).join("")}`;
+  renderActiveFilters();
   const list = filteredPois();
   // In the transport focus view only the focused service's site stays on the map.
   renderMarkers(state.focusSiteKey ? state.pois.filter(poi => sourceSiteKey(poi) === state.focusSiteKey) : list);
   renderList(list);
+}
+
+/** Active filters as compact chips under the list toolbar, plus a count on its Filtri button. */
+function renderActiveFilters() {
+  const summary = document.getElementById("active-filter-summary");
+  if (!summary) return;
+  const f = state.filters;
+  const allCats = f.cats.size === state.categories.length;
+  const chips = [
+    allCats ? "" : `${f.cats.size} bisogni`,
+    f.q?.trim() ? `“${f.q.trim()}”` : "",
+    f.openNow ? "Aperti ora" : "",
+    f.type,
+    f.prestation ? document.getElementById("prestation-filter").selectedOptions?.[0]?.textContent || "Prestazione" : "",
+    f.access ? document.getElementById("access-filter").selectedOptions?.[0]?.textContent || f.access : "",
+    f.section !== "all" ? document.getElementById("section-filter").selectedOptions?.[0]?.textContent : "",
+  ].filter(Boolean);
+  summary.innerHTML = chips.length
+    ? chips.map(c => `<span class="filter-chip">${escapeHtml(c)}</span>`).join("")
+    : `<span class="filter-none">Nessun filtro attivo · tutti i bisogni</span>`;
+  const count = document.getElementById("list-filter-count");
+  if (count) { count.hidden = !chips.length; count.textContent = String(chips.length); }
 }
 
 function filteredPois(now = new Date()) {
