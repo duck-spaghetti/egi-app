@@ -327,3 +327,12 @@ A photo module (organisation/user submissions, Street View on request, sensitive
 exclusion) and a Mapillary test were built and then removed at the user's request; see
 [feasibility](../.scratch/mapillary/feasibility.md). Git history keeps the code
 (`f8cce40`, `36d7f9c`).
+
+### Filter counts (2026-11-09)
+
+The Filtri sheet shows the number of services available ("1398 servizi disponibili", or
+"N servizi su T con i filtri attivi"). Need tiles, service types, prestations, access
+claims and sources show faceted counts: each value is counted under all the *other*
+active filters (`facetCounts` / `passesFilters` in `map.js`), so a count is the number of
+results that choosing that value would give. Values with no results are hidden from the
+selects, and need tiles with no results are dimmed.

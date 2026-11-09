@@ -7,8 +7,8 @@ const transportSource = fs.readFileSync(path.join(__dirname, '../app/frontend/st
 let source = fs.readFileSync(path.join(__dirname, '../app/frontend/static/js/map.js'), 'utf8');
 // Isolate pure adaptation/filter helpers; real browser bootstrap is checked separately.
 source = source.replace(/init\(\)\.catch\(\(error\) => \{[\s\S]*?\n\}\);/, '');
-const fakeElement = () => ({classList:{add(){},remove(){},toggle(){}}, setAttribute(){}, addEventListener(){}, querySelector:()=>null, querySelectorAll:()=>[], innerHTML:'', textContent:'', scrollTop:0, dataset:{}});
-const sandbox = {document:{getElementById:()=>fakeElement(), querySelector:()=>fakeElement(), querySelectorAll:()=>[]}, window:{EGI_MAP_CONTEXT:{languageCode:'it'},EGI_I18N:{t:(_key,_args,fallback)=>fallback||''}}, console, URLSearchParams};
+const fakeElement = () => ({classList:{add(){},remove(){},toggle(){}}, setAttribute(){}, addEventListener(){}, append(){}, querySelector:()=>null, querySelectorAll:()=>[], innerHTML:'', textContent:'', scrollTop:0, dataset:{}});
+const sandbox = {document:{getElementById:()=>fakeElement(), querySelector:()=>fakeElement(), querySelectorAll:()=>[], createElement:()=>fakeElement()}, window:{EGI_MAP_CONTEXT:{languageCode:'it'},EGI_I18N:{t:(_key,_args,fallback)=>fallback||''}}, console, URLSearchParams};
 vm.createContext(sandbox);
 vm.runInContext(transportSource + '\nthis.TransportLayer = TransportLayer;',sandbox);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '../app/frontend/static/js/cycle-layer.js'), 'utf8') + '\nthis.CycleLayer = CycleLayer;',sandbox);
@@ -37,6 +37,11 @@ vm.runInContext(`
   state.filters.type='Mensa'; state.filters.prestation='7'; state.filters.access='appuntamento'; state.filters.q='caffe pasti';
   if(filteredPois().map(p=>p.id).join(',')!=='near') throw Error('AND filters, accent folding or positive flags broken');
   state.filters.type=''; state.filters.prestation=''; state.filters.access=''; state.filters.q='';
+  state.filters.cats=new Set(['cibo']); state.filters.order='name';
+  const facets=facetCounts();
+  if(facets.shown!==3 || facets.cats.get('ascolto')!==1 || facets.cats.get('cibo')!==3) throw Error('need counts must ignore the need filter itself');
+  if(facets.prestation.get('7')!==2 || facets.type.get('Mensa')!==3 || facets.type.has('Ascolto')) throw Error('type/prestation counts must follow the other filters');
+  state.filters.cats=new Set(['cibo','ascolto']);
   state.filters.section='needs_position';
   if(filteredPois().map(p=>p.id).join(',')!=='missing') throw Error('missing-position section lost service');
   state.filters.section='directory';

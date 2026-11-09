@@ -495,7 +495,9 @@ function renderCatGrid() {
     const tile = document.createElement("button");
     tile.className = `cat-tile${state.filters.cats.has(slug) ? " active" : ""}`;
     tile.setAttribute("aria-pressed", String(state.filters.cats.has(slug)));
-    tile.innerHTML = categoryBadge(category);
+    const n = state.facets?.cats.get(slug) || 0;
+    tile.innerHTML = `${categoryBadge(category)}<span class="cat-count" aria-label="${n} servizi">${n}</span>`;
+    tile.classList.toggle("empty", n === 0);
     tile.addEventListener("click", () => {
       if (state.filters.cats.has(slug)) state.filters.cats.delete(slug);
       else state.filters.cats.add(slug);
@@ -586,11 +588,17 @@ function applyShellTranslations() {
 }
 
 function refresh() {
+  renderFacets();
   renderActiveFilters();
   const list = filteredPois();
   // In the transport focus view only the focused service's site stays on the map.
   renderMarkers(state.focusSiteKey ? state.pois.filter(poi => sourceSiteKey(poi) === state.focusSiteKey) : list);
   renderList(list);
+}
+
+/** Text of a select's chosen option without its "(count)" suffix. */
+function selectedLabel(id, fallback) {
+  return (document.getElementById(id)?.selectedOptions?.[0]?.textContent || fallback).replace(/ \(\d+\)$/, "");
 }
 
 /** Active filters as compact chips under the list toolbar, plus a count on its Filtri button. */
@@ -603,10 +611,10 @@ function renderActiveFilters() {
     allCats ? "" : `${f.cats.size} bisogni`,
     f.q?.trim() ? `“${f.q.trim()}”` : "",
     f.openNow ? "Aperti ora" : "",
-    f.source ? (document.getElementById("source-filter").selectedOptions?.[0]?.textContent || f.source).replace(/ \(\d+\)$/,"") : "",
+    f.source ? selectedLabel("source-filter", f.source) : "",
     f.type,
-    f.prestation ? document.getElementById("prestation-filter").selectedOptions?.[0]?.textContent || "Prestazione" : "",
-    f.access ? document.getElementById("access-filter").selectedOptions?.[0]?.textContent || f.access : "",
+    f.prestation ? selectedLabel("prestation-filter", "Prestazione") : "",
+    f.access ? selectedLabel("access-filter", f.access) : "",
     f.section !== "all" ? document.getElementById("section-filter").selectedOptions?.[0]?.textContent : "",
   ].filter(Boolean);
   summary.innerHTML = chips.length
@@ -616,25 +624,58 @@ function renderActiveFilters() {
   if (count) { count.hidden = !chips.length; count.textContent = String(chips.length); }
 }
 
+function searchTerms() {
+  return state.filters.q?.trim() ? folded(state.filters.q).split(/\s+/).filter(Boolean) : [];
+}
+
+/** Values a POI contributes to one filter facet (for counts and matching). */
+function facetValues(poi, facet) {
+  const raw = poi.raw || {};
+  if (facet === "cats") return [resolveCategory(poi)?.slug || "other"];
+  if (facet === "source") return [sourceCode(poi)];
+  if (facet === "type") return raw.native_classifications?.tipologia ? [raw.native_classifications.tipologia] : [];
+  if (facet === "prestation") return (raw.native_classifications?.prestazioni || []).map(v => String(v.id));
+  if (facet === "access") return Object.entries(raw.access_raw || {}).filter(([, v]) => v === true).map(([k]) => k);
+  return [];
+}
+
+/** Does a POI pass every active filter, optionally ignoring one facet (faceted counts)? */
+function passesFilters(p, skip = null, now = new Date(), terms = searchTerms()) {
+  const f = state.filters;
+  if (skip !== "cats" && !f.cats.has(facetValues(p, "cats")[0])) return false;
+  for (const facet of ["source", "type", "prestation", "access"]) {
+    if (skip !== facet && f[facet] && !facetValues(p, facet).includes(f[facet])) return false;
+  }
+  if (terms.length && !terms.every(term => searchableService(p).includes(term))) return false;
+  const section = p.raw?.placement?.section;
+  if (f.section === "directory" && section !== "directory") return false;
+  if (f.section === "services" && section === "directory") return false;
+  if (f.section === "needs_position" && (section === "directory" || (p.latitude !== null && p.longitude !== null))) return false;
+  if (f.openNow && !["open", "closing"].includes(sourceOpeningStatus(p.raw?.hours_display, now).kind)) return false;
+  return true;
+}
+
+/** Per-facet counts: each value counted under all the other active filters. */
+function facetCounts(now = new Date()) {
+  const terms = searchTerms();
+  const counts = {cats: new Map(), source: new Map(), type: new Map(), prestation: new Map(), access: new Map(), shown: 0};
+  for (const p of state.pois) {
+    if (passesFilters(p, null, now, terms)) counts.shown++;
+    for (const facet of ["cats", "source", "type", "prestation", "access"]) {
+      if (!passesFilters(p, facet, now, terms)) continue;
+      for (const v of facetValues(p, facet)) counts[facet].set(v, (counts[facet].get(v) || 0) + 1);
+    }
+  }
+  return counts;
+}
+
 function filteredPois(now = new Date()) {
-  let list = state.pois.map(poi=>({...poi,
+  const terms = searchTerms();
+  let list = state.pois.filter(p => passesFilters(p, null, now, terms)).map(poi=>({...poi,
     category_slug: resolveCategory(poi)?.slug || "other",
     category_color: resolveCategory(poi)?.color || categoryColor("other"),
     category_label: resolveCategory(poi)?.label || "Altro",
     category_icon_path: resolveCategory(poi)?.icon_path || null}));
-  list=list.filter(p=>state.filters.cats.has(p.category_slug));
-  if (state.filters.source) list=list.filter(p=>sourceCode(p)===state.filters.source);
-  if (state.filters.type) list=list.filter(p=>p.raw?.native_classifications?.tipologia===state.filters.type);
-  if (state.filters.prestation) list=list.filter(p=>(p.raw?.native_classifications?.prestazioni || []).some(v=>String(v.id)===state.filters.prestation));
-  if (state.filters.access) list=list.filter(p=>p.raw?.access_raw?.[state.filters.access]===true);
-  if (state.filters.q?.trim()) {
-    const terms=folded(state.filters.q).split(/\s+/).filter(Boolean);
-    list=list.filter(p=>terms.every(term=>searchableService(p).includes(term)));
-  }
-  if (state.filters.section==="directory") list=list.filter(p=>p.raw?.placement?.section==="directory");
-  if (state.filters.section==="services") list=list.filter(p=>p.raw?.placement?.section!=="directory");
-  if (state.filters.section==="needs_position") list=list.filter(p=>p.raw?.placement?.section!=="directory" && (p.latitude===null || p.longitude===null));
-  if (state.filters.openNow) list=list.filter(p=>["open","closing"].includes(sourceOpeningStatus(p.raw?.hours_display,now).kind));
   if (state.userLoc) list=list.map(p=>({...p,_dist:p.raw?.placement?.section!=="directory" && Number.isFinite(p.latitude) && Number.isFinite(p.longitude) ? distanceKm(state.userLoc,{lat:p.latitude,lng:p.longitude}) : null}));
   return list.sort((a,b)=>{
     const distance=state.filters.order==="distance" && state.userLoc ? (a._dist??Infinity)-(b._dist??Infinity) : 0;
@@ -1638,26 +1679,48 @@ function searchableService(poi) {
     ...(raw.contacts || []).map(c => c.value)].filter(Boolean).join(" "));
 }
 
+/** Rebuild one select: values with a count under the other filters, plus the selected one. */
+function fillFacetSelect(select, facet, allLabel, labels) {
+  const counts = state.facets?.[facet] || new Map();
+  const selected = state.filters[facet];
+  const values = [...labels.keys()].filter(v => counts.get(v) || v === selected)
+    .sort((a, b) => labels.get(a).localeCompare(labels.get(b), "it"));
+  if (selected && !labels.has(selected)) state.filters[facet] = "";
+  select.innerHTML = `<option value="">${escapeHtml(allLabel)}</option>` + values.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(labels.get(v))} (${counts.get(v) || 0})</option>`).join("");
+  select.value = state.filters[facet];
+}
+
 function renderSearchOptions() {
   const types = document.getElementById("service-type-filter");
   const prestations = document.getElementById("prestation-filter");
   const access = document.getElementById("access-filter");
+  const sources = document.getElementById("source-filter");
   if (!types || !prestations || !access) return;
-  renderSourceOptions();
-  const base = state.pois.filter(p => state.filters.cats.has(p.category?.slug) && (!state.filters.source || sourceCode(p) === state.filters.source));
-  const typeNames = [...new Set(base.map(p => p.raw?.native_classifications?.tipologia).filter(Boolean))].sort((a,b) => a.localeCompare(b,"it"));
-  if (!typeNames.includes(state.filters.type)) state.filters.type = "";
-  types.innerHTML = '<option value="">Tutte le tipologie</option>' + typeNames.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("");
-  types.value = state.filters.type;
-  const byType = base.filter(p => !state.filters.type || p.raw?.native_classifications?.tipologia === state.filters.type);
-  const native = new Map(byType.flatMap(p => (p.raw?.native_classifications?.prestazioni || []).map(v => [String(v.id),v.nome])));
-  if (!native.has(state.filters.prestation)) state.filters.prestation = "";
-  prestations.innerHTML = '<option value="">Tutte le prestazioni</option>' + [...native].sort((a,b) => a[1].localeCompare(b[1],"it")).map(([id,name]) => `<option value="${escapeHtml(id)}">${escapeHtml(name)}</option>`).join("");
-  prestations.value = state.filters.prestation;
-  const claims = new Map(base.flatMap(p => (p.raw?.access_display?.sections || []).flatMap(s => s.entries.filter(e=>e.value===true).map(e=>[e.code,e.label]))));
-  if (!claims.has(state.filters.access)) state.filters.access = "";
-  access.innerHTML = '<option value="">Tutte le indicazioni di accesso</option>' + [...claims].sort((a,b)=>a[1].localeCompare(b[1],"it")).map(([code,label])=>`<option value="${escapeHtml(code)}">${escapeHtml(label)}</option>`).join("");
-  access.value = state.filters.access;
+  if (!state.facets) state.facets = facetCounts();
+  const labels = {type: new Map(), prestation: new Map(), access: new Map(), source: new Map()};
+  for (const p of state.pois) {
+    const raw = p.raw || {};
+    if (raw.native_classifications?.tipologia) labels.type.set(raw.native_classifications.tipologia, raw.native_classifications.tipologia);
+    (raw.native_classifications?.prestazioni || []).forEach(v => labels.prestation.set(String(v.id), v.nome));
+    (raw.access_display?.sections || []).forEach(s => s.entries.filter(e => e.value === true).forEach(e => labels.access.set(e.code, e.label)));
+    labels.source.set(sourceCode(p), sourceName(p));
+  }
+  fillFacetSelect(types, "type", "Tutte le tipologie", labels.type);
+  fillFacetSelect(prestations, "prestation", "Tutte le prestazioni", labels.prestation);
+  fillFacetSelect(access, "access", "Tutte le indicazioni di accesso", labels.access);
+  if (sources) fillFacetSelect(sources, "source", "Tutte le fonti", labels.source);
+}
+
+/** Recount facets and update the filter sheet: total, need tiles and selects. */
+function renderFacets() {
+  state.facets = facetCounts();
+  const total = document.getElementById("filter-total");
+  if (total) {
+    const all = state.pois.length;
+    total.textContent = state.facets.shown === all ? `${all} servizi disponibili` : `${state.facets.shown} servizi su ${all} con i filtri attivi`;
+  }
+  renderCatGrid();
+  renderSearchOptions();
 }
 
 /** Source of a service row: Helpinet or one of the map exports (see app/backend/preview.py). */
@@ -1674,16 +1737,6 @@ function facilityLine(poi) {
 
 function sourceName(poi) {
   return poi.raw?.sources?.[0]?.source_name || "Helpinet";
-}
-
-function renderSourceOptions() {
-  const select = document.getElementById("source-filter");
-  if (!select) return;
-  const counts = new Map();
-  state.pois.forEach(p => counts.set(sourceCode(p), {name: sourceName(p), n: (counts.get(sourceCode(p))?.n || 0) + 1}));
-  if (!counts.has(state.filters.source)) state.filters.source = "";
-  select.innerHTML = '<option value="">Tutte le fonti</option>' + [...counts].sort((a,b)=>a[1].name.localeCompare(b[1].name,"it")).map(([code,v])=>`<option value="${escapeHtml(code)}">${escapeHtml(v.name)} (${v.n})</option>`).join("");
-  select.value = state.filters.source;
 }
 
 /** Map-export positions are geocoded estimates; say how they were found. */
