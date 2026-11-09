@@ -229,7 +229,7 @@ document.addEventListener("keydown", e => {
 fetch("/api/preview/review/overlaps").then(r => r.json()).then(data => {
   pairs = data.pairs;
   const names = {};
-  pairs.forEach(p => { names[p.a.source_code] = p.a.source; names[p.b.source_code] = p.b.source; });
+  pairs.forEach(p => { names[p.a.source_code] = p.a.source_name || p.a.source; names[p.b.source_code] = p.b.source_name || p.b.source; });
   document.getElementById("source-filter").insertAdjacentHTML("beforeend",
     Object.entries(names).sort((x, y) => x[1].localeCompare(y[1])).map(([c, n]) => `<option value="${esc(c)}">${esc(n)}</option>`).join(""));
   renderList();

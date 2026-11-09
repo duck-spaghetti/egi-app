@@ -1,4 +1,4 @@
-"""Overlap review pairs: cross-source only, graded by address, type, distance and names."""
+"""Overlap review pairs: across datasets (sources or guide chapters), graded by address, type, distance and names."""
 
 import unittest
 
@@ -34,6 +34,20 @@ class ReviewTests(unittest.TestCase):
         self.assertNotIn(("a", "d"), pairs, "same source is never paired")
         self.assertIn(pairs[("d", "b")]["tier"] if ("d", "b") in pairs else pairs[("b", "d")]["tier"], {"C", "D"})
         self.assertTrue(all(p["a"]["source_code"] != p["b"]["source_code"] for p in pairs.values()))
+
+    def test_guide_chapters_are_paired_but_one_chapter_is_not(self):
+        """Two chapters of one guide are separate datasets (runs); one chapter is not paired with itself."""
+        def guide(i, run, chapter, title):
+            c = card(i, "sant-egidio", title, "Via di Porta San Lorenzo 7", 41.9, 12.51, "Centro di ascolto")
+            c.update(run_id=run, sources=[{"source_name": "Sant'Egidio · DOVE 2026", "source_kind": "document"}],
+                     native_classifications={"tipologia": "Centro di ascolto", "layer_path": [chapter]})
+            return c
+        cards = [guide("g1", "r-ascolto", "Ascolto", "Centro ascolto stranieri"), guide("g2", "r-curarsi", "Curarsi", "Centro ascolto stranieri"),
+                 guide("g3", "r-ascolto", "Ascolto", "Centro ascolto stranieri")]
+        pairs = {(p["a"]["id"], p["b"]["id"]) for p in overlap_pairs(cards)}
+        self.assertEqual(pairs, {("g1", "g2"), ("g2", "g3")})
+        first = overlap_pairs(cards)[0]
+        self.assertEqual({first["a"]["source"], first["b"]["source"]}, {"Sant'Egidio · DOVE 2026 · Ascolto", "Sant'Egidio · DOVE 2026 · Curarsi"})
 
     def test_shared_contacts_match_without_position_and_groups_join_sources(self):
         def unplaced(i, source, title, address, phone, email, kind="Mensa sociale"):

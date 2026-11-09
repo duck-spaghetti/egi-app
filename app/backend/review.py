@@ -1,6 +1,7 @@
 """Duplicate review: candidate pairs and groups of services that may describe the same thing.
 
-Read-only. Candidates are cross-source only and come from blocking on the normalized
+Read-only. Candidates come from different datasets (different sources, or different
+chapters of one guide such as Sant'Egidio's) and from blocking on the normalized
 address, a shared phone or email, and a 40 m grid around placed services (services
 without a position still match by address or contact). Each pair gets a score from
 independent signals, kept as evidence the reviewer can read:
@@ -146,11 +147,14 @@ def metres(a: tuple[float, float], b: tuple[float, float]) -> float:
 
 
 def summary(card: dict[str, Any], point: tuple[float, float] | None) -> dict[str, Any]:
+    """Side-by-side fields of one card; a guide's chapter is appended to its source name."""
     source = (card.get("sources") or [{}])[0]
+    chapter = ((card.get("native_classifications") or {}).get("layer_path") or [None])[0] if source.get("source_kind") == "document" else None
     hours = card.get("hours_display") or {}
     days = [f"{d['label'][:3]} {', '.join(i['label'] for i in d['intervals'])}" for d in hours.get("days", []) if d.get("intervals")]
     return {
-        "id": card["id"], "source": source.get("source_name"), "source_code": card.get("source_code", "helpinet"),
+        "id": card["id"], "source": " · ".join(x for x in (source.get("source_name"), chapter) if x),
+        "source_name": source.get("source_name"), "source_code": card.get("source_code", "helpinet"),
         "title": card.get("service_title"), "facility": card.get("facility_name"),
         "type": (card.get("native_classifications") or {}).get("tipologia"), "need": (card.get("category") or {}).get("label"),
         "address": (card.get("place") or {}).get("address"),
@@ -164,11 +168,13 @@ def summary(card: dict[str, Any], point: tuple[float, float] | None) -> dict[str
 
 
 class _Prepared:
-    __slots__ = ("card", "source", "point", "key", "street", "words", "quoted", "phones", "emails", "domains", "type", "need")
+    __slots__ = ("card", "source", "dataset", "point", "key", "street", "words", "quoted", "phones", "emails", "domains", "type", "need")
 
     def __init__(self, card: dict[str, Any]) -> None:
+        """Normalize one card's address, names and contacts for blocking and scoring."""
         self.card = card
         self.source = card.get("source_code", "helpinet")
+        self.dataset = (self.source, card.get("run_id"))  # one run per displayed dataset (guide chapter)
         geometry = (card.get("place") or {}).get("geometry")
         self.point = (geometry["coordinates"][1], geometry["coordinates"][0]) if geometry else None
         address = (card.get("place") or {}).get("address")
@@ -255,7 +261,10 @@ def tier_for(points: int, facts: dict[str, Any]) -> str | None:
 
 
 def overlap_pairs(cards: list[dict[str, Any]], max_distance: float = 40.0) -> list[dict[str, Any]]:
-    """Cross-source candidate pairs with score, evidence and group, strongest first."""
+    """Cross-dataset candidate pairs with score, evidence and group, strongest first.
+
+    Records of one dataset are never paired; records of two chapters of one guide are.
+    """
     prepared = [_Prepared(c) for c in cards]
     phone_use = Counter(p for item in prepared for p in item.phones)
     generic_phones = {p for p, n in phone_use.items() if n > 6}  # switchboards, CUP, helplines listed by many services
@@ -284,7 +293,7 @@ def overlap_pairs(cards: list[dict[str, Any]], max_distance: float = 40.0) -> li
             group = [m for dy in (-1, 0, 1) for dx in (-1, 0, 1) for m in grid.get(f"{gy + dy}:{gx + dx}", [])]
         for x in members:
             for y in group:
-                if x != y and prepared[x].source != prepared[y].source:
+                if x != y and prepared[x].dataset != prepared[y].dataset:
                     candidates.add((min(x, y), max(x, y)))
     pairs = []
     for x, y in candidates:
