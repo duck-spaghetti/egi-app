@@ -19,6 +19,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .geocoding import search_address
 from .review import overlap_pairs
+from . import taxonomy
 from .preview import AREA, LANGUAGES, categories, debug_positions, is_map_row, services, source_list
 from .presentation import coverage
 from .subjects import PostgresSubjectSource, SubjectSource, SubjectSourceUnavailable
@@ -132,8 +133,14 @@ def is_placed(card: dict[str, Any]) -> bool:
 
 @app.get("/api/preview/categories")
 def preview_categories(rows: list[dict[str, Any]] = Depends(subjects)):
-    """Return native source-need presentation groups for the recovered filters."""
-    return categories(rows)
+    """Return the need tiles of the presentation taxonomy (v0.2) for the filters."""
+    return taxonomy.need_categories()
+
+
+@app.get("/api/preview/taxonomy")
+def preview_taxonomy():
+    """Presentation vocabulary v0.2: need tiles, offers, audiences, access, meal times and paths."""
+    return taxonomy.public_vocabulary()
 
 
 @app.get("/api/preview/transport")

@@ -76,7 +76,7 @@ vm.runInContext(`
   state.pois=[near,samePoint,otherPoint,missing];
   const sites=siteGroups([near]);
   if(sites.length!==1 || sites[0].length!==2 || !sites[0].some(p=>p.id==='same')) throw Error('cross-category siblings hidden or different point inherited');
-  if(!categoryBadge({label:'igiene_personale',icon_path:'/static/assets/icons/default/shower.svg'}).includes('Igiene Personale')) throw Error('category caption or badge icon missing');
+  if(!categoryBadge({label:'igiene_personale',icon_path:'/static/assets/icons/default/shower.svg'}).includes('Igiene personale')) throw Error('category caption or badge icon missing');
 
   const withHours=(id,display)=>({...near,id,raw:{...near.raw,hours_display:display}});
   state.pois=[withHours('open',hours([['09:00','18:00']])),withHours('later',hours([['16:00','18:00']])),withHours('unknown',hours([])),withHours('ambiguous',hours([['22:00','02:00']],['verify']))];

@@ -117,6 +117,30 @@ Database-backed loader tests run separately under egi-importer with EGI_TEST_DSN
 pointing specifically to the dedicated egi_import_contract database. Recorded evidence
 and the scope are in [v0.1 plan](docs/v01-plan.md).
 
+## Need-first presentation taxonomy (v0.2)
+
+The map's need tiles, offers ("Prestazione"), "Per chi", "Pasto", "Come si accede" and quick
+paths come from `app/backend/taxonomy_v0_2.json`, applied to every card by
+`app/backend/taxonomy.py` (`/api/preview/taxonomy` serves the labels and paths). Approved by
+the user on 2026-11-09 ([proposal](../.scratch/taxonomy/proposal.md), sections 10–11).
+
+- Tiles: Mangiare, Dormire, Lavarsi e vestirsi, Centri diurni e multiservizi (working
+  label), Salute, Ascolto e aiuto, Documenti e diritti, Istruzione e lavoro. A card appears
+  under every need of its offers; the source's own need stays in `source_category`.
+- Each offer, audience and access tag records its basis: the source service type, a name
+  rule, a source flag, or a printed word (`interpreted`, shown dashed with "*" on the card).
+  Original source fields are unchanged.
+- Meal tags (colazione/pranzo/cena) only for services offering a meal: from opening windows,
+  else from printed words.
+- Consultori and vocational training stay enabled for debugging; set `"enabled": false` on
+  the offer to switch one off. Paid hostels stay hidden with an "a pagamento" tag.
+- Quick paths: Violenza contro le donne, Stanotte non so dove dormire, Lavarmi e mangiare
+  oggi, Appena arrivato / senza documenti. The emergency sheet links to the help lines.
+
+Measured on 2026-11-09 (2,038 placed services): every card has a need; 392 have two or more;
+offers: 2,118 from source types, 1,016 from printed words, 75 from names, 51 from the
+multi-service rule. This is a presentation mapping, not the canonical taxonomy (egi_database).
+
 ## Limits
 
 The local preview has a separate floating **Livelli** control, independent from

@@ -12,8 +12,9 @@ const state = {
   cityOptions: [],
   filters: {
     cats: new Set(),
-    q: "", source: "", issue: "", type: "", prestation: "", access: "", section: "all", order: "name", openNow: false,
+    q: "", source: "", issue: "", type: "", prestation: "", access: "", audience: "", meal: "", path: "", section: "all", order: "name", openNow: false,
   },
+  taxonomy: {needs: [], offers: [], audiences: [], access: [], meal_times: [], paths: []},
   view: "map",
   userLoc: null,
   city: context.cityName || "Roma",
@@ -147,6 +148,7 @@ async function loadData() {
     fetch("/api/preview/areas"),
     fetch("/api/preview/category-translations?limit=1000"),
   ]);
+  try { state.taxonomy = await readJson(await fetch("/api/preview/taxonomy"), "tassonomia"); } catch (_e) { /* paths and labels optional */ }
 
   const categories = await readJson(categoriesResponse, "categorie");
   state.languages = await readJson(languagesResponse, "lingue");
@@ -169,7 +171,7 @@ async function loadData() {
 function bindUi() {
   document.getElementById("open-now-filter").addEventListener("change",event=>{state.filters.openNow=event.target.checked; refresh();});
   document.getElementById("service-query").addEventListener("input",event=>{state.filters.q=event.target.value; refresh();});
-  for (const [id,key] of [["source-filter","source"],["issue-filter","issue"],["service-type-filter","type"],["prestation-filter","prestation"],["access-filter","access"],["section-filter","section"],["sort-services","order"]]) {
+  for (const [id,key] of [["source-filter","source"],["issue-filter","issue"],["service-type-filter","type"],["prestation-filter","prestation"],["access-filter","access"],["audience-filter","audience"],["meal-filter","meal"],["section-filter","section"],["sort-services","order"]]) {
     document.getElementById(id).addEventListener("change",event=>{
       state.filters[key]=event.target.value;
       if (key==="type" || key==="source") renderSearchOptions();
@@ -184,9 +186,10 @@ function bindUi() {
     void geocodeAddress(document.getElementById("addr-input").value.trim());
   });
   document.getElementById("open-emergency").addEventListener("click", () => openSheet("sheet-sos"));
+  document.getElementById("sos-directory")?.addEventListener("click", () => document.getElementById("open-directory").click());
   document.getElementById("open-directory").addEventListener("click", () => {
     state.filters.section="directory";
-    state.filters.q=""; state.filters.source=""; state.filters.issue=""; state.filters.type=""; state.filters.prestation=""; state.filters.access="";
+    state.filters.q=""; state.filters.source=""; state.filters.issue=""; state.filters.type=""; state.filters.prestation=""; state.filters.access=""; state.filters.audience=""; state.filters.meal=""; state.filters.path="";
     state.filters.openNow=false; state.filters.cats=new Set(state.categories.map(c=>c.slug));
     document.getElementById("section-filter").value="directory";
     document.getElementById("service-query").value="";
@@ -232,12 +235,14 @@ function bindUi() {
   viewToggle.addEventListener("click", toggleView);
   updateViewToggle();
   document.getElementById("reset-filters").addEventListener("click", () => {
+    state.filters.path = ""; renderPaths();
     state.filters.cats = new Set();
     renderCatGrid();
     renderSearchOptions();
     refresh();
   });
   document.getElementById("select-all-filters").addEventListener("click", () => {
+    state.filters.path = ""; renderPaths();
     state.filters.cats = new Set(state.categories.map((category) => category.slug));
     renderCatGrid();
     renderSearchOptions();
@@ -333,6 +338,7 @@ function updateViewToggle() {
 }
 
 function renderFilters() {
+  renderPaths();
   renderCatGrid();
   renderSearchOptions();
   renderLanguageList();
@@ -619,7 +625,10 @@ function renderActiveFilters() {
     f.source ? selectedLabel("source-filter", f.source) : "",
     f.issue ? selectedLabel("issue-filter", f.issue) : "",
     f.type,
+    f.path ? `Percorso: ${(state.taxonomy.paths.find(x => x.code === f.path) || {}).label || f.path}` : "",
     f.prestation ? selectedLabel("prestation-filter", "Prestazione") : "",
+    f.audience ? selectedLabel("audience-filter", f.audience) : "",
+    f.meal ? selectedLabel("meal-filter", f.meal) : "",
     f.access ? selectedLabel("access-filter", f.access) : "",
     f.section !== "all" ? document.getElementById("section-filter").selectedOptions?.[0]?.textContent : "",
   ].filter(Boolean);
@@ -640,9 +649,11 @@ function facetValues(poi, facet) {
   if (facet === "cats") return raw.needs?.length ? raw.needs : [resolveCategory(poi)?.slug || "other"];
   if (facet === "source") return [sourceCode(poi)];
   if (facet === "type") return raw.native_classifications?.tipologia ? [raw.native_classifications.tipologia] : [];
-  if (facet === "prestation") return (raw.native_classifications?.prestazioni || []).map(v => String(v.id));
+  if (facet === "prestation") return raw.offers ? raw.offers.map(o => o.code) : (raw.native_classifications?.prestazioni || []).map(v => String(v.id));
+  if (facet === "audience") return (raw.audiences || []).map(a => a.code);
+  if (facet === "meal") return (raw.meal_times || []).map(m => m.code);
   if (facet === "issue") return raw.placement?.issue && raw.placement.issue !== "ok" && raw.placement.issue !== "manual" ? [raw.placement.issue] : [];
-  if (facet === "access") return Object.entries(raw.access_raw || {}).filter(([, v]) => v === true).map(([k]) => k);
+  if (facet === "access") return raw.access_tags ? raw.access_tags.map(a => a.code) : Object.entries(raw.access_raw || {}).filter(([, v]) => v === true).map(([k]) => k);
   return [];
 }
 
@@ -650,8 +661,12 @@ function facetValues(poi, facet) {
 function passesFilters(p, skip = null, now = new Date(), terms = searchTerms()) {
   const f = state.filters;
   if (skip !== "cats" && !facetValues(p, "cats").some(slug => f.cats.has(slug))) return false;
-  for (const facet of ["source", "issue", "type", "prestation", "access"]) {
+  for (const facet of ["source", "issue", "type", "prestation", "access", "audience", "meal"]) {
     if (skip !== facet && f[facet] && !facetValues(p, facet).includes(f[facet])) return false;
+  }
+  if (f.path) {
+    const path = state.taxonomy.paths.find(x => x.code === f.path);
+    if (path && !(p.raw?.offers || []).some(o => path.offers.includes(o.code))) return false;
   }
   if (terms.length && !terms.every(term => searchableService(p).includes(term))) return false;
   const section = p.raw?.placement?.section;
@@ -665,10 +680,10 @@ function passesFilters(p, skip = null, now = new Date(), terms = searchTerms()) 
 /** Per-facet counts: each value counted under all the other active filters. */
 function facetCounts(now = new Date()) {
   const terms = searchTerms();
-  const counts = {cats: new Map(), source: new Map(), issue: new Map(), type: new Map(), prestation: new Map(), access: new Map(), shown: 0};
+  const counts = {cats: new Map(), source: new Map(), issue: new Map(), type: new Map(), prestation: new Map(), access: new Map(), audience: new Map(), meal: new Map(), shown: 0};
   for (const p of state.pois) {
     if (passesFilters(p, null, now, terms)) counts.shown++;
-    for (const facet of ["cats", "source", "issue", "type", "prestation", "access"]) {
+    for (const facet of ["cats", "source", "issue", "type", "prestation", "access", "audience", "meal"]) {
       if (!passesFilters(p, facet, now, terms)) continue;
       for (const v of facetValues(p, facet)) counts[facet].set(v, (counts[facet].get(v) || 0) + 1);
     }
@@ -778,7 +793,8 @@ async function openDetail(id) {
     ${renderPositionNote(raw)}
     ${transitSectionShell(poi)}
     <section class="detail-section"><h3>Descrizione</h3><p${raw.sources?.[0]?.source_kind==="document"?' class="source-printed-text"':""}>${escapeHtml(description)}</p>${!raw.description && summary?.text?'<span class="derived-label">Sintesi ricavata dai campi della fonte · non descrizione originale</span>':""}</section>
-    <section class="detail-section"><h3>${raw.source_code && raw.source_code!=="helpinet" ? "Temi indicati" : "Prestazioni indicate"}</h3><div class="service-chips">${prestations.map(v=>`<span class="service-chip">${escapeHtml(v.nome)}</span>`).join("") || "Non indicati dalla fonte"}</div></section>
+    ${renderOffers(raw)}
+    <section class="detail-section"><h3>${raw.source_code && raw.source_code!=="helpinet" ? "Temi indicati dalla fonte" : "Prestazioni indicate dalla fonte"}</h3><div class="service-chips">${prestations.map(v=>`<span class="service-chip">${escapeHtml(v.nome)}</span>`).join("") || "Non indicati dalla fonte"}</div></section>
     ${raw.source_code && raw.source_code!=="helpinet" && !raw.access_display?.sections?.length && !raw.access_display?.texts?.length ? "" : `<section class="detail-section"><h3>Accesso e destinatari</h3>${renderSourceAccess(raw.access_display)}</section>`}
     <section class="detail-section"><h3>Orari del servizio</h3>${renderSourceHours(raw.hours_display)}</section>
     <section class="detail-section"><h3>Contatti di questo servizio</h3>${renderContacts(poi.contacts || [])}</section>
@@ -1712,17 +1728,25 @@ function renderSearchOptions() {
   const sources = document.getElementById("source-filter");
   if (!types || !prestations || !access) return;
   if (!state.facets) state.facets = facetCounts();
-  const labels = {type: new Map(), prestation: new Map(), access: new Map(), source: new Map()};
+  const labels = {type: new Map(), prestation: new Map(), access: new Map(), audience: new Map(), meal: new Map(), source: new Map()};
+  const needLabel = Object.fromEntries((state.taxonomy.needs || []).map(n => [n.slug, n.label]));
   for (const p of state.pois) {
     const raw = p.raw || {};
     if (raw.native_classifications?.tipologia) labels.type.set(raw.native_classifications.tipologia, raw.native_classifications.tipologia);
-    (raw.native_classifications?.prestazioni || []).forEach(v => labels.prestation.set(String(v.id), v.nome));
-    (raw.access_display?.sections || []).forEach(s => s.entries.filter(e => e.value === true).forEach(e => labels.access.set(e.code, e.label)));
+    if (raw.offers) raw.offers.forEach(o => labels.prestation.set(o.code, `${needLabel[o.need] || o.need} › ${o.label}`));
+    else (raw.native_classifications?.prestazioni || []).forEach(v => labels.prestation.set(String(v.id), v.nome));
+    (raw.audiences || []).forEach(a => labels.audience.set(a.code, a.label));
+    (raw.meal_times || []).forEach(m => labels.meal.set(m.code, m.label));
+    if (raw.access_tags) raw.access_tags.forEach(a => labels.access.set(a.code, a.label));
+    else (raw.access_display?.sections || []).forEach(s => s.entries.filter(e => e.value === true).forEach(e => labels.access.set(e.code, e.label)));
     labels.source.set(sourceCode(p), sourceName(p));
   }
   fillFacetSelect(types, "type", "Tutte le tipologie", labels.type);
   fillFacetSelect(prestations, "prestation", "Tutte le prestazioni", labels.prestation);
-  fillFacetSelect(access, "access", "Tutte le indicazioni di accesso", labels.access);
+  fillFacetSelect(access, "access", "Qualsiasi modalità di accesso", labels.access);
+  const audience = document.getElementById("audience-filter"), meal = document.getElementById("meal-filter");
+  if (audience) fillFacetSelect(audience, "audience", "Per tutte e tutti", labels.audience);
+  if (meal) fillFacetSelect(meal, "meal", "Qualsiasi pasto", labels.meal);
   if (sources) fillFacetSelect(sources, "source", "Tutte le fonti", labels.source);
   const issues = document.getElementById("issue-filter");
   if (issues) issues.closest?.(".issue-filter-wrap")?.toggleAttribute("hidden", !DEBUG_MODE);
@@ -1827,8 +1851,52 @@ function chooseReferencePoint() {
   showToast("Tocca la mappa per scegliere il riferimento");
 }
 
+/** Quick paths (taxonomy v0.2): one tap sets a curated set of offers and shows its guidance. */
+function renderPaths() {
+  const wrap = document.getElementById("path-buttons");
+  if (!wrap) return;
+  const paths = state.taxonomy.paths || [];
+  wrap.closest(".quick-paths")?.toggleAttribute("hidden", !paths.length);
+  wrap.innerHTML = paths.map(p => `<button type="button" class="btn path-btn${state.filters.path === p.code ? " on" : ""}" data-path="${escapeHtml(p.code)}" aria-pressed="${state.filters.path === p.code}">${escapeHtml(p.label)}</button>`).join("");
+  wrap.querySelectorAll("[data-path]").forEach(b => b.addEventListener("click", () => selectPath(b.dataset.path)));
+  const note = document.getElementById("path-note");
+  const current = paths.find(p => p.code === state.filters.path);
+  if (note) { note.hidden = !current; note.textContent = current ? current.text : ""; }
+}
+
+function selectPath(code) {
+  const f = state.filters;
+  f.path = f.path === code ? "" : code;
+  if (f.path) {
+    Object.assign(f, {q: "", source: "", issue: "", type: "", prestation: "", access: "", audience: "", meal: "", section: "all", openNow: false});
+    f.cats = new Set(state.categories.map(c => c.slug));
+    document.getElementById("service-query").value = "";
+    document.getElementById("open-now-filter").checked = false;
+    document.getElementById("section-filter").value = "all";
+  }
+  renderPaths(); renderCatGrid(); renderSearchOptions(); refresh();
+}
+
+/** "Cosa offre": offers grouped by need, then audiences, access and meal times; interpretations marked. */
+function renderOffers(raw) {
+  if (!raw.offers) return "";
+  const needs = Object.fromEntries((state.taxonomy.needs || []).map(n => [n.slug, n.label]));
+  const chip = x => `<span class="service-chip${x.interpreted ? " interpreted" : ""}" title="${escapeHtml(x.basis || "")}">${escapeHtml(x.label)}${x.interpreted ? " *" : ""}</span>`;
+  const groups = (raw.needs || []).map(n => {
+    const items = raw.offers.filter(o => o.need === n);
+    return `<div class="access-section"><h4>${escapeHtml(needs[n] || n)}</h4><div class="service-chips">${items.map(chip).join("") || '<span class="unknown-value">Bisogno indicato dalla fonte</span>'}</div></div>`;
+  }).join("");
+  const tags = [["Per chi", raw.audiences], ["Pasto", raw.meal_times], ["Come si accede", raw.access_tags]]
+    .filter(([, list]) => list?.length)
+    .map(([title, list]) => `<div class="access-section"><h4>${title}</h4><div class="service-chips">${list.map(chip).join("")}</div></div>`).join("");
+  const interpreted = [...raw.offers, ...(raw.audiences || []), ...(raw.access_tags || [])].some(x => x.interpreted);
+  return `<section class="detail-section"><h3>Cosa offre</h3>${groups}${tags}<p class="source-note">${interpreted ? "* Ricavato dal testo della fonte: interpretazione da verificare. " : ""}Passa sopra un'etichetta per vedere da dove viene.</p></section>`;
+}
+
 function categoryCaption(value) {
-  return String(value || "Servizio").replaceAll("_", " ").replace(/(^|\s)(\p{L})/gu, (_,space,letter)=>space+letter.toLocaleUpperCase("it"));
+  // Sentence case: taxonomy labels are written as phrases ("Lavarsi e vestirsi").
+  const text = String(value || "Servizio").replaceAll("_", " ");
+  return text.charAt(0).toLocaleUpperCase("it") + text.slice(1);
 }
 
 function categoryBadge(category) {

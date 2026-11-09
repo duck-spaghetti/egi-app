@@ -1,0 +1,218 @@
+"""Need-first presentation taxonomy (vocabulary `taxonomy_v0_2.json`), applied to service cards.
+
+Read-only interpretation: original source fields stay untouched; every assignment carries
+its basis so that interpretations can be reviewed and corrected later (user decision,
+2026-11-09: interpretations are acceptable while the original data is kept).
+
+For one card `apply` sets:
+
+- `offers`: what the service gives (Pasto, Docce, STP/ENI …), each with need, label and basis —
+  the source service type ("tipo della fonte"), a name rule ("nome"), or a printed word
+  ("testo: «docce»", marked `interpreted`);
+- `needs` (all needs, primary first) and `category` (the primary need tile); the primary need
+  comes from the source service type, else the source's own need, else the first offer;
+- `audiences` ("per chi"; `reserved` when the text says solo/riservato), `access_tags`,
+  `meal_times` (colazione/pranzo/cena from hours, else from words) for services offering a meal;
+- membership of "Centri diurni e multiservizi" by type/name or by at least two basic needs
+  (eat, wash/dress, sleep) at one place.
+
+The vocabulary is the approved v0.2 proposal (.scratch/taxonomy/proposal.md), not the
+canonical taxonomy; offers can be switched off with `"enabled": false`.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import unicodedata
+from functools import lru_cache
+from pathlib import Path
+from typing import Any
+
+VOCABULARY = Path(__file__).with_name("taxonomy_v0_2.json")
+TIME_RANGE = re.compile(r"(\d{1,2})[.:](\d{2})\s*[-–]\s*(\d{1,2})[.:](\d{2})")
+
+
+def fold(text: str | None) -> str:
+    """Lower-case ASCII text for matching (accents removed)."""
+    return unicodedata.normalize("NFKD", text or "").encode("ascii", "ignore").decode().lower()
+
+
+def _compile(pattern: str | None) -> re.Pattern[str] | None:
+    return re.compile(rf"(?:{fold(pattern)})", re.I) if pattern else None
+
+
+@lru_cache(maxsize=1)
+def vocabulary() -> dict[str, Any]:
+    """The vocabulary file with compiled rules (read once)."""
+    return compile_vocabulary(json.loads(VOCABULARY.read_text(encoding="utf-8")))
+
+
+def compile_vocabulary(data: dict[str, Any]) -> dict[str, Any]:
+    """Compile the rules of a vocabulary dict (also used by tests for variants)."""
+    for group in ("offers", "audiences", "access"):
+        for item in data[group]:
+            item["_words"], item["_names"] = _compile(item.get("words")), _compile(item.get("names"))
+            item["_types"] = set(item.get("types", []))
+    for slot in data["meal_times"]["slots"]:
+        slot["_words"] = _compile(slot.get("words"))
+    data["_not_offers"] = _compile(data.get("not_offer_phrases"))
+    data["_reserved"] = _compile(data.get("reserved_words"))
+    data["_needs"] = {n["code"]: n for n in data["needs"]}
+    return data
+
+
+def need_categories() -> list[dict[str, Any]]:
+    """Need tiles in the shape the map expects for categories."""
+    return [
+        {"id": i, "slug": n["code"], "label": n["label"], "color": n["color"],
+         "icon_path": f"/static/assets/icons/default/{n['icon']}.svg", "sort_order": i, "area_id": 1,
+         "is_active": True, "classification_status": vocabulary()["version"]}
+        for i, n in enumerate(vocabulary()["needs"], 1)
+    ]
+
+
+def card_text(card: dict[str, Any]) -> str:
+    """Folded title, facility, description, offer text and source topics of a card."""
+    natives = card.get("native_classifications") or {}
+    parts = [card.get("service_title"), card.get("facility_name"), card.get("description"), card.get("offer_text")]
+    parts += [p.get("nome", "") for p in natives.get("prestazioni") or [] if isinstance(p, dict)]
+    text = fold(" ".join(str(p or "") for p in parts))
+    not_offers = vocabulary()["_not_offers"]
+    return not_offers.sub(" ", text) if not_offers else text
+
+
+def _match(item: dict[str, Any], kind: str | None, title: str, text: str) -> tuple[str, bool] | None:
+    """(basis, interpreted) when a rule matches the card, else None."""
+    if kind and kind in item["_types"]:
+        return f"tipo della fonte: {kind}", False
+    if item["_names"] and (m := item["_names"].search(title)):
+        return f"nome: «{m.group(0)}»", False
+    if item["_words"] and (m := item["_words"].search(text)):
+        return f"testo: «{m.group(0)}»", True
+    return None
+
+
+def _minutes(hour: str, minute: str) -> int:
+    return int(hour) * 60 + int(minute)
+
+
+def time_windows(card: dict[str, Any]) -> list[tuple[int, int]]:
+    """Opening windows in minutes from structured hours, printed blocks or raw hour text."""
+    display = card.get("hours_display") or {}
+    windows = []
+    for day in display.get("days", []):
+        for interval in day.get("intervals", []):
+            if m := TIME_RANGE.search(interval.get("label", "")):
+                windows.append((_minutes(m[1], m[2]), _minutes(m[3], m[4])))
+    texts = [b.get("text", "") for b in display.get("scoped") or []] or [display.get("raw_text") or card.get("hours_raw") or ""]
+    for text in texts:
+        if not isinstance(text, str):  # Helpinet keeps structured hours, already read above
+            continue
+        for m in TIME_RANGE.finditer(text):
+            windows.append((_minutes(m[1], m[2]), _minutes(m[3], m[4])))
+    return [(s, e) for s, e in windows if s < e]
+
+
+def meal_times(card: dict[str, Any], text: str) -> list[dict[str, str]]:
+    """Colazione/pranzo/cena: from opening windows when present, else from printed words."""
+    def at(value: str) -> int:
+        h, m = value.split(":")
+        return int(h) * 60 + int(m)
+    found: dict[str, dict[str, str]] = {}
+    windows = time_windows(card)
+    for slot in vocabulary()["meal_times"]["slots"]:
+        hit = None
+        for s, e in windows:
+            if ("starts_before" in slot and s < at(slot["starts_before"])) or \
+               ("overlaps" in slot and s < at(slot["overlaps"][1]) and e > at(slot["overlaps"][0])) or \
+               ("ends_after" in slot and e > at(slot["ends_after"])):
+                hit = f"orari: {s // 60:02d}:{s % 60:02d}–{e // 60:02d}:{e % 60:02d}"
+                break
+        if not hit and slot["_words"] and (m := slot["_words"].search(text)):
+            hit = f"testo: «{m.group(0)}»"
+        if hit:
+            found[slot["code"]] = {"code": slot["code"], "label": slot["label"], "basis": hit, "interpreted": True}  # deduced
+    return list(found.values())
+
+
+def apply(card: dict[str, Any]) -> dict[str, Any]:
+    """Add offers, needs, primary category, audiences, access tags and meal times to a card."""
+    vocab = vocabulary()
+    kind = (card.get("native_classifications") or {}).get("tipologia")
+    title = fold(f"{card.get('service_title') or ''} {card.get('name') or ''}")
+    text = card_text(card)
+    source_need = (card.get("category") or {}).get("slug")
+    offers = []
+    overriding = False
+    for item in vocab["offers"]:
+        if item.get("enabled", True) is False:
+            continue
+        if hit := _match(item, kind, title, text):
+            offers.append({"code": item["code"], "need": item["need"], "label": item["label"], "basis": hit[0], "interpreted": hit[1]})
+            overriding |= bool(item.get("overrides_type")) and hit[0].startswith("nome")
+    if overriding:  # e.g. Agenzia delle Entrate typed "Sportello sociale pubblico" by the guide: the name decides
+        offers = [o for o in offers if not o["basis"].startswith("tipo della fonte")]
+        source_need = None
+    needs: list[str] = []
+    by_type = [o["need"] for o in offers if o["basis"].startswith("tipo della fonte")]
+    fallback = vocab["source_need_fallback"].get(source_need or "")
+    # Source needs of a same-source group (a placemark repeated per layer) are kept too.
+    grouped = [] if overriding else [vocab["source_need_fallback"].get(n, n if n in vocab["_needs"] else None) for n in card.get("needs") or []]
+    for need in by_type + ([fallback] if fallback else []) + grouped + [o["need"] for o in offers]:
+        if need and need not in needs:
+            needs.append(need)
+    basic = {o["need"] for o in offers} & set(vocab["multiservice"]["basic_needs"])
+    placed = bool((card.get("place") or {}).get("address") or (card.get("place") or {}).get("geometry"))
+    if "multiservizi" not in needs and len(basic) >= vocab["multiservice"]["min_basic_needs"] and placed:
+        needs.append("multiservizi")
+        offers.append({"code": "piu_servizi", "need": "multiservizi", "label": "Più servizi di base nello stesso luogo",
+                       "basis": "regola: " + ", ".join(sorted(basic)), "interpreted": True})
+    if not needs:
+        needs = ["ascolto_aiuto"]
+        offers.append({"code": "associazioni", "need": "ascolto_aiuto", "label": "Associazioni e orientamento",
+                       "basis": "nessuna regola: assegnato per difetto", "interpreted": True})
+    primary = vocab["_needs"][needs[0]]
+    category = next(c for c in need_categories() if c["slug"] == primary["code"])
+    reserved = bool(vocab["_reserved"] and vocab["_reserved"].search(text))
+    raw_flags = card.get("access_raw") if isinstance(card.get("access_raw"), dict) else {}
+    claims = {code for code, value in raw_flags.items() if value is True}  # Helpinet lists false flags too
+    claims |= {e["code"] for s in (card.get("access_display") or {}).get("sections", []) for e in s.get("entries", []) if e.get("value") is True}
+    audiences = []
+    for item in vocab["audiences"]:
+        hit = ("indicazione della fonte", False) if claims & set(item.get("claims", [])) else _match(item, kind, title, text)
+        if hit:
+            audiences.append({"code": item["code"], "label": item["label"], "basis": hit[0], "interpreted": hit[1], "reserved_hint": reserved})
+    access = []
+    for item in vocab["access"]:
+        hit = None
+        if claims & set(item.get("claims", [])):
+            hit = ("indicazione della fonte", False)
+        elif item.get("placement") and (card.get("placement") or {}).get("section") == item["placement"]:
+            hit = ("servizio a distanza", False)
+        elif card.get("delivery_mode") in item.get("delivery", []):
+            hit = ("modalità indicata dalla fonte", False)
+        else:
+            hit = _match(item, kind, title, text)
+        if hit:
+            access.append({"code": item["code"], "label": item["label"], "basis": hit[0], "interpreted": hit[1]})
+    card.update({
+        "source_category": card.get("category"), "category": category, "category_id": category["id"],
+        "needs": needs, "offers": offers, "audiences": audiences, "access_tags": access,
+        "meal_times": meal_times(card, text) if any(o["code"] == "pasto" for o in offers) else [],
+        "taxonomy_version": vocab["version"],
+    })
+    return card
+
+
+def public_vocabulary() -> dict[str, Any]:
+    """Labels, paths and meal slots for the interface (no compiled rules)."""
+    vocab = vocabulary()
+    return {
+        "version": vocab["version"], "needs": need_categories(),
+        "offers": [{"code": o["code"], "need": o["need"], "label": o["label"]} for o in vocab["offers"] if o.get("enabled", True) is not False],
+        "audiences": [{"code": a["code"], "label": a["label"]} for a in vocab["audiences"]],
+        "access": [{"code": a["code"], "label": a["label"]} for a in vocab["access"]],
+        "meal_times": [{"code": m["code"], "label": m["label"]} for m in vocab["meal_times"]["slots"]],
+        "paths": vocab["paths"],
+    }

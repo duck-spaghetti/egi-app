@@ -1491,3 +1491,11 @@ html[dir="rtl"] .sheet-back-head .arrow,
 /* Source freshness on service cards (user decision 2026-11-09: say when data may be old). */
 .freshness-note { font-size:12px;line-height:1.45;margin:6px 0;padding:6px 9px;border-radius:8px;background:#f2efe6;color:var(--ink-soft); }
 .freshness-note.stale { background:#fff3d6;color:#6b4b00; }
+
+/* Quick paths and taxonomy chips (taxonomy v0.2) */
+.quick-paths h3 { margin:0 0 8px;font-size:15px; }
+.path-buttons { display:flex;flex-wrap:wrap;gap:8px; }
+.path-btn { font-size:13px;padding:8px 11px; }
+.path-btn.on { background:var(--ink, #242424);color:#fff;border-color:transparent; }
+.path-note { margin:10px 0 0;padding:9px 11px;border-radius:9px;background:#f3ecdc;font-size:13px;line-height:1.45; }
+.service-chip.interpreted { background:transparent;border:1px dashed #b9ae95; }

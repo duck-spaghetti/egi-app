@@ -113,7 +113,16 @@ def service_kind(card: dict[str, Any]) -> str | None:
 
 
 def proposed_needs(card: dict[str, Any]) -> list[dict[str, str]]:
-    """Needs served by the card: own need, needs of its kind, needs read from its offer."""
+    """Needs served by the card: own need, needs of its kind, needs read from its offer.
+
+    Cards already placed in the presentation taxonomy (`taxonomy.apply`) use its needs and
+    the basis of the first offer of each need.
+    """
+    if card.get("taxonomy_version"):
+        basis = {}
+        for offer in card.get("offers") or []:
+            basis.setdefault(offer["need"], f"{offer['label']} ({offer['basis']})")
+        return [{"need": n, "basis": basis.get(n, "bisogno indicato dalla fonte")} for n in card.get("needs") or []]
     found: dict[str, str] = {}
     own = (card.get("category") or {}).get("slug") or (card.get("category") or {}).get("code")
     if own:

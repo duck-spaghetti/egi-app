@@ -11,6 +11,7 @@ import math
 import re
 from typing import Any
 
+from . import taxonomy
 from .presentation import access_sections, weekly_hours, placement
 
 LANGUAGES = [
@@ -181,7 +182,16 @@ def source_point(position: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def services(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Adapt source subjects to existing map cards while labelling all data unreviewed."""
+    """Adapt source subjects to existing map cards while labelling all data unreviewed.
+
+    Each card is then placed in the need-first presentation taxonomy (`taxonomy.apply`);
+    the source's own need stays in `source_category`.
+    """
+    return [taxonomy.apply(card) for card in _source_cards(rows)]
+
+
+def _source_cards(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Cards with the source-native need group as category (before the taxonomy)."""
     by_code = {c["slug"]: c for c in categories(rows)}
     result = []
     for row in rows:

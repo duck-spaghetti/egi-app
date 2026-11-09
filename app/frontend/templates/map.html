@@ -87,6 +87,7 @@
         <a class="sos-num" href="tel:114"><span>Emergenza infanzia</span><span class="num">114</span></a>
       </div>
     </div>
+    <p><button class="btn" type="button" id="sos-directory">Linee di aiuto e servizi a distanza</button></p>
   </div>
 </div>
 
@@ -108,6 +109,11 @@
       <div class="issue-filter-wrap" hidden><label for="issue-filter">Problema di posizione</label>
       <select id="issue-filter"><option value="">Qualsiasi (anche posizioni presenti)</option></select></div>
     </div>
+    <div class="filter-group quick-paths">
+      <h3>Percorsi rapidi</h3>
+      <div class="path-buttons" id="path-buttons"></div>
+      <p class="path-note" id="path-note" hidden></p>
+    </div>
     <fieldset class="discovery-path">
       <legend>Trova il servizio</legend>
       <label class="open-now-filter" style="display:flex;align-items:center;gap:9px;margin:0 0 14px;font-weight:600;cursor:pointer"><input id="open-now-filter" type="checkbox" style="width:18px;height:18px;margin:0"> Aperti ora</label>
@@ -120,7 +126,10 @@
       <p class="source-note">Scegli uno o più bisogni, poi affina tipo e prestazione. I punti mostrano anche gli altri servizi disponibili nella stessa posizione.</p>
     </fieldset>
     <div class="filter-group service-search">
-      <label for="access-filter">Indicazione di accesso o destinatario</label><select id="access-filter"></select>
+      <label for="audience-filter">Per chi</label><select id="audience-filter"></select>
+      <label for="meal-filter">Pasto</label><select id="meal-filter"></select>
+      <label for="access-filter">Come si accede</label><select id="access-filter"></select>
+      <p class="source-note">Prestazioni, destinatari e accesso sono ricavati dai dati delle fonti; quelli letti dal testo sono interpretazioni da verificare (vedi la scheda).</p>
     </div>
 
     <div class="filter-actions">
