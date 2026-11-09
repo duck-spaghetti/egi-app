@@ -309,8 +309,7 @@
     boundsSouth: {{ city.bbox_south if city else '41.800' }},
     boundsEast: {{ city.bbox_east if city else '12.650' }},
     boundsWest: {{ city.bbox_west if city else '12.350' }},
-    languageCode: {{ language.code|tojson if language else '"IT"' }},
-    mediaEnabled: {{ 'true' if media_enabled else 'false' }}
+    languageCode: {{ language.code|tojson if language else '"IT"' }}
   };
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -318,6 +317,5 @@
 <script src="/static/js/transport-layer.js" defer></script>
 <script src="/static/js/cycle-layer.js" defer></script>
 <script src="/static/js/debug-sources.js" defer></script>
-<script src="/static/js/media-panel.js" defer></script>
 <script src="/static/js/map.js" defer></script>
 {% endblock %}

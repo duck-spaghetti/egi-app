@@ -18,7 +18,6 @@ from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .geocoding import search_address
-from .media import MediaCatalog, enabled as media_enabled, representation
 from .preview import AREA, LANGUAGES, categories, debug_positions, is_map_row, services, source_list
 from .presentation import coverage
 from .subjects import PostgresSubjectSource, SubjectSource, SubjectSourceUnavailable
@@ -99,7 +98,6 @@ def map_page(request: Request, city_id: int = 1, lang: str = "it"):
             "city": city,
             "language": SimpleNamespace(**language),
             "lang": language["code"],
-            "media_enabled": media_enabled(),
         },
     )
 
@@ -342,28 +340,6 @@ def helpinet_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def debug_sources(rows: list[dict[str, Any]] = Depends(subjects)):
     """List displayed sources for the local position-check view (map ?debug=1)."""
     return source_list(rows)
-
-
-MEDIA_CATALOG = MediaCatalog()
-_SERVICE_INDEX: dict[int, dict[str, dict[str, Any]]] = {}
-
-
-def service_by_id(rows: list[dict[str, Any]], service_id: str) -> dict[str, Any] | None:
-    """Look a card up by id, reusing the index while the subject snapshot is unchanged."""
-    key = id(rows)
-    if key not in _SERVICE_INDEX:
-        _SERVICE_INDEX.clear()
-        _SERVICE_INDEX[key] = {s["id"]: s for s in services(rows)}
-    return _SERVICE_INDEX[key].get(service_id)
-
-
-@app.get("/api/preview/media")
-def service_media(service: str = Query(min_length=1, max_length=80), rows: list[dict[str, Any]] = Depends(subjects)):
-    """How to represent one service: priority organisation > user; Street View on request."""
-    card = service_by_id(rows, service)
-    if card is None:
-        raise HTTPException(404, "Servizio non disponibile")
-    return representation(card, MEDIA_CATALOG)
 
 
 @app.get("/api/preview/debug/positions")

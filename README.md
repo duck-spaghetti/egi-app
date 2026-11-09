@@ -321,22 +321,9 @@ alternatives, an OpenStreetMap link and the service card. Data comes from
 `GET /api/preview/debug/sources` and `GET /api/preview/debug/positions?source=<code>`;
 these include candidates the normal map hides.
 
-### Service photos module (2026-11-09)
+### Service photos (removed 2026-11-09)
 
-User decisions: exclude sensitive services, prefer 360° images, and use this provider
-priority: organisation submission → user submission, with Google Street View on
-request only. Mapillary was tested and removed on 2026-11-09 (car-mounted shots rarely
-show an entrance); it is future work, see
-[feasibility](../.scratch/mapillary/feasibility.md). Implemented in `app/backend/media.py` (`GET /api/preview/media?service=<id>`)
-and `app/frontend/static/js/media-panel.js` (card section "Foto", fetched only when a card opens).
-
-- **Excluded:** protected addresses, positive `vittima_di_violenza`/`vittima_di_tortura`
-  claims, and a conservative keyword match (`SENSITIVE`: antiviolenza, CAV, violenza,
-  tratta, casa rifugio, …). These services get no image and no Street View link, debug
-  included. Remote and itinerant services get no image.
-- **Organisation/user:** approved entries in `.local/media/submissions.json`
-  (`service_id`, `provider`, `url`, `status: approved`, `author`, `licence`, `is_360`).
-  This is an interim store until the `media.*` schema is approved; it is empty today.
-- **Street View:** a Google Maps link (`map_action=pano`) opened by the user. Google
-  imagery is never embedded, fetched or stored, and no key is needed.
-- **Switch:** `EGI_MEDIA_ENABLED=0` removes the endpoint output and the card section.
+A photo module (organisation/user submissions, Street View on request, sensitive-service
+exclusion) and a Mapillary test were built and then removed at the user's request; see
+[feasibility](../.scratch/mapillary/feasibility.md). Git history keeps the code
+(`f8cce40`, `36d7f9c`).

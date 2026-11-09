@@ -728,7 +728,6 @@ async function openDetail(id) {
     <p class="source-note">${escapeHtml(sourceName(poi))} · dati non revisionati.${raw.declared_update?` Aggiornamento dichiarato dalla fonte: ${escapeHtml(raw.declared_update)}.`:""}${raw.itinerant_source?" Servizio itinerante: il punto della fonte non è una sede fissa verificata.":""}</p>
     ${renderPositionNote(raw)}
     ${transitSectionShell(poi)}
-    <div id="media-slot"></div>
     <section class="detail-section"><h3>Descrizione</h3><p>${escapeHtml(description)}</p>${!raw.description && summary?.text?'<span class="derived-label">Sintesi ricavata dai campi della fonte · non descrizione originale</span>':""}</section>
     <section class="detail-section"><h3>${raw.source_code && raw.source_code!=="helpinet" ? "Temi indicati" : "Prestazioni indicate"}</h3><div class="service-chips">${prestations.map(v=>`<span class="service-chip">${escapeHtml(v.nome)}</span>`).join("") || "Non indicati dalla fonte"}</div></section>
     ${raw.source_code && raw.source_code!=="helpinet" ? "" : `<section class="detail-section"><h3>Accesso e destinatari</h3>${renderSourceAccess(raw.access_display)}</section>`}
@@ -736,7 +735,6 @@ async function openDetail(id) {
     <section class="detail-section"><h3>Contatti di questo servizio</h3>${renderContacts(poi.contacts || [])}</section>
     ${siblings.length?`<section class="detail-section"><h3>Altri servizi presso ${escapeHtml(raw.facility_name || "questo gruppo")}</h3><p class="source-note">Collegamento provvisorio dal gruppo Helpinet. Ogni scheda mantiene orari, accesso e contatti indipendenti.</p>${siblings.map(serviceButton).join("")}</section>`:""}
     <details class="detail-section"><summary>Provenienza e dati originali</summary>${renderProvenance(poi)}<pre class="source-evidence">${escapeHtml(JSON.stringify({record:raw.source_locator,gruppo:raw.source_group,sintesi:raw.derived_summary,campi_originali:raw.source_values,posizione:raw.position,da_verificare:raw.review_required},null,2))}</pre></details>`;
-  if (context.mediaEnabled && typeof MediaPanel !== "undefined") void MediaPanel.render(poi.id, document.getElementById("media-slot"));
   bindServiceButtons();
   void loadTransitDetail(poi);
   document.querySelector("#sheet-detail .sheet-body").scrollTop=0;
