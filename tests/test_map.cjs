@@ -34,20 +34,29 @@ vm.runInContext(`
   state.pois=[missing,far,near,remote]; state.categories=[{id:1,slug:'cibo'},{id:2,slug:'ascolto'}];
   state.filters.cats=new Set(['cibo','ascolto']); state.filters.order='distance';
   if(filteredPois().map(p=>p.id).join(',')!=='near,far,missing,remote') throw Error('distance sorting or unknown-last broken');
-  state.filters.type='Mensa'; state.filters.prestation='7'; state.filters.access='appuntamento'; state.filters.q='caffe pasti';
-  if(filteredPois().map(p=>p.id).join(',')!=='near') throw Error('AND filters, accent folding or positive flags broken');
-  state.filters.type=''; state.filters.prestation=''; state.filters.access=''; state.filters.q='';
+  state.filters.access='appuntamento'; state.filters.q='caffe pasti';
+  if(filteredPois().map(p=>p.id).join(',')!=='near,remote') throw Error('AND filters, accent folding or positive flags broken');
+  state.filters.access=''; state.filters.q='';
   state.filters.cats=new Set(['cibo']); state.filters.order='name';
   const facets=facetCounts();
   if(facets.shown!==3 || facets.cats.get('ascolto')!==1 || facets.cats.get('cibo')!==3) throw Error('need counts must ignore the need filter itself');
-  if(facets.prestation.get('7')!==2 || facets.type.get('Mensa')!==3 || facets.type.has('Ascolto')) throw Error('type/prestation counts must follow the other filters');
   state.filters.cats=new Set(['cibo','ascolto']);
   state.filters.section='needs_position';
   if(filteredPois().map(p=>p.id).join(',')!=='missing') throw Error('missing-position section lost service');
   state.filters.section='directory';
   if(filteredPois().map(p=>p.id).join(',')!=='remote' || googleMapsDirectionsHref(remote)!==null) throw Error('directory eligibility or route broken');
   state.filters.section='all'; state.filters.cats=new Set();
-  if(filteredPois().length) throw Error('empty need selection became all');
+  if(filteredPois().length!==4) throw Error('no need selected must show every service (filters r4)');
+  // A chosen need lists its offers, all on; switching one off hides services offering only that.
+  const withOffers=(id,offers)=>({...make(id,id,[12.5,41.9],1,'Mensa',7,false),raw:{...make(id,id,[12.5,41.9],1,'Mensa',7,false).raw,needs:['cibo'],offers}});
+  const meal=withOffers('meal',[{code:'pasto',need:'cibo',label:'Pasto'}]);
+  const both=withOffers('both',[{code:'pasto',need:'cibo',label:'Pasto'},{code:'pacco',need:'cibo',label:'Pacco'}]);
+  const parcel=withOffers('parcel',[{code:'pacco',need:'cibo',label:'Pacco'}]);
+  state.pois=[meal,both,parcel]; state.filters.cats=new Set(['cibo']); state.filters.offersOff=new Set(['pasto']);
+  if(filteredPois().map(p=>p.id).sort().join(',')!=='both,parcel') throw Error('switched-off offer not applied');
+  const oc=facetCounts();
+  if(oc.offer.get('pasto')!==2 || oc.offer.get('pacco')!==2) throw Error('offer counts must ignore the offers filter itself');
+  state.filters.offersOff=new Set(); state.filters.cats=new Set(); state.pois=[missing,far,near,remote];
 
   const hours=(ranges,issues=[])=>({days:[{day:'lun',label:'Lunedì',intervals:ranges.map(([a,b])=>({opens_raw:a,closes_raw:b,review_note:null})),issues}]});
   const at=iso=>new Date(iso);
@@ -128,7 +137,11 @@ vm.runInContext(`
   const svc={id:'s1',title:'Igiene personale',address:'Via X 1',contacts:[{type:'phone',value:'Tel. 06.1',dial:'061'}],latitude:41.9,longitude:12.5,
     raw:{category:{slug:'lavarsi'},offers:[{code:'docce',need:'lavarsi',label:'Docce',basis:'prestazione della fonte: Doccia'}],
          native_classifications:{prestazioni:[{nome:'Doccia'},{nome:'Barbiere'},{nome:'Livello A1'}]},course_facts:{levels:['A1']},placement:{section:'services'}}};
-  if(serviceTitle(svc)!=='Docce') throw Error('title is not the main offer');
+  if(serviceKind(svc)!=='Docce') throw Error('service type is not the main offer');
+  const named={...svc,raw:{...svc.raw,facility_name:'Opere Antoniane',organization_raw:'OPERE ANTONIANE'}};
+  if(serviceTitle(named)!=='Opere Antoniane' || serviceOrganiser(named)!=='') throw Error('facility title or organiser de-duplication wrong');
+  if(serviceOrganiser({...named,raw:{...named.raw,organization_raw:'Associazione Opere Antoniane ODV'}})!=='Associazione Opere Antoniane ODV') throw Error('distinct organiser hidden');
+  if(formatDistance(0.8504)!=='850 m' || formatDistance(1.25)!=='1,3 km') throw Error('distance format wrong');
   if(uncoveredPrestazioni(svc.raw).join(',')!=='Barbiere') throw Error('covered prestazioni or course levels repeated');
   if(serviceTitle({...svc,raw:{offers:[]}})!=='Igiene personale') throw Error('title fallback lost');
   const bar=renderServiceBar(svc);
@@ -163,7 +176,7 @@ vm.runInContext(`
   function twoSiteFixture(){ return [make('site-a','Mensa',[12.5,41.9],1,'Mensa',7,false), make('site-b','Docce',[12.5,41.9],1,'Mensa',7,false)]; }
   // Focus view keeps only the focused site's markers.
   const rendered=[]; const realRender=renderMarkers; renderMarkers=list=>rendered.push(list.map(p=>p.id)); renderList=()=>{};
-  state.pois=[near,far,...twoSiteFixture()]; state.filters={...state.filters,cats:new Set(['cibo','ascolto']),section:'all',type:'',prestation:'',access:'',q:'',openNow:false};
+  state.pois=[near,far,...twoSiteFixture()]; state.filters={...state.filters,cats:new Set(['cibo','ascolto']),offersOff:new Set(),section:'all',access:'',q:'',openNow:false};
   state.focusSiteKey=sourceSiteKey(far); refresh();
   if(rendered.at(-1).join(',')!=='far') throw Error('focus view does not isolate the service site');
   state.focusSiteKey=null; refresh();

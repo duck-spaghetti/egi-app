@@ -143,8 +143,8 @@ approved on 2026-11-09; v0.3 on 2026-11-15 during the source-by-source review
   windows, else from printed words.
 - Set `"enabled": false` on an offer to switch it off. Paid hostels stay hidden with an
   "a pagamento" tag.
-- Quick paths: Violenza e protezione, Stanotte non so dove dormire, Lavarmi e mangiare
-  oggi, Appena arrivato / senza documenti. The emergency sheet links to the help lines.
+- Quick paths stay in the vocabulary (`/api/preview/taxonomy`) but are no longer shown in the
+  filters (user, 2026-11-16). The emergency sheet links to the help lines.
 
 Measured on 2026-11-15 with Helpinet run helpinet-03 (2,251 cards; 309 Helpinet after six
 merges, all placed): one need each — Salute 66, Mangiare 45, Orientamento 43, Documenti 30,
@@ -287,6 +287,19 @@ sheet (`openDetail` in `map.js`) has:
 - a **fixed bar**: Chiama (or Scrivi / Sito web when there is no phone) and Indicazioni.
 
 The service chooser for several services at one point keeps the plain sheet head.
+
+**Round r4 (2026-11-16)**: the title is the facility name with the service type (main offer
+cluster) beside it, in the sheet and the list (sorted by facility, then type); "Organizzato da"
+is hidden when it repeats the facility; the sheet header shows the distance when a position is
+set; "Cosa offre" lists offers and the source's other prestazioni in one row of chips
+(outlined = source wording); "Altri servizi qui" sits above "Fonti e aggiornamenti"; labels
+"Igiene" (was Lavarsi) and "Supporto alle dipendenze".
+
+**Filters r4**: need first. Nothing is selected when the map opens (= every service);
+choosing a need lists its offers as chips, all on, each can be switched off; "Pasto" appears
+only inside Mangiare. "Tipo di servizio", "Prestazione" and the quick paths are gone. A fixed
+bar holds "Cerca" (closes the filters and shows the map) and "Azzera filtri" (when a filter
+is active).
 
 **List cards** follow the same hierarchy: category (and distance), title, facility · address,
 hours status with today's hours, transit badge, organiser · sources · "da verificare".

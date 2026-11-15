@@ -16,7 +16,7 @@
   },
   {
    "code": "lavarsi",
-   "label": "Lavarsi",
+   "label": "Igiene",
    "color": "#1e6091",
    "icon": "shower"
   },
@@ -275,7 +275,7 @@
   {
    "code": "dipendenze",
    "need": "salute",
-   "label": "Dipendenze",
+   "label": "Supporto alle dipendenze",
    "types": [
     "Dipendenze (Ser.D)",
     "Alcologia e auto-aiuto"

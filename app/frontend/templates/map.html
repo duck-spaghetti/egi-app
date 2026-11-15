@@ -109,34 +109,25 @@
       <div class="issue-filter-wrap" hidden><label for="issue-filter">Problema di posizione</label>
       <select id="issue-filter"><option value="">Qualsiasi (anche posizioni presenti)</option></select></div>
     </div>
-    <div class="filter-group quick-paths">
-      <h3>Percorsi rapidi</h3>
-      <div class="path-buttons" id="path-buttons"></div>
-      <p class="path-note" id="path-note" hidden></p>
-    </div>
     <fieldset class="discovery-path">
       <legend>Trova il servizio</legend>
       <label class="open-now-filter" style="display:flex;align-items:center;gap:9px;margin:0 0 14px;font-weight:600;cursor:pointer"><input id="open-now-filter" type="checkbox" style="width:18px;height:18px;margin:0"> Aperti ora</label>
       <p class="source-note">Secondo gli orari strutturati delle fonti (Helpinet e GrIS). Con il filtro attivo, gli orari sconosciuti, testuali o ambigui sono esclusi.</p>
-      <div class="discovery-step"><h3>1 · Bisogno</h3><div class="cat-grid" id="cat-grid"></div></div>
-      <div class="discovery-refine">
-        <div><label for="service-type-filter">2 · Tipo di servizio</label><select id="service-type-filter"></select></div>
-        <div><label for="prestation-filter">3 · Prestazione</label><select id="prestation-filter"></select></div>
-      </div>
-      <p class="source-note">Scegli uno o più bisogni, poi affina tipo e prestazione. I punti mostrano anche gli altri servizi disponibili nella stessa posizione.</p>
+      <div class="discovery-step"><h3>Bisogno</h3><div class="cat-grid" id="cat-grid"></div></div>
+      <p class="source-note" id="need-hint">Nessun bisogno scelto: vedi tutti i servizi. Scegli un bisogno per vederne le prestazioni.</p>
+      <div class="offer-groups" id="offer-groups"></div>
     </fieldset>
     <div class="filter-group service-search">
       <label for="audience-filter">Per chi</label><select id="audience-filter"></select>
-      <label for="meal-filter">Pasto</label><select id="meal-filter"></select>
       <label for="access-filter">Come si accede</label><select id="access-filter"></select>
       <p class="source-note">Prestazioni, destinatari e accesso sono ricavati dai dati delle fonti; quelli letti dal testo sono interpretazioni da verificare (vedi la scheda).</p>
     </div>
 
-    <div class="filter-actions">
-      <button class="btn" id="reset-filters" data-i18n="map.deselect_all">Deseleziona tutto</button>
-      <button class="btn primary" id="select-all-filters" data-i18n="map.select_all">Seleziona tutto</button>
-    </div>
   </div></div>
+  <div class="filter-bar">
+    <button class="btn" id="reset-filters" type="button" hidden>Azzera filtri</button>
+    <button class="btn primary" id="filters-search" type="button">Cerca</button>
+  </div>
 </div>
 
 <div class="sheet layer-panel" id="sheet-layers"><div class="sheet-head"><h2>Livelli della mappa</h2><button class="sheet-close" data-close>Chiudi</button></div><div class="sheet-body">    <div class="filter-group">

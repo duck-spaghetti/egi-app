@@ -11,8 +11,8 @@ const state = {
   transitAvailability: "loading",
   cityOptions: [],
   filters: {
-    cats: new Set(),
-    q: "", source: "", issue: "", type: "", prestation: "", access: "", audience: "", meal: "", path: "", section: "all", order: "name", openNow: false,
+    cats: new Set(), offersOff: new Set(),
+    q: "", source: "", issue: "", access: "", audience: "", meal: "", section: "all", order: "name", openNow: false,
   },
   taxonomy: {needs: [], offers: [], audiences: [], access: [], meal_times: [], paths: []},
   view: "map",
@@ -165,16 +165,16 @@ async function loadData() {
   state.pois = services.map(normalizePublicService).filter(Boolean);
   void loadTransitSummaries();
   setInterval(loadTransitSummaries, 300000);
-  state.filters.cats = new Set(state.categories.map((category) => category.slug));
+  state.filters.cats = new Set();  // filters r4: nothing selected = every service
 }
 
 function bindUi() {
   document.getElementById("open-now-filter").addEventListener("change",event=>{state.filters.openNow=event.target.checked; refresh();});
   document.getElementById("service-query").addEventListener("input",event=>{state.filters.q=event.target.value; refresh();});
-  for (const [id,key] of [["source-filter","source"],["issue-filter","issue"],["service-type-filter","type"],["prestation-filter","prestation"],["access-filter","access"],["audience-filter","audience"],["meal-filter","meal"],["section-filter","section"],["sort-services","order"]]) {
+  for (const [id,key] of [["source-filter","source"],["issue-filter","issue"],["access-filter","access"],["audience-filter","audience"],["section-filter","section"],["sort-services","order"]]) {
     document.getElementById(id).addEventListener("change",event=>{
       state.filters[key]=event.target.value;
-      if (key==="type" || key==="source") renderSearchOptions();
+      if (key==="source") renderSearchOptions();
       if (key==="order" && event.target.value==="distance" && !state.userLoc) openSheet("sheet-location");
       refresh();
     });
@@ -189,8 +189,8 @@ function bindUi() {
   document.getElementById("sos-directory")?.addEventListener("click", () => document.getElementById("open-directory").click());
   document.getElementById("open-directory").addEventListener("click", () => {
     state.filters.section="directory";
-    state.filters.q=""; state.filters.source=""; state.filters.issue=""; state.filters.type=""; state.filters.prestation=""; state.filters.access=""; state.filters.audience=""; state.filters.meal=""; state.filters.path="";
-    state.filters.openNow=false; state.filters.cats=new Set(state.categories.map(c=>c.slug));
+    state.filters.q=""; state.filters.source=""; state.filters.issue=""; state.filters.access=""; state.filters.audience=""; state.filters.meal="";
+    state.filters.openNow=false; state.filters.cats=new Set(); state.filters.offersOff=new Set();
     document.getElementById("section-filter").value="directory";
     document.getElementById("service-query").value="";
     document.getElementById("open-now-filter").checked=false;
@@ -234,19 +234,10 @@ function bindUi() {
 
   viewToggle.addEventListener("click", toggleView);
   updateViewToggle();
-  document.getElementById("reset-filters").addEventListener("click", () => {
-    state.filters.path = ""; renderPaths();
-    state.filters.cats = new Set();
-    renderCatGrid();
-    renderSearchOptions();
-    refresh();
-  });
-  document.getElementById("select-all-filters").addEventListener("click", () => {
-    state.filters.path = ""; renderPaths();
-    state.filters.cats = new Set(state.categories.map((category) => category.slug));
-    renderCatGrid();
-    renderSearchOptions();
-    refresh();
+  document.getElementById("reset-filters").addEventListener("click", resetFilters);
+  document.getElementById("filters-search").addEventListener("click", () => {
+    closeSheets();
+    if (state.view !== "map") toggleView();
   });
   document.getElementById("geo-btn").addEventListener("click", locateUser);
   document.querySelectorAll("[data-sub]").forEach((row) => {
@@ -337,8 +328,36 @@ function updateViewToggle() {
   viewToggleLabel.textContent = showMapAction ? t("map.map_view") : t("map.list");
 }
 
+/** "Azzera filtri": back to every service, as when the map opens (filters r4). */
+function resetFilters() {
+  Object.assign(state.filters, {cats: new Set(), offersOff: new Set(), q: "", source: "", issue: "", access: "", audience: "", meal: "", section: "all", openNow: false});
+  document.getElementById("service-query").value = "";
+  document.getElementById("open-now-filter").checked = false;
+  document.getElementById("section-filter").value = "all";
+  renderCatGrid();
+  renderSearchOptions();
+  refresh();
+}
+
+/** Filters that differ from "every service" (the bar shows "Azzera filtri" when any). */
+function activeFilterLabels() {
+  const f = state.filters;
+  const needLabel = Object.fromEntries((state.taxonomy.needs || []).map(n => [n.slug, n.label]));
+  return [
+    ...[...f.cats].map(slug => categoryCaption(needLabel[slug] || slug)),
+    f.offersOff.size ? `${f.offersOff.size} prestazioni escluse` : "",
+    f.q?.trim() ? `“${f.q.trim()}”` : "",
+    f.openNow ? "Aperti ora" : "",
+    f.source ? selectedLabel("source-filter", f.source) : "",
+    f.issue ? selectedLabel("issue-filter", f.issue) : "",
+    f.audience ? selectedLabel("audience-filter", f.audience) : "",
+    f.meal ? ((state.taxonomy.meal_times || []).find(m => m.code === f.meal) || {}).label || f.meal : "",
+    f.access ? selectedLabel("access-filter", f.access) : "",
+    f.section !== "all" ? document.getElementById("section-filter")?.selectedOptions?.[0]?.textContent : "",
+  ].filter(Boolean);
+}
+
 function renderFilters() {
-  renderPaths();
   renderCatGrid();
   renderSearchOptions();
   renderLanguageList();
@@ -447,7 +466,7 @@ function nearestStopHtml(choice, index, alerts = []) {
   const link = choice.link;
   const mode = g.modes.includes("metro") ? "Stazione metro" : g.modes.includes("rail") ? "Stazione" : g.modes.length === 1 && g.modes[0] === "tram" ? "Fermata tram" : "Fermata";
   return `<div class="nearest-stop"><p class="service-key">${link ? "Fermata collegata a te" : "Fermata più vicina"}</p>
-    <p class="nearest-stop-name"><strong>${escapeHtml(mode)} ${escapeHtml(g.stop_name)}</strong> · ${g.walk_min} min a piedi${g.wheelchair === "yes" ? ' · <span class="wheelchair-tag">accessibile in sedia a rotelle</span>' : ""}</p>
+    <p class="nearest-stop-name"><strong>${escapeHtml(mode)} ${escapeHtml(g.stop_name)}</strong> · circa ${g.walk_min} min a piedi${g.wheelchair === "yes" ? ' · <span class="wheelchair-tag">accessibile in sedia a rotelle</span>' : ""}</p>
     <div class="nearest-stop-lines">${g.lines.map(line => `<button type="button" class="line-chip-button" data-focus-route="${escapeHtml(line.route_id)}" aria-label="Mostra ${escapeHtml(modeName(line.mode))} ${escapeHtml(line.code)} sulla mappa">${lineChip(line)}</button>`).join("")}<button type="button" class="transit-row-focus" data-focus-stop="${index}">Mostra linee</button></div>
     ${TransportLayer.alertsHtml(stopAlerts(g, alerts), new Set(g.lines.map(line => line.route_id)))}
     ${link ? `<p class="nearest-stop-link">${escapeHtml(modeName(link.line.mode))} ${escapeHtml(link.line.code)} passa anche da ${escapeHtml(link.from.stop_name)}, vicino alla tua posizione.</p>` : ""}</div>`;
@@ -542,14 +561,45 @@ function renderCatGrid() {
     tile.innerHTML = `${categoryBadge(category)}<span class="cat-count" aria-label="${n} servizi">${n}</span>`;
     tile.classList.toggle("empty", n === 0);
     tile.addEventListener("click", () => {
-      if (state.filters.cats.has(slug)) state.filters.cats.delete(slug);
-      else state.filters.cats.add(slug);
+      if (state.filters.cats.has(slug)) {
+        state.filters.cats.delete(slug);
+        (state.taxonomy.offers || []).filter(o => o.need === slug).forEach(o => state.filters.offersOff.delete(o.code));
+        if (slug === "mangiare") state.filters.meal = "";
+      } else state.filters.cats.add(slug);
       renderCatGrid();
       renderSearchOptions();
       refresh();
     });
     wrap.append(tile);
   });
+  renderOfferGroups();
+}
+
+/** For each chosen need, its offers as chips (all on at first) and, for Mangiare, the meal. */
+function renderOfferGroups() {
+  const wrap = document.getElementById("offer-groups");
+  const hint = document.getElementById("need-hint");
+  if (!wrap) return;
+  const f = state.filters;
+  if (hint) hint.hidden = f.cats.size > 0;
+  const counts = state.facets?.offer || new Map();
+  const mealCounts = state.facets?.meal || new Map();
+  wrap.innerHTML = state.categories.filter(c => f.cats.has(c.slug)).map(c => {
+    const offers = (state.taxonomy.offers || []).filter(o => o.need === c.slug && counts.get(o.code));
+    const chips = offers.map(o => {
+      const on = !f.offersOff.has(o.code);
+      return `<button type="button" class="offer-chip${on ? " on" : ""}" aria-pressed="${on}" data-offer="${escapeHtml(o.code)}">${escapeHtml(o.label)} <span>${counts.get(o.code)}</span></button>`;
+    }).join("");
+    const meals = c.slug === "mangiare" ? (state.taxonomy.meal_times || []).filter(m => mealCounts.get(m.code) || f.meal === m.code) : [];
+    const meal = meals.length ? `<label class="offer-meal">Pasto <select data-meal><option value="">Qualsiasi</option>${meals.map(m => `<option value="${escapeHtml(m.code)}"${f.meal === m.code ? " selected" : ""}>${escapeHtml(m.label)} (${mealCounts.get(m.code) || 0})</option>`).join("")}</select></label>` : "";
+    return `<div class="offer-group"><h4>${escapeHtml(categoryCaption(c.label || c.slug))}</h4><div class="offer-chips">${chips || '<span class="source-note">Nessuna prestazione con i filtri attivi.</span>'}</div>${meal}</div>`;
+  }).join("");
+  wrap.querySelectorAll("[data-offer]").forEach(b => b.addEventListener("click", () => {
+    const code = b.dataset.offer;
+    if (f.offersOff.has(code)) f.offersOff.delete(code); else f.offersOff.add(code);
+    refresh();
+  }));
+  wrap.querySelector("[data-meal]")?.addEventListener("change", e => { f.meal = e.target.value; refresh(); });
 }
 
 function renderLanguageList() {
@@ -646,27 +696,14 @@ function selectedLabel(id, fallback) {
 
 /** Active filters as compact chips under the list toolbar, plus a count on its Filtri button. */
 function renderActiveFilters() {
+  const chips = activeFilterLabels();
+  const reset = document.getElementById("reset-filters");
+  if (reset) reset.hidden = !chips.length;
   const summary = document.getElementById("active-filter-summary");
   if (!summary) return;
-  const f = state.filters;
-  const allCats = f.cats.size === state.categories.length;
-  const chips = [
-    allCats ? "" : `${f.cats.size} bisogni`,
-    f.q?.trim() ? `“${f.q.trim()}”` : "",
-    f.openNow ? "Aperti ora" : "",
-    f.source ? selectedLabel("source-filter", f.source) : "",
-    f.issue ? selectedLabel("issue-filter", f.issue) : "",
-    f.type,
-    f.path ? `Percorso: ${(state.taxonomy.paths.find(x => x.code === f.path) || {}).label || f.path}` : "",
-    f.prestation ? selectedLabel("prestation-filter", "Prestazione") : "",
-    f.audience ? selectedLabel("audience-filter", f.audience) : "",
-    f.meal ? selectedLabel("meal-filter", f.meal) : "",
-    f.access ? selectedLabel("access-filter", f.access) : "",
-    f.section !== "all" ? document.getElementById("section-filter").selectedOptions?.[0]?.textContent : "",
-  ].filter(Boolean);
   summary.innerHTML = chips.length
     ? chips.map(c => `<span class="filter-chip">${escapeHtml(c)}</span>`).join("")
-    : `<span class="filter-none">Nessun filtro attivo · tutti i bisogni</span>`;
+    : `<span class="filter-none">Nessun filtro attivo · tutti i servizi</span>`;
   const count = document.getElementById("list-filter-count");
   if (count) { count.hidden = !chips.length; count.textContent = String(chips.length); }
 }
@@ -680,8 +717,7 @@ function facetValues(poi, facet) {
   const raw = poi.raw || {};
   if (facet === "cats") return raw.needs?.length ? raw.needs : [resolveCategory(poi)?.slug || "other"];
   if (facet === "source") return [sourceCode(poi)];
-  if (facet === "type") return raw.native_classifications?.tipologia ? [raw.native_classifications.tipologia] : [];
-  if (facet === "prestation") return raw.offers ? raw.offers.map(o => o.code) : (raw.native_classifications?.prestazioni || []).map(v => String(v.id));
+  if (facet === "offer") return (raw.offers || []).map(o => o.code);
   if (facet === "audience") return (raw.audiences || []).map(a => a.code);
   if (facet === "meal") return (raw.meal_times || []).map(m => m.code);
   if (facet === "issue") return raw.placement?.issue && raw.placement.issue !== "ok" && raw.placement.issue !== "manual" ? [raw.placement.issue] : [];
@@ -692,14 +728,21 @@ function facetValues(poi, facet) {
 /** Does a POI pass every active filter, optionally ignoring one facet (faceted counts)? */
 function passesFilters(p, skip = null, now = new Date(), terms = searchTerms()) {
   const f = state.filters;
-  if (skip !== "cats" && !facetValues(p, "cats").some(slug => f.cats.has(slug))) return false;
-  for (const facet of ["source", "issue", "type", "prestation", "access", "audience", "meal"]) {
+  // Need first (filters r4): no need chosen = every service; within a chosen need the
+  // service passes unless all its offers there are switched off.
+  if (skip !== "cats" && f.cats.size) {
+    const offers = p.raw?.offers || [];
+    const ok = facetValues(p, "cats").some(slug => {
+      if (!f.cats.has(slug)) return false;
+      const mine = offers.filter(o => o.need === slug);
+      return skip === "offer" || !mine.length || mine.some(o => !f.offersOff.has(o.code));
+    });
+    if (!ok) return false;
+  }
+  for (const facet of ["source", "issue", "access", "audience"]) {
     if (skip !== facet && f[facet] && !facetValues(p, facet).includes(f[facet])) return false;
   }
-  if (f.path) {
-    const path = state.taxonomy.paths.find(x => x.code === f.path);
-    if (path && !(p.raw?.offers || []).some(o => path.offers.includes(o.code))) return false;
-  }
+  if (skip !== "meal" && f.meal && f.cats.has("mangiare") && !facetValues(p, "meal").includes(f.meal)) return false;
   if (terms.length && !terms.every(term => searchableService(p).includes(term))) return false;
   const section = p.raw?.placement?.section;
   if (f.section === "directory" && section !== "directory") return false;
@@ -712,10 +755,10 @@ function passesFilters(p, skip = null, now = new Date(), terms = searchTerms()) 
 /** Per-facet counts: each value counted under all the other active filters. */
 function facetCounts(now = new Date()) {
   const terms = searchTerms();
-  const counts = {cats: new Map(), source: new Map(), issue: new Map(), type: new Map(), prestation: new Map(), access: new Map(), audience: new Map(), meal: new Map(), shown: 0};
+  const counts = {cats: new Map(), source: new Map(), issue: new Map(), offer: new Map(), access: new Map(), audience: new Map(), meal: new Map(), shown: 0};
   for (const p of state.pois) {
     if (passesFilters(p, null, now, terms)) counts.shown++;
-    for (const facet of ["cats", "source", "issue", "type", "prestation", "access", "audience", "meal"]) {
+    for (const facet of ["cats", "source", "issue", "offer", "access", "audience", "meal"]) {
       if (!passesFilters(p, facet, now, terms)) continue;
       for (const v of facetValues(p, facet)) counts[facet].set(v, (counts[facet].get(v) || 0) + 1);
     }
@@ -735,7 +778,7 @@ function filteredPois(now = new Date()) {
     const distance=state.filters.order==="distance" && state.userLoc ? (a._dist??Infinity)-(b._dist??Infinity) : 0;
     // "Nome" sorts by the title the card shows (layout r3), then by facility.
     return (Number.isNaN(distance)?0:distance) || serviceTitle(a).localeCompare(serviceTitle(b),"it")
-      || String(a.raw?.facility_name || "").localeCompare(String(b.raw?.facility_name || ""),"it") || String(a.id).localeCompare(String(b.id));
+      || serviceKind(a).localeCompare(serviceKind(b),"it") || String(a.id).localeCompare(String(b.id));
   });
 }
 
@@ -784,17 +827,17 @@ function renderList(list) {
   wrap.innerHTML=list.map(poi=>{
     const raw=poi.raw || {};
     const siblings=sameSourceGroup(poi).length;
-    const distance=state.userLoc ? (poi._dist==null ? "Distanza non disponibile" : poi._dist<1?`${Math.round(poi._dist*1000)} m`:`${poi._dist.toFixed(1)} km`) : "";
+    const distance=state.userLoc ? (poi._dist==null ? "Distanza non disponibile" : formatDistance(poi._dist)) : "";
     const icon=normalizeCategoryIconPath(poi.category_icon_path);
     // Same hierarchy as the service sheet header (layout r3): category, title, place, hours, who.
-    const facility=raw.facility_name || raw.name || "";
     const status=sourceOpeningStatus(raw.hours_display);
     const today=todayHours(raw.hours_display);
-    const who=[raw.organization_raw, ...sourceNames(poi)].filter(Boolean);
+    const who=[serviceOrganiser(poi), ...sourceNames(poi)].filter(Boolean);
     return `<button type="button" class="poi-item" data-id="${escapeHtml(poi.id)}"><span class="marker-stripe" style="background:${poi.category_color}"></span><span class="info">
       <span class="meta">${categoryBadge(resolveCategory(poi))}${distance?`<span class="dist">${escapeHtml(distance)}</span>`:""}${raw.itinerant_source?'<span class="dist">Itinerante</span>':""}</span>
       <span class="service-list-title"><span class="name">${escapeHtml(serviceTitle(poi))}</span></span>
-      <span class="facility-name">${facility ? `<strong>${escapeHtml(facility)}</strong>` : ""}${facility && poi.address ? " · " : ""}${escapeHtml(poi.address || "")}${siblings>1?` · ${siblings} servizi qui`:""}</span>
+      <span class="service-kind">${escapeHtml(serviceKind(poi))}${siblings>1?` <span class="service-key">· ${siblings} servizi qui</span>`:""}</span>
+      <span class="facility-name">${escapeHtml(poi.address || "")}</span>
       <span class="service-status ${status.kind}" data-opening-service="${escapeHtml(poi.id)}"><strong>${escapeHtml(status.label)}</strong>${today ? `<span class="service-today">${escapeHtml(today)}</span>` : ""}<small hidden></small></span>
       ${transitBadge(poi)}
       <span class="list-who">${escapeHtml(who.join(" · "))} · <span class="list-flag">da verificare</span></span>
@@ -827,7 +870,7 @@ async function openDetail(id) {
   document.getElementById("detail-top").innerHTML=renderServiceHeader(poi);
   document.getElementById("detail-body").innerHTML=[
     renderInfoSection(poi), renderHoursSection(poi), renderContactsSection(poi),
-    renderArriveSection(poi), renderSourcesSection(poi)].join("");
+    renderArriveSection(poi), renderOtherServices(poi), renderSourcesSection(poi)].join("");
   document.getElementById("detail-bar").innerHTML=renderServiceBar(poi);
   bindServiceButtons();
   bindServiceSheet(poi);
@@ -839,8 +882,29 @@ async function openDetail(id) {
 
 const SERVICE_SECTIONS=[["info","Informazioni"],["orari","Orari"],["contatti","Contatti"],["arrivare","Come arrivare"]];
 
-/** Main offer cluster of the card's primary need, else the source's service name. */
+/** Title (layout r4): the facility name; the service type goes beside it (`serviceKind`). */
 function serviceTitle(poi) {
+  return poi.raw?.facility_name || poi.raw?.name || serviceKind(poi);
+}
+
+function formatDistance(km) {
+  return km<1 ? `${Math.round(km*1000)} m` : `${km.toFixed(1).replace(".", ",")} km`;
+}
+
+/** Distance from the reference position, when one is set and the service has a fixed point. */
+function serviceDistance(poi) {
+  if (!state.userLoc || poi.raw?.placement?.section==="directory" || !Number.isFinite(poi.latitude) || !Number.isFinite(poi.longitude)) return "";
+  return formatDistance(distanceKm(state.userLoc,{lat:poi.latitude,lng:poi.longitude}));
+}
+
+/** Organiser line only when it says more than the facility name. */
+function serviceOrganiser(poi) {
+  const org=String(poi.raw?.organization_raw || "").trim();
+  return org && org.toLowerCase()!==String(serviceTitle(poi)).trim().toLowerCase() ? org : "";
+}
+
+/** Service type: main offer cluster of the card's primary need, else the source's service name. */
+function serviceKind(poi) {
   const raw=poi.raw || {};
   const primary=raw.category?.slug || raw.needs?.[0];
   const offer=(raw.offers || []).find(o=>o.need===primary && o.code!=="associazioni") || (raw.offers || []).find(o=>o.code!=="associazioni");
@@ -871,18 +935,20 @@ function sourceNames(poi) {
 function renderServiceHeader(poi) {
   const raw=poi.raw || {};
   const cat=resolveCategory(poi) || {};
-  const facility=raw.facility_name || raw.name || "";
   const address=poi.address || "";
   const status=sourceOpeningStatus(raw.hours_display);
   const today=todayHours(raw.hours_display);
   const report=reportErrorAction(poi);
+  const distance=serviceDistance(poi);
+  const organiser=serviceOrganiser(poi);
   return `<header class="service-head">
-    <div class="service-head-row">${categoryBadge(cat)}<button type="button" class="service-close" data-close-service aria-label="Chiudi la scheda">Chiudi</button></div>
+    <div class="service-head-row">${categoryBadge(cat)}${distance ? `<span class="service-distance">${escapeHtml(distance)}</span>` : ""}<button type="button" class="service-close" data-close-service aria-label="Chiudi la scheda">Chiudi</button></div>
     <h2 class="service-title">${escapeHtml(serviceTitle(poi))}</h2>
-    <p class="service-where">${facility ? `<strong>${escapeHtml(facility)}</strong>` : ""}${facility && address ? " · " : ""}${escapeHtml(address || (facility ? "" : raw.placement?.label || ""))}</p>
+    <p class="service-kind">${escapeHtml(serviceKind(poi))}</p>
+    <p class="service-where">${escapeHtml(address || raw.placement?.label || "")}</p>
     <p class="service-status ${status.kind}" data-opening-service="${escapeHtml(poi.id)}"><strong>${escapeHtml(status.label)}</strong>${today ? `<span class="service-today">${escapeHtml(today)}</span>` : ""}${hoursNeedReview(raw.hours_display) ? '<span class="flag-hours">orari da verificare</span>' : ""}<small hidden></small></p>
     <div class="service-extra">
-      ${raw.organization_raw ? `<p class="service-line"><span class="service-key">Organizzato da</span> ${escapeHtml(raw.organization_raw)}</p>` : ""}
+      ${organiser ? `<p class="service-line"><span class="service-key">Organizzato da</span> ${escapeHtml(organiser)}</p>` : ""}
       <p class="service-line service-sources"><span class="service-key">Fonti</span> ${sourceNames(poi).map(n=>`<span class="source-chip">${escapeHtml(n)}</span>`).join("")}<button type="button" class="flag-data" data-jump="fonti">da verificare</button>${report ? `<a class="service-report" href="${escapeHtml(report.href)}">Segnala errore</a>` : ""}</p>
     </div>
   </header>
@@ -912,7 +978,7 @@ function renderInfoSection(poi) {
   const raw=poi.raw || {};
   const interpreted=new Set([...(raw.offers || []),...(raw.audiences || []),...(raw.access_tags || [])].filter(x=>x.interpreted).map(x=>x.label));
   const offers=uniqueLabels((raw.offers || []).filter(o=>o.code!=="associazioni" || raw.offers.length===1).map(o=>o.label));
-  const extra=uncoveredPrestazioni(raw);
+  const extra=uncoveredPrestazioni(raw).filter(n=>!offers.some(o=>o.toLowerCase()===n.toLowerCase()));
   const sections=raw.access_display?.sections || [];
   const entries=code=>(sections.find(s=>s.code===code)?.entries || []).map(e=>e.label);
   const forWhom=uniqueLabels([...entries("audience"),...(raw.audiences || []).map(a=>a.label)]);
@@ -920,11 +986,9 @@ function renderInfoSection(poi) {
   const texts=raw.access_display?.texts || [];
   const levels=raw.course_facts?.levels || [];
   const description=raw.description || "";
-  const siblings=sameSourceGroup(poi).filter(p=>p.id!==poi.id);
   const printed=raw.sources?.[0]?.source_kind==="document" ? ' class="source-printed-text"' : "";
   return `<section class="detail-section service-section" id="sec-info"><h3>Informazioni</h3>
-    ${offers.length ? `<h4>Cosa offre</h4>${chipList(offers, interpreted)}` : ""}
-    ${extra.length ? `<p class="service-also"><span class="service-key">Indicato anche dalla fonte</span> ${escapeHtml(extra.join(" · "))}</p>` : ""}
+    ${offers.length || extra.length ? `<h4>Cosa offre</h4><div class="service-chips">${offers.map(x=>`<span class="service-chip${interpreted.has(x) ? " interpreted" : ""}">${escapeHtml(x)}</span>`).join("")}${extra.map(x=>`<span class="service-chip from-source" title="Voce della fonte">${escapeHtml(x)}</span>`).join("")}</div>` : ""}
     ${forWhom.length ? `<h4>Per chi</h4>${chipList(forWhom, interpreted)}` : ""}
     ${access.length ? `<h4>Come si accede</h4>${chipList(access, interpreted)}` : ""}
     ${texts.map(t=>`<h4>${escapeHtml(t.title)}</h4><p class="source-hours-text">${escapeHtml(t.text)}</p>`).join("")}
@@ -932,7 +996,6 @@ function renderInfoSection(poi) {
     ${description ? (description.length > 260
       ? `<details class="service-description"><summary><span class="service-key">Descrizione della fonte</span> ${escapeHtml(description.slice(0,160))}…</summary><p${printed}>${escapeHtml(description)}</p></details>`
       : `<h4>Descrizione della fonte</h4><p${printed}>${escapeHtml(description)}</p>`) : ""}
-    ${siblings.length ? `<h4>Altri servizi qui</h4>${siblings.map(serviceButton).join("")}` : ""}
   </section>`;
 }
 
@@ -968,6 +1031,12 @@ function renderArriveSection(poi) {
     ${where ? `<p class="service-note">${escapeHtml(where)}</p>` : ""}
     ${transitSectionShell(poi)}
   </section>`;
+}
+
+/** Other services at the same place: own block above "Fonti e aggiornamenti" (layout r4). */
+function renderOtherServices(poi) {
+  const siblings=sameSourceGroup(poi).filter(p=>p.id!==poi.id);
+  return siblings.length ? `<section class="detail-section service-section" id="sec-altri"><h3>Altri servizi qui</h3>${siblings.map(serviceButton).join("")}</section>` : "";
 }
 
 /** The only place that details how reliable the card is (one flag in the header). */
@@ -1950,31 +2019,21 @@ function fillFacetSelect(select, facet, allLabel, labels) {
 }
 
 function renderSearchOptions() {
-  const types = document.getElementById("service-type-filter");
-  const prestations = document.getElementById("prestation-filter");
   const access = document.getElementById("access-filter");
   const sources = document.getElementById("source-filter");
-  if (!types || !prestations || !access) return;
+  if (!access) return;
   if (!state.facets) state.facets = facetCounts();
-  const labels = {type: new Map(), prestation: new Map(), access: new Map(), audience: new Map(), meal: new Map(), source: new Map()};
-  const needLabel = Object.fromEntries((state.taxonomy.needs || []).map(n => [n.slug, n.label]));
+  const labels = {access: new Map(), audience: new Map(), source: new Map()};
   for (const p of state.pois) {
     const raw = p.raw || {};
-    if (raw.native_classifications?.tipologia) labels.type.set(raw.native_classifications.tipologia, raw.native_classifications.tipologia);
-    if (raw.offers) raw.offers.forEach(o => labels.prestation.set(o.code, `${needLabel[o.need] || o.need} › ${o.label}`));
-    else (raw.native_classifications?.prestazioni || []).forEach(v => labels.prestation.set(String(v.id), v.nome));
     (raw.audiences || []).forEach(a => labels.audience.set(a.code, a.label));
-    (raw.meal_times || []).forEach(m => labels.meal.set(m.code, m.label));
     if (raw.access_tags) raw.access_tags.forEach(a => labels.access.set(a.code, a.label));
     else (raw.access_display?.sections || []).forEach(s => s.entries.filter(e => e.value === true).forEach(e => labels.access.set(e.code, e.label)));
     labels.source.set(sourceCode(p), sourceName(p));
   }
-  fillFacetSelect(types, "type", "Tutte le tipologie", labels.type);
-  fillFacetSelect(prestations, "prestation", "Tutte le prestazioni", labels.prestation);
   fillFacetSelect(access, "access", "Qualsiasi modalità di accesso", labels.access);
-  const audience = document.getElementById("audience-filter"), meal = document.getElementById("meal-filter");
+  const audience = document.getElementById("audience-filter");
   if (audience) fillFacetSelect(audience, "audience", "Per tutte e tutti", labels.audience);
-  if (meal) fillFacetSelect(meal, "meal", "Qualsiasi pasto", labels.meal);
   if (sources) fillFacetSelect(sources, "source", "Tutte le fonti", labels.source);
   const issues = document.getElementById("issue-filter");
   if (issues) issues.closest?.(".issue-filter-wrap")?.toggleAttribute("hidden", !DEBUG_MODE);
@@ -2084,47 +2143,6 @@ function chooseReferencePoint() {
   showToast("Tocca la mappa per scegliere il riferimento");
 }
 
-/** Quick paths (presentation taxonomy): one tap sets a curated set of offers and shows its guidance. */
-function renderPaths() {
-  const wrap = document.getElementById("path-buttons");
-  if (!wrap) return;
-  const paths = state.taxonomy.paths || [];
-  wrap.closest(".quick-paths")?.toggleAttribute("hidden", !paths.length);
-  wrap.innerHTML = paths.map(p => `<button type="button" class="btn path-btn${state.filters.path === p.code ? " on" : ""}" data-path="${escapeHtml(p.code)}" aria-pressed="${state.filters.path === p.code}">${escapeHtml(p.label)}</button>`).join("");
-  wrap.querySelectorAll("[data-path]").forEach(b => b.addEventListener("click", () => selectPath(b.dataset.path)));
-  const note = document.getElementById("path-note");
-  const current = paths.find(p => p.code === state.filters.path);
-  if (note) { note.hidden = !current; note.textContent = current ? current.text : ""; }
-}
-
-function selectPath(code) {
-  const f = state.filters;
-  f.path = f.path === code ? "" : code;
-  if (f.path) {
-    Object.assign(f, {q: "", source: "", issue: "", type: "", prestation: "", access: "", audience: "", meal: "", section: "all", openNow: false});
-    f.cats = new Set(state.categories.map(c => c.slug));
-    document.getElementById("service-query").value = "";
-    document.getElementById("open-now-filter").checked = false;
-    document.getElementById("section-filter").value = "all";
-  }
-  renderPaths(); renderCatGrid(); renderSearchOptions(); refresh();
-}
-
-/** "Cosa offre": offers grouped by need, then audiences, access and meal times; interpretations marked. */
-function renderOffers(raw) {
-  if (!raw.offers) return "";
-  const needs = Object.fromEntries((state.taxonomy.needs || []).map(n => [n.slug, n.label]));
-  const chip = x => `<span class="service-chip${x.interpreted ? " interpreted" : ""}" title="${escapeHtml(x.basis || "")}">${escapeHtml(x.label)}${x.interpreted ? " *" : ""}</span>`;
-  const groups = (raw.needs || []).map(n => {
-    const items = raw.offers.filter(o => o.need === n);
-    return `<div class="access-section"><h4>${escapeHtml(needs[n] || n)}</h4><div class="service-chips">${items.map(chip).join("") || '<span class="unknown-value">Bisogno indicato dalla fonte</span>'}</div></div>`;
-  }).join("");
-  const tags = [["Per chi", raw.audiences], ["Pasto", raw.meal_times], ["Come si accede", raw.access_tags]]
-    .filter(([, list]) => list?.length)
-    .map(([title, list]) => `<div class="access-section"><h4>${title}</h4><div class="service-chips">${list.map(chip).join("")}</div></div>`).join("");
-  const interpreted = [...raw.offers, ...(raw.audiences || []), ...(raw.access_tags || [])].some(x => x.interpreted);
-  return `<section class="detail-section"><h3>Cosa offre</h3>${groups}${tags}<p class="source-note">${interpreted ? "* Ricavato dal testo della fonte: interpretazione da verificare. " : ""}Passa sopra un'etichetta per vedere da dove viene.</p></section>`;
-}
 
 function categoryCaption(value) {
   // Sentence case: taxonomy labels are written as phrases ("Vestiti e coperte").

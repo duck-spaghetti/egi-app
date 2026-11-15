@@ -1567,3 +1567,23 @@ html[dir="rtl"] .sheet-back-head .arrow,
 .poi-item .meta { margin:0 0 4px;align-items:center;gap:8px; }
 .list-who { display:block;font-size:12px;color:var(--ink-faint);margin-top:4px; }
 .list-flag { color:#805d14; }
+
+/* Layout r4: facility as title, service type beside it, distance, unified offers. */
+.service-kind { display:block;margin:0 0 2px;font-size:15px;font-weight:600;color:var(--ink); }
+.poi-item .service-kind { font-size:14px;margin:2px 0; }
+.service-distance { font:600 12px/1 system-ui;color:var(--ink-soft);margin-inline-end:auto;margin-inline-start:8px; }
+.service-chip.from-source { background:transparent;border:1px solid var(--line);color:var(--ink-soft); }
+.service-top.compact .service-kind { display:none; }
+
+/* Filters r4: need first, offers as chips, fixed Cerca / Azzera filtri bar. */
+.offer-groups { display:grid;gap:12px;margin:4px 0 8px; }
+.offer-group h4 { margin:0 0 6px;font-size:13px;font-weight:700; }
+.offer-chips { display:flex;flex-wrap:wrap;gap:6px; }
+.offer-chip { border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);border-radius:var(--radius-pill);padding:6px 10px;font:500 13px/1.2 system-ui;cursor:pointer;text-decoration:line-through; }
+.offer-chip span { font-size:11px;color:var(--ink-faint);margin-inline-start:2px; }
+.offer-chip.on { background:var(--ink);border-color:var(--ink);color:#fff;text-decoration:none; }
+.offer-chip.on span { color:#d8d2c4; }
+.offer-meal { display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;font-weight:600; }
+.filter-bar { flex-shrink:0;display:flex;gap:10px;padding:10px 18px calc(10px + var(--safe-bottom));border-top:1px solid var(--line);background:var(--paper); }
+.filter-bar .btn { flex:1; }
+.filter-bar .btn[hidden] { display:none; }
