@@ -130,6 +130,7 @@ class PresentationTests(unittest.TestCase):
             }
         )
         self.assertEqual(display["days"][0]["intervals"][0]["label"], "18:00 – 20:00")
+        self.assertEqual([d["label"] for d in display["days"]][:5], ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì"])
         self.assertEqual(display["days"][1]["state"], "unknown")
         self.assertEqual(display["days"][4]["issues"], [])
         overnight = display["days"][4]["intervals"][0]

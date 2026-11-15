@@ -146,22 +146,22 @@ def weekly_hours(raw: Any, corrections: list[dict[str, Any]] | None = None) -> d
             )
             note = None
             overnight = valid and end < start
-            label = f'{start or "?"} – {end or "?"}'
+            shown = f'{start or "?"} – {end or "?"}'
             if not valid:
                 note = "Formato orario da verificare"
             elif end == start:
                 note = "Apertura e chiusura coincidono: da verificare"
             elif overnight:
-                label += " (del giorno dopo)"
+                shown += " (del giorno dopo)"
             elif (start, end) == ("00:00", "23:59"):
-                label = "Aperto 24 ore"
+                shown = "Aperto 24 ore"
             if note:
                 issues.append(note)
             intervals.append(
                 {
                     "opens_raw": start,
                     "closes_raw": end,
-                    "label": label,
+                    "label": shown,
                     "overnight": overnight,
                     "review_note": note,
                     "raw": interval,
