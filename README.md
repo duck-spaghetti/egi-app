@@ -117,29 +117,40 @@ Database-backed loader tests run separately under egi-importer with EGI_TEST_DSN
 pointing specifically to the dedicated egi_import_contract database. Recorded evidence
 and the scope are in [v0.1 plan](docs/v01-plan.md).
 
-## Need-first presentation taxonomy (v0.2)
+## Need-first presentation taxonomy (v0.3)
 
 The map's need tiles, offers ("Prestazione"), "Per chi", "Pasto", "Come si accede" and quick
-paths come from `app/backend/taxonomy_v0_2.json`, applied to every card by
-`app/backend/taxonomy.py` (`/api/preview/taxonomy` serves the labels and paths). Approved by
-the user on 2026-11-09 ([proposal](../.scratch/taxonomy/proposal.md), sections 10–11).
+paths come from `app/backend/taxonomy_v0_3.json`, applied to every card by
+`app/backend/taxonomy.py` (`/api/preview/taxonomy` serves the labels and paths). v0.2 was
+approved on 2026-11-09; v0.3 on 2026-11-15 during the source-by-source review
+([proposal](../.scratch/taxonomy/proposal.md) §13, [plan](../.scratch/taxonomy/v0.3-plan.md)).
 
-- Tiles: Mangiare, Dormire, Lavarsi e vestirsi, Centri diurni e multiservizi (working
-  label), Salute, Ascolto e aiuto, Documenti e diritti, Istruzione e lavoro. A card appears
-  under every need of its offers; the source's own need stays in `source_category`.
-- Each offer, audience and access tag records its basis: the source service type, a name
-  rule, a source flag, or a printed word (`interpreted`, shown dashed with "*" on the card).
-  Original source fields are unchanged.
-- Meal tags (colazione/pranzo/cena) only for services offering a meal: from opening windows,
-  else from printed words.
-- Consultori and vocational training stay enabled for debugging; set `"enabled": false` on
-  the offer to switch one off. Paid hostels stay hidden with an "a pagamento" tag.
-- Quick paths: Violenza contro le donne, Stanotte non so dove dormire, Lavarmi e mangiare
+- Tiles: Mangiare, Dormire, Lavarsi, Vestiti e coperte, Centri diurni e multiservizi,
+  Salute, Violenza e protezione, Orientamento: non so da dove partire (was Ascolto e aiuto),
+  Documenti e diritti, Istruzione, Lavoro. The source's own need stays in `source_category`.
+- **Structured sources (Helpinet)**: a card enters one need, from its own service type (or a
+  listed override: "Anti tratta" and services named "CAV …" → Violenza), and its offers come
+  only from its own `prestazioni` inside that need, else from the type's default cluster.
+  Facility names and referral offers ("Orientamento ai servizi", "Orientamento socio-legale")
+  assign nothing (`structured` in the vocabulary).
+- **Other sources** keep the v0.2 rules until their own review: a card appears under every
+  need of its offers (type, name rule or printed word). Anti-violence centres go to Violenza
+  only.
+- Each offer, audience and access tag records its basis: the source service type, a source
+  prestazione, a name rule, a source flag, or a printed word (`interpreted`, shown dashed with
+  "*" on the card). Original source fields are unchanged.
+- Meal tags (colazione/pranzo/cena) only for meals on site or to take away: from opening
+  windows, else from printed words.
+- Set `"enabled": false` on an offer to switch it off. Paid hostels stay hidden with an
+  "a pagamento" tag.
+- Quick paths: Violenza e protezione, Stanotte non so dove dormire, Lavarmi e mangiare
   oggi, Appena arrivato / senza documenti. The emergency sheet links to the help lines.
 
-Measured on 2026-11-09 (2,038 placed services): every card has a need; 392 have two or more;
-offers: 2,118 from source types, 1,016 from printed words, 75 from names, 51 from the
-multi-service rule. This is a presentation mapping, not the canonical taxonomy (egi_database).
+Measured on 2026-11-15 (2,257 services, Helpinet run helpinet-02): Helpinet services have one
+need each — Salute 66, Mangiare 46, Orientamento 43, Lavarsi 31, Documenti 30, Lavoro 24,
+Violenza 21, Dormire 19, Vestiti e coperte 17, Istruzione 17, Multiservizi 1; e.g. Dipendenze
+29 (22 Alcoholics Anonymous groups), pasto sul posto 28 / da asporto 12 / cibo da cucinare 7.
+This is a presentation mapping, not the canonical taxonomy (egi_database).
 
 ## Limits
 

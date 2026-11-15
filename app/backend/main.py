@@ -133,13 +133,13 @@ def is_placed(card: dict[str, Any]) -> bool:
 
 @app.get("/api/preview/categories")
 def preview_categories(rows: list[dict[str, Any]] = Depends(subjects)):
-    """Return the need tiles of the presentation taxonomy (v0.2) for the filters."""
+    """Return the need tiles of the presentation taxonomy (v0.3) for the filters."""
     return taxonomy.need_categories()
 
 
 @app.get("/api/preview/taxonomy")
 def preview_taxonomy():
-    """Presentation vocabulary v0.2: need tiles, offers, audiences, access, meal times and paths."""
+    """Presentation vocabulary v0.3: need tiles, offers, audiences, access, meal times and paths."""
     return taxonomy.public_vocabulary()
 
 

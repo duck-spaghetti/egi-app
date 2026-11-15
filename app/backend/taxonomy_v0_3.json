@@ -1,0 +1,1057 @@
+{
+ "version": "egi-roma-needs/0.3",
+ "status": "presentation mapping approved by the user on 2026-11-15 (.scratch/taxonomy/proposal.md section 13, rounds 3-4; plan .scratch/taxonomy/v0.3-plan.md); not the canonical vocabulary",
+ "needs": [
+  {
+   "code": "mangiare",
+   "label": "Mangiare",
+   "color": "#d4691a",
+   "icon": "eat"
+  },
+  {
+   "code": "dormire",
+   "label": "Dormire",
+   "color": "#2d5f3f",
+   "icon": "bed"
+  },
+  {
+   "code": "lavarsi",
+   "label": "Lavarsi",
+   "color": "#1e6091",
+   "icon": "shower"
+  },
+  {
+   "code": "vestiti_coperte",
+   "label": "Vestiti e coperte",
+   "color": "#3f7d8c",
+   "icon": "shirt"
+  },
+  {
+   "code": "multiservizi",
+   "label": "Centri diurni e multiservizi",
+   "color": "#8b587b",
+   "icon": "house"
+  },
+  {
+   "code": "salute",
+   "label": "Salute",
+   "color": "#b91c47",
+   "icon": "hospital"
+  },
+  {
+   "code": "violenza",
+   "label": "Violenza e protezione",
+   "color": "#9c2a7a",
+   "icon": "report"
+  },
+  {
+   "code": "orientamento",
+   "label": "Orientamento: non so da dove partire",
+   "color": "#7c5e1a",
+   "icon": "direction"
+  },
+  {
+   "code": "documenti_diritti",
+   "label": "Documenti e diritti",
+   "color": "#4a3b8c",
+   "icon": "law"
+  },
+  {
+   "code": "istruzione",
+   "label": "Istruzione",
+   "color": "#466b70",
+   "icon": "building"
+  },
+  {
+   "code": "lavoro",
+   "label": "Lavoro",
+   "color": "#5b6b2f",
+   "icon": "office"
+  }
+ ],
+ "source_need_fallback": {
+  "cibo": "mangiare",
+  "dormire": "dormire",
+  "igiene_personale": "lavarsi",
+  "abiti_e_coperte": "vestiti_coperte",
+  "curarmi": "salute",
+  "ascolto": "orientamento",
+  "documenti": "documenti_diritti",
+  "istituzioni": "documenti_diritti",
+  "lavoro": "lavoro",
+  "istruzione": "istruzione",
+  "socialita": "orientamento"
+ },
+ "offers": [
+  {
+   "code": "pasto",
+   "need": "mangiare",
+   "label": "Pasto sul posto (mensa)",
+   "types": [
+    "Mensa sociale"
+   ],
+   "words": "mens[ae]|pasto caldo|pasti caldi|colazion\\w*|pranzo|\\bcen[ae]\\b|buoni pasto|pasti a domicilio"
+  },
+  {
+   "code": "pasto_asporto",
+   "need": "mangiare",
+   "label": "Pasto da asporto o in strada",
+   "words": "pasto da asporto|pasti da asporto|da portare via|asporto"
+  },
+  {
+   "code": "cibo_da_cucinare",
+   "need": "mangiare",
+   "label": "Cibo da cucinare: viveri, pacchi, spesa",
+   "types": [
+    "Distribuzione generi alimentari"
+   ],
+   "words": "pacch[io] (?:alimentar\\w*|viveri|spesa)|distribuzione (?:di )?(?:viveri|alimentari|generi alimentari|pacchi)|\\bviveri\\b|generi alimentari|\\balimentari\\b|emporio|market solidal\\w*|spesa solidal\\w*|buoni spesa|carta spesa"
+  },
+  {
+   "code": "dormitorio",
+   "need": "dormire",
+   "label": "Posto per la notte",
+   "words": "dormitor\\w*|accoglienza notturna|posti letto|ospitalit[aà] notturna|centro notturno"
+  },
+  {
+   "code": "accoglienza",
+   "need": "dormire",
+   "label": "Casa di accoglienza",
+   "types": [
+    "Centro di accoglienza",
+    "Accoglienza e orientamento abitativo",
+    "Centro di accoglienza LGBTQI",
+    "Ostello"
+   ],
+   "words": "centro di (?:prima )?accoglienza|casa di accoglienza|casa famiglia|semi.?autonom\\w*|prima accoglienza"
+  },
+  {
+   "code": "ostello_pagamento",
+   "need": "dormire",
+   "label": "Ostello a pagamento",
+   "types": [
+    "Ostello"
+   ]
+  },
+  {
+   "code": "emergenza_sos",
+   "need": "dormire",
+   "label": "Emergenza: Sala Operativa Sociale",
+   "names": "sala operativa sociale"
+  },
+  {
+   "code": "docce",
+   "need": "lavarsi",
+   "label": "Docce",
+   "types": [
+    "Igiene personale"
+   ],
+   "words": "docc[ie]a?|docce|servizio igien\\w*"
+  },
+  {
+   "code": "lavanderia",
+   "need": "lavarsi",
+   "label": "Lavanderia",
+   "types": [
+    "Lavanderia"
+   ],
+   "words": "lavanderi\\w*|lavatric\\w*"
+  },
+  {
+   "code": "vestiti",
+   "need": "vestiti_coperte",
+   "label": "Vestiti",
+   "types": [
+    "Abbigliamento"
+   ],
+   "words": "vestit\\w*|vestiario|abbigliament\\w*|guardaroba|indumenti|cambio (?:abiti|vestiti)"
+  },
+  {
+   "code": "biancheria",
+   "need": "vestiti_coperte",
+   "label": "Biancheria intima",
+   "words": "biancheri\\w*|intim[oi]\\b"
+  },
+  {
+   "code": "coperte",
+   "need": "vestiti_coperte",
+   "label": "Coperte e sacchi a pelo",
+   "types": [
+    "Riparo",
+    "Kit"
+   ],
+   "words": "copert[ae]|sacch?[io] a pelo"
+  },
+  {
+   "code": "kit_igiene",
+   "need": "lavarsi",
+   "label": "Kit igienico",
+   "types": [],
+   "words": "kit (?:per l.)?igien\\w*|prodotti per l.igiene"
+  },
+  {
+   "code": "barbiere",
+   "need": "lavarsi",
+   "label": "Barbiere e parrucchiere",
+   "words": "barbier\\w*|parrucch\\w*"
+  },
+  {
+   "code": "centro_diurno",
+   "need": "multiservizi",
+   "label": "Centro diurno",
+   "types": [
+    "Centro diurno"
+   ],
+   "names": "centro diurno"
+  },
+  {
+   "code": "stazione_di_posta",
+   "need": "multiservizi",
+   "label": "Stazione di posta e polo multiservizi",
+   "names": "stazion[ei] di posta|polo social\\w*|multiserviz\\w*|\\bhub\\b|binario 95"
+  },
+  {
+   "code": "aggregazione",
+   "need": "multiservizi",
+   "label": "Centri di aggregazione e attività",
+   "names": "centro di aggregazione"
+  },
+  {
+   "code": "medico",
+   "need": "salute",
+   "label": "Medico e ambulatorio gratuito",
+   "types": [
+    "Medicina generale",
+    "Poliambulatorio",
+    "Servizi sanitari e sociosanitari",
+    "Medicina specialistica",
+    "Medicina diagnostica",
+    "Assistenza infermieristica"
+   ],
+   "words": "ambulatori\\w*|visite mediche|medicina generale|medico di base"
+  },
+  {
+   "code": "stp_eni",
+   "need": "salute",
+   "label": "Senza documenti: tessera STP/ENI",
+   "types": [
+    "Rilascio STP/ENI"
+   ],
+   "words": "\\bstp\\b|\\beni\\b"
+  },
+  {
+   "code": "dentista",
+   "need": "salute",
+   "label": "Dentista",
+   "words": "dentist\\w*|odontoiatr\\w*"
+  },
+  {
+   "code": "farmaci",
+   "need": "salute",
+   "label": "Farmaci",
+   "types": [
+    "Farmacia sociale"
+   ],
+   "words": "farmac\\w*"
+  },
+  {
+   "code": "orientamento_sanitario",
+   "need": "salute",
+   "label": "Orientamento sanitario",
+   "types": [
+    "Sportello socio sanitario"
+   ],
+   "words": "orientamento sanitario"
+  },
+  {
+   "code": "psicologo",
+   "need": "salute",
+   "label": "Psicologo e salute mentale",
+   "types": [
+    "Salute mentale"
+   ],
+   "words": "psicolog\\w*|psichiatr\\w*|salute mentale"
+  },
+  {
+   "code": "dipendenze",
+   "need": "salute",
+   "label": "Dipendenze",
+   "types": [
+    "Dipendenze (Ser.D)",
+    "Alcologia e auto-aiuto"
+   ],
+   "words": "ser\\.?d\\b|dipendenz\\w*|alcolis\\w*|alcologi\\w*|gioco d.azzardo|tossicodipend\\w*"
+  },
+  {
+   "code": "consultorio",
+   "need": "salute",
+   "label": "Ginecologia, gravidanza e consultori",
+   "types": [
+    "Consultorio familiare"
+   ],
+   "words": "consultori\\w*|ginecolog\\w*|ostetric\\w*",
+   "enabled": true,
+   "note": "to be disabled later (user, 2026-11-09); kept on while debugging"
+  },
+  {
+   "code": "pediatria",
+   "need": "salute",
+   "label": "Bambini (pediatria)",
+   "types": [
+    "Pediatria"
+   ],
+   "words": "pediatr\\w*"
+  },
+  {
+   "code": "infettive",
+   "need": "salute",
+   "label": "Test HIV e malattie infettive",
+   "types": [
+    "Malattie infettive",
+    "Screening"
+   ],
+   "words": "\\bhiv\\b|\\baids\\b|infettiv\\w*|tubercol\\w*|vaccin\\w*"
+  },
+  {
+   "code": "ospedale",
+   "need": "salute",
+   "label": "Ospedali e pronto soccorso",
+   "types": [
+    "Ospedale"
+   ],
+   "words": "ospedal\\w*|pronto soccorso|policlinico"
+  },
+  {
+   "code": "hospice",
+   "need": "salute",
+   "label": "Hospice e cure palliative",
+   "types": [
+    "Hospice"
+   ],
+   "words": "hospice|cure palliative"
+  },
+  {
+   "code": "centro_antiviolenza",
+   "need": "violenza",
+   "label": "Centri antiviolenza e sportelli donna",
+   "types": [
+    "Centro antiviolenza",
+    "Salute e tutela della donna"
+   ],
+   "words": "antiviolenz\\w*|violenza (?:di genere|sulle donne|contro le donne)",
+   "replaces_source_need": true
+  },
+  {
+   "code": "anti_tratta",
+   "need": "violenza",
+   "label": "Anti-tratta",
+   "words": "anti.?tratta|tratta (?:di esseri umani|delle persone)"
+  },
+  {
+   "code": "centro_ascolto",
+   "need": "orientamento",
+   "label": "Centri d'ascolto e sportelli",
+   "types": [
+    "Centro di ascolto",
+    "Sportello sociale",
+    "Sportello di prossimità"
+   ],
+   "words": "centr[oi] d[i’' ]+ascolto"
+  },
+  {
+   "code": "servizi_sociali",
+   "need": "orientamento",
+   "label": "Servizi sociali, segretariato, PUA",
+   "types": [
+    "Sportello sociale pubblico",
+    "Punto unico di accesso"
+   ],
+   "names": "^municipio\\b",
+   "words": "segretariato sociale|servizi sociali"
+  },
+  {
+   "code": "linee_aiuto",
+   "need": "orientamento",
+   "label": "Linee telefoniche di aiuto",
+   "types": [
+    "Linea telefonica di aiuto"
+   ],
+   "names": "numero verde|telefono (?:verde|azzurro|rosa|d.argento)"
+  },
+  {
+   "code": "unita_strada",
+   "need": "orientamento",
+   "label": "Presidi e unità di strada",
+   "types": [
+    "Unità di strada"
+   ],
+   "words": "unit[aà] di strada"
+  },
+  {
+   "code": "anziani_casa",
+   "need": "orientamento",
+   "label": "Anziani e assistenza a casa",
+   "types": [
+    "Assistenza domiciliare"
+   ],
+   "words": "assistenza domiciliare"
+  },
+  {
+   "code": "usura",
+   "need": "orientamento",
+   "label": "Debiti e usura",
+   "types": [
+    "Prevenzione usura"
+   ],
+   "words": "usura|sovraindebitament\\w*"
+  },
+  {
+   "code": "associazioni",
+   "need": "orientamento",
+   "label": "Associazioni e orientamento",
+   "types": [
+    "Socialità e volontariato",
+    "Servizi di pubbliche relazioni"
+   ]
+  },
+  {
+   "code": "residenza",
+   "need": "documenti_diritti",
+   "label": "Residenza e anagrafe",
+   "names": "^municipio\\b",
+   "words": "residenz[ae]|anagraf\\w*|carta d.identit\\w*|certificati anagrafici"
+  },
+  {
+   "code": "permesso",
+   "need": "documenti_diritti",
+   "label": "Permesso di soggiorno e protezione",
+   "types": [
+    "Permessi di soggiorno e immigrazione"
+   ],
+   "words": "permess[oi] di soggiorno|protezione internazionale|richiest[ae] d.asilo|questura"
+  },
+  {
+   "code": "legale",
+   "need": "documenti_diritti",
+   "label": "Avvocato e consulenza legale",
+   "types": [
+    "Consulenza e tutela legale"
+   ],
+   "words": "legal[ei]|avvocat\\w*"
+  },
+  {
+   "code": "fisco",
+   "need": "documenti_diritti",
+   "label": "Fisco, CAF, pensioni e patronati",
+   "names": "agenzia delle entrate|aequa roma",
+   "words": "\\bcaa?f\\b|patronat\\w*|\\bisee\\b|pension[ei]|dichiarazione dei redditi",
+   "overrides_type": true
+  },
+  {
+   "code": "giustizia",
+   "need": "documenti_diritti",
+   "label": "Giustizia e uffici giudiziari",
+   "types": [
+    "Tribunale"
+   ],
+   "names": "messa alla prova|u\\.?i?\\.?e\\.?p\\.?e|tribunal\\w*|procura|corte d|giudice",
+   "overrides_type": true
+  },
+  {
+   "code": "pratiche",
+   "need": "documenti_diritti",
+   "label": "Pratiche, CAF e patronato",
+   "types": [
+    "Pratiche amministrative"
+   ]
+  },
+  {
+   "code": "italiano",
+   "need": "istruzione",
+   "label": "Corsi di italiano",
+   "types": [
+    "Corsi linguistici"
+   ],
+   "words": "corsi? di (?:lingua )?italiano|scuola di (?:lingua )?italiano|alfabetizzazione|italiano per stranieri"
+  },
+  {
+   "code": "lingue",
+   "need": "istruzione",
+   "label": "Corsi di lingue",
+   "words": "corsi? di lingu[ae] (?!italiana)"
+  },
+  {
+   "code": "scuola",
+   "need": "istruzione",
+   "label": "Scuola e licenza media",
+   "types": [
+    "Scuola"
+   ],
+   "words": "licenza media|terza media|\\bcpia\\b"
+  },
+  {
+   "code": "formazione",
+   "need": "lavoro",
+   "label": "Formazione professionale",
+   "types": [
+    "Corsi e formazione",
+    "Formazione professionale"
+   ],
+   "words": "formazione professionale|corsi? professional\\w*|corsi? di formazione",
+   "enabled": true,
+   "note": "to be disabled later (user, 2026-11-09); kept on while debugging"
+  },
+  {
+   "code": "doposcuola",
+   "need": "istruzione",
+   "label": "Doposcuola e sostegno scolastico",
+   "words": "doposcuola|sostegno scolastico|aiuto (?:allo|nello) studio"
+  },
+  {
+   "code": "cercare_lavoro",
+   "need": "lavoro",
+   "label": "Orientamento al lavoro e curriculum",
+   "types": [
+    "Orientamento al lavoro",
+    "Lavoro",
+    "Centro di Orientamento al Lavoro"
+   ],
+   "words": "ricerca (?:di )?lavoro|curriculum|offert[ae] di lavoro|orientamento al lavoro.impiego"
+  },
+  {
+   "code": "centro_impiego",
+   "need": "lavoro",
+   "label": "Centri per l'Impiego",
+   "types": [
+    "Centro per l'Impiego"
+   ],
+   "words": "centr[oi] per l.impiego"
+  },
+  {
+   "code": "tirocini",
+   "need": "lavoro",
+   "label": "Tirocini",
+   "words": "tirocin\\w*"
+  },
+  {
+   "code": "diritti_lavoro",
+   "need": "lavoro",
+   "label": "Diritti sul lavoro (sindacati)",
+   "types": [
+    "Patronato e assistenza sindacale"
+   ],
+   "words": "sindacal\\w*|vertenz\\w*"
+  }
+ ],
+ "not_offer_phrases": "(?:disturbi|comportament\\w*)[\\w\\s]{0,30}alimentar\\w*|nutrizion\\w*",
+ "multiservice": {
+  "offers": [
+   "centro_diurno",
+   "stazione_di_posta"
+  ],
+  "basic_needs": [
+   "mangiare",
+   "lavarsi",
+   "vestiti_coperte",
+   "dormire"
+  ],
+  "min_basic_needs": 2,
+  "requires_place": true
+ },
+ "audiences": [
+  {
+   "code": "donne",
+   "label": "Donne",
+   "types": [
+    "Centro antiviolenza",
+    "Salute e tutela della donna"
+   ],
+   "words": "\\bdonn[ae]\\b|femminil\\w*",
+   "claims": [
+    "donna",
+    "donne_violenza",
+    "salute_donna_infanzia"
+   ]
+  },
+  {
+   "code": "madri_bambini",
+   "label": "Gravidanza, madri e neonati",
+   "words": "gravidanz\\w*|gestant\\w*|\\bmamm[ae]\\b|\\bmadri\\b|neonat\\w*|maternit\\w*",
+   "claims": [
+    "donna_in_gravidanza",
+    "nuclei_monogenitoriali"
+   ]
+  },
+  {
+   "code": "minori_famiglie",
+   "label": "Minori e famiglie con bambini",
+   "words": "\\bminori\\b|bambin[ie]|famiglie|nuclei familiari|ragazz[ie]",
+   "claims": [
+    "minori",
+    "nuclei_familiari",
+    "minori_non_accompagnati"
+   ]
+  },
+  {
+   "code": "giovani",
+   "label": "Giovani",
+   "words": "giovan[ie]|adolescent\\w*",
+   "claims": [
+    "neomaggiorenni"
+   ]
+  },
+  {
+   "code": "lgbtqi",
+   "label": "Persone LGBTQI+",
+   "types": [
+    "Centro di accoglienza LGBTQI"
+   ],
+   "words": "lgbt\\w*|\\btrans\\b|transgender|omosessual\\w*|queer",
+   "claims": [
+    "lgbtqia+"
+   ]
+  },
+  {
+   "code": "migranti",
+   "label": "Migranti, rifugiati e richiedenti asilo",
+   "types": [
+    "Rilascio STP/ENI",
+    "Permessi di soggiorno e immigrazione"
+   ],
+   "words": "migrant\\w*|stranier\\w*|immigrat\\w*|rifugiat\\w*|richiedent\\w*|profugh\\w*",
+   "claims": [
+    "migranti",
+    "migranti_forzati",
+    "extracomunitari",
+    "stp",
+    "eni",
+    "stp_eni_holders"
+   ]
+  },
+  {
+   "code": "senza_dimora",
+   "label": "Persone senza dimora",
+   "words": "senza (?:fissa )?dimora|senzatetto|homeless|persone in strada",
+   "claims": [
+    "senza_fissa_dimora"
+   ]
+  },
+  {
+   "code": "detenuti",
+   "label": "Detenuti ed ex detenuti",
+   "words": "detenut\\w*|carcer\\w*|messa alla prova|penitenziar\\w*"
+  },
+  {
+   "code": "anziani",
+   "label": "Anziani",
+   "words": "anzian\\w*|terza et[aà]"
+  },
+  {
+   "code": "dipendenze",
+   "label": "Persone con dipendenze",
+   "types": [
+    "Dipendenze (Ser.D)",
+    "Alcologia e auto-aiuto"
+   ],
+   "words": "tossicodipend\\w*|alcolist\\w*|dipendenz\\w*",
+   "claims": [
+    "dipendenza_da_sostanze",
+    "tossicodipendenti",
+    "dipendenza",
+    "dipendenza_da_gioco_azzardo"
+   ]
+  },
+  {
+   "code": "disabilita",
+   "label": "Persone con disabilità",
+   "words": "disabil\\w*|handicap",
+   "claims": [
+    "disabili"
+   ]
+  },
+  {
+   "code": "uomini",
+   "label": "Uomini",
+   "words": "\\buomini\\b|maschil\\w*",
+   "claims": [
+    "uomo"
+   ]
+  }
+ ],
+ "reserved_words": "\\bsolo (?:per )?|riservat\\w*|esclusivamente|unicamente",
+ "access": [
+  {
+   "code": "senza_appuntamento",
+   "label": "Senza appuntamento (accesso diretto)",
+   "words": "bassa soglia|accesso libero|libero accesso|senza appuntamento|accesso diretto",
+   "claims": [
+    "accesso_diretto"
+   ]
+  },
+  {
+   "code": "appuntamento",
+   "label": "Su appuntamento",
+   "words": "appuntament\\w*|prenotazion\\w*|su prenotazione",
+   "claims": [
+    "appuntamento",
+    "colloquio_di_ingresso",
+    "prenotazione_sul_posto"
+   ]
+  },
+  {
+   "code": "invio",
+   "label": "Con invio (centro d'ascolto, servizi sociali)",
+   "claims": [
+    "accesso_su_valutazione",
+    "chiama_1522",
+    "invio_centro_ascolto",
+    "segnalazione"
+   ],
+   "words": "tramite (?:i |il )?(?:servizi sociali|centr[oi] d.ascolto|municipi\\w*|sala operativa)|su invio|inviat[ie] da|autorizzazion\\w*|segnalazion\\w* dei servizi"
+  },
+  {
+   "code": "tessera",
+   "label": "Serve una tessera",
+   "words": "\\btessera\\b",
+   "claims": [
+    "tesseramento"
+   ]
+  },
+  {
+   "code": "senza_documenti",
+   "label": "Anche senza documenti (STP/ENI)",
+   "types": [
+    "Rilascio STP/ENI"
+   ],
+   "words": "senza documenti|senza permesso|irregolar\\w*|\\bstp\\b",
+   "claims": [
+    "eni",
+    "senza_documenti",
+    "stp",
+    "stp_eni_holders"
+   ]
+  },
+  {
+   "code": "servono_documenti",
+   "label": "Servono documenti (permesso, residenza, ISEE)",
+   "claims": [
+    "con_documenti",
+    "permesso_di_soggiorno",
+    "residenza",
+    "isee_richiesto"
+   ]
+  },
+  {
+   "code": "gratuito",
+   "label": "Gratuito",
+   "claims": [
+    "gratuito"
+   ]
+  },
+  {
+   "code": "contributo",
+   "label": "Con contributo",
+   "claims": [
+    "con_contributo",
+    "contributo",
+    "contributo_alloggio"
+   ]
+  },
+  {
+   "code": "a_pagamento",
+   "label": "A pagamento",
+   "claims": [
+    "a_pagamento",
+    "costo_variabile"
+   ]
+  },
+  {
+   "code": "telefono",
+   "label": "Solo telefono o online",
+   "placement": "directory"
+  },
+  {
+   "code": "itinerante",
+   "label": "Itinerante",
+   "delivery": [
+    "itinerant"
+   ],
+   "types": [
+    "Unità di strada"
+   ]
+  }
+ ],
+ "meal_times": {
+  "applies_to_need": "mangiare",
+  "slots": [
+   {
+    "code": "colazione",
+    "label": "Colazione",
+    "starts_before": "10:30",
+    "words": "colazion\\w*"
+   },
+   {
+    "code": "pranzo",
+    "label": "Pranzo",
+    "overlaps": [
+     "11:30",
+     "15:00"
+    ],
+    "words": "pranzo"
+   },
+   {
+    "code": "cena",
+    "label": "Cena",
+    "ends_after": "18:00",
+    "words": "\\bcen[ae]\\b"
+   }
+  ],
+  "offers": [
+   "pasto",
+   "pasto_asporto"
+  ]
+ },
+ "paths": [
+  {
+   "code": "violenza",
+   "label": "Violenza e protezione",
+   "offers": [
+    "centro_antiviolenza",
+    "anti_tratta"
+   ],
+   "text": "1522 è gratuito e attivo 24 ore su 24. I centri antiviolenza accolgono e orientano; le case rifugio si raggiungono tramite 1522 e i centri, il loro indirizzo non è pubblico."
+  },
+  {
+   "code": "stanotte",
+   "label": "Stanotte non so dove dormire",
+   "offers": [
+    "dormitorio",
+    "accoglienza",
+    "emergenza_sos"
+   ],
+   "text": "Per un posto letto in emergenza chiama la Sala Operativa Sociale (800 440 022, gratuito, 24 ore su 24). Molti dormitori hanno un orario di ingresso serale."
+  },
+  {
+   "code": "lavarsi_mangiare",
+   "label": "Lavarmi e mangiare oggi",
+   "offers": [
+    "docce",
+    "vestiti",
+    "pasto",
+    "pasto_asporto",
+    "centro_diurno",
+    "stazione_di_posta"
+   ],
+   "text": "Docce, cambio vestiti, pasti e centri diurni. Controlla orari e giorni nella scheda: le fonti non sono sempre aggiornate."
+  },
+  {
+   "code": "appena_arrivato",
+   "label": "Appena arrivato / senza documenti",
+   "offers": [
+    "stp_eni",
+    "permesso",
+    "residenza",
+    "italiano",
+    "legale"
+   ],
+   "text": "Con la tessera STP/ENI puoi essere curato anche senza permesso di soggiorno. Qui trovi anche permessi, residenza, corsi di italiano e assistenza legale."
+  }
+ ],
+ "default_offer": {
+  "code": "associazioni",
+  "need": "orientamento"
+ },
+ "structured": {
+  "_doc": "Sources with their own service type and offer list (S1, user rule 2026-11-15): a card enters one need, from its type (or a listed override), and its clusters come only from its own type and prestazioni within that need; facility names and referral offers do not assign needs.",
+  "sources": [
+   "helpinet"
+  ],
+  "type_need": {
+   "Sportello sociale": "orientamento",
+   "Sportello di prossimità": "orientamento",
+   "Punto unico di accesso": "orientamento",
+   "Igiene personale": "lavarsi",
+   "Lavanderia": "lavarsi",
+   "Mensa sociale": "mangiare",
+   "Distribuzione generi alimentari": "mangiare",
+   "Consulenza e tutela legale": "documenti_diritti",
+   "Pratiche amministrative": "documenti_diritti",
+   "Sportello Sanitario": "salute",
+   "Medicina generale": "salute",
+   "Salute mentale": "salute",
+   "Poliambulatorio": "salute",
+   "Sportello socio sanitario": "salute",
+   "Medicina specialistica": "salute",
+   "Medicina diagnostica": "salute",
+   "Assistenza infermieristica": "salute",
+   "Screening": "salute",
+   "Consultorio familiare": "salute",
+   "Farmacia sociale": "salute",
+   "Salute e tutela della donna": "violenza",
+   "Centro di accoglienza": "dormire",
+   "Centro di accoglienza LGBTQI": "dormire",
+   "Lavoro": "lavoro",
+   "Centro di Orientamento al Lavoro": "lavoro",
+   "Centro per l'Impiego": "lavoro",
+   "Scuola": "istruzione",
+   "Corsi linguistici": "istruzione",
+   "Abbigliamento": "vestiti_coperte",
+   "Riparo": "vestiti_coperte",
+   "Kit": "vestiti_coperte",
+   "Servizi di pubbliche relazioni": "multiservizi"
+  },
+  "type_offer": {
+   "Sportello sociale": "centro_ascolto",
+   "Sportello di prossimità": "centro_ascolto",
+   "Punto unico di accesso": "servizi_sociali",
+   "Igiene personale": "docce",
+   "Lavanderia": "lavanderia",
+   "Mensa sociale": "pasto",
+   "Distribuzione generi alimentari": "cibo_da_cucinare",
+   "Consulenza e tutela legale": "legale",
+   "Pratiche amministrative": "pratiche",
+   "Medicina generale": "medico",
+   "Salute mentale": "psicologo",
+   "Poliambulatorio": "medico",
+   "Sportello socio sanitario": "orientamento_sanitario",
+   "Medicina specialistica": "medico",
+   "Medicina diagnostica": "medico",
+   "Assistenza infermieristica": "medico",
+   "Screening": "infettive",
+   "Consultorio familiare": "consultorio",
+   "Farmacia sociale": "farmaci",
+   "Salute e tutela della donna": "centro_antiviolenza",
+   "Centro di accoglienza": "accoglienza",
+   "Centro di accoglienza LGBTQI": "accoglienza",
+   "Lavoro": "cercare_lavoro",
+   "Centro di Orientamento al Lavoro": "cercare_lavoro",
+   "Centro per l'Impiego": "centro_impiego",
+   "Scuola": "italiano",
+   "Corsi linguistici": "italiano",
+   "Abbigliamento": "vestiti",
+   "Riparo": "coperte",
+   "Kit": "coperte",
+   "Servizi di pubbliche relazioni": "aggregazione"
+  },
+  "type_offer_always": [
+   "Centro per l'Impiego",
+   "Salute e tutela della donna",
+   "Consultorio familiare",
+   "Farmacia sociale",
+   "Punto unico di accesso"
+  ],
+  "prestazioni": {
+   "Colazione": "pasto",
+   "Pranzo": "pasto",
+   "Cena": "pasto",
+   "Pasto da asporto": "pasto_asporto",
+   "Portare via": "pasto_asporto",
+   "Pacchi alimentari": "cibo_da_cucinare",
+   "Accoglienza notturna": "dormitorio",
+   "Circuito SOS": "dormitorio",
+   "Dormitorio h24": "accoglienza",
+   "Circuito SAI": "accoglienza",
+   "Doccia": "docce",
+   "Lavanderia": "lavanderia",
+   "Barbiere": "barbiere",
+   "Kit igienico": "kit_igiene",
+   "Vestiti": "vestiti",
+   "Kit biancheria intima": "biancheria",
+   "Coperte": "coperte",
+   "Assistenza sanitaria": "medico",
+   "Medicina generale": "medico",
+   "Ambulatorio": "medico",
+   "Medicina specialistica": "medico",
+   "Medicina diagnostica": "medico",
+   "Prescrizioni mediche": "medico",
+   "Cardiologia": "medico",
+   "Dermatologia": "medico",
+   "Neurologia": "medico",
+   "Oculista": "medico",
+   "Ortopedia": "medico",
+   "Pneumologia": "medico",
+   "Medicina legale": "medico",
+   "Odontoiatria": "dentista",
+   "Ginecologia": "consultorio",
+   "Ostetricia": "consultorio",
+   "Pediatria": "pediatria",
+   "Test rapido HIV": "infettive",
+   "Test rapido Sifilide": "infettive",
+   "Test rapido Epatite": "infettive",
+   "Malattie sessualmente trasmissibili": "infettive",
+   "Infettivologia": "infettive",
+   "Distribuzione profilattici": "infettive",
+   "Supporto psicologico": "psicologo",
+   "Psicologo": "psicologo",
+   "Psichiatra": "psicologo",
+   "Counseling Psicologico": "psicologo",
+   "Supporto dipendenze": "dipendenze",
+   "Dipendenza": "dipendenze",
+   "Distribuzione siringhe": "dipendenze",
+   "Distribuzione materiale sterile": "dipendenze",
+   "Farmaci": "farmaci",
+   "Orientamento sanitario": "orientamento_sanitario",
+   "Anti tratta": "anti_tratta",
+   "Segretariato Sociale": "servizi_sociali",
+   "Supporto Permesso di Soggiorno": "permesso",
+   "Supporto richiesta Protezione Internazionale": "permesso",
+   "Ricongiungimento familiare": "permesso",
+   "Rimpatrio Volontario Assistito": "permesso",
+   "Consulenza legale": "legale",
+   "Avvocato": "legale",
+   "Servizio legale": "legale",
+   "Gratuito patrocinio": "legale",
+   "CAF e Patronato": "pratiche",
+   "Supporto richiesta documenti": "pratiche",
+   "Corsi di italiano": "italiano",
+   "Corsi di lingue": "lingue",
+   "Sostegno scolastico": "doposcuola",
+   "Orientamento al lavoro": "cercare_lavoro",
+   "Curriculum Vitae": "cercare_lavoro",
+   "Supporto lavoro": "cercare_lavoro",
+   "Formazione": "formazione",
+   "Corsi Formazione Lavoro": "formazione",
+   "Attività": "aggregazione"
+  },
+  "_prestazioni_without_cluster": [
+   "Accoglienza",
+   "Ascolto",
+   "Bassa soglia",
+   "Colloquio di primo contatto",
+   "Distribuzione",
+   "Infopoint",
+   "Lgbtqia+",
+   "Mediazione (MLC)",
+   "Orientamento abitativo",
+   "Orientamento ai servizi",
+   "Orientamento socio-legale",
+   "Servizi all'infanzia",
+   "Servizio detenuti",
+   "Servizio volontario",
+   "Unità di strada"
+  ],
+  "need_overrides": [
+   {
+    "prestazioni": [
+     "Anti tratta"
+    ],
+    "need": "violenza",
+    "basis": "prestazione: Anti tratta"
+   },
+   {
+    "names": "^cav\\b",
+    "need": "violenza",
+    "offer": "centro_antiviolenza",
+    "basis": "nome del servizio: CAV"
+   }
+  ],
+  "itinerant_offer": {
+   "orientamento": "unita_strada"
+  },
+  "excludes": {
+   "pasto_asporto": [
+    "pasto"
+   ]
+  }
+ }
+}

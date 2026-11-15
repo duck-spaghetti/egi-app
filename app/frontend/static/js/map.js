@@ -1851,7 +1851,7 @@ function chooseReferencePoint() {
   showToast("Tocca la mappa per scegliere il riferimento");
 }
 
-/** Quick paths (taxonomy v0.2): one tap sets a curated set of offers and shows its guidance. */
+/** Quick paths (presentation taxonomy): one tap sets a curated set of offers and shows its guidance. */
 function renderPaths() {
   const wrap = document.getElementById("path-buttons");
   if (!wrap) return;
@@ -1894,7 +1894,7 @@ function renderOffers(raw) {
 }
 
 function categoryCaption(value) {
-  // Sentence case: taxonomy labels are written as phrases ("Lavarsi e vestirsi").
+  // Sentence case: taxonomy labels are written as phrases ("Vestiti e coperte").
   const text = String(value || "Servizio").replaceAll("_", " ");
   return text.charAt(0).toLocaleUpperCase("it") + text.slice(1);
 }

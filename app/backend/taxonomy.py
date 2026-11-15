@@ -1,4 +1,4 @@
-"""Need-first presentation taxonomy (vocabulary `taxonomy_v0_2.json`), applied to service cards.
+"""Need-first presentation taxonomy (vocabulary `taxonomy_v0_3.json`), applied to service cards.
 
 Read-only interpretation: original source fields stay untouched; every assignment carries
 its basis so that interpretations can be reviewed and corrected later (user decision,
@@ -14,9 +14,14 @@ For one card `apply` sets:
 - `audiences` ("per chi"; `reserved` when the text says solo/riservato), `access_tags`,
   `meal_times` (colazione/pranzo/cena from hours, else from words) for services offering a meal;
 - membership of "Centri diurni e multiservizi" by type/name or by at least two basic needs
-  (eat, wash/dress, sleep) at one place.
+  (eat, wash, sleep) at one place.
 
-The vocabulary is the approved v0.2 proposal (.scratch/taxonomy/proposal.md), not the
+Structured sources (`structured.sources`, Helpinet) follow the v0.3 rule instead (user,
+2026-11-15): a card enters one need, from its own service type or a listed override, and its
+offers come only from its own type and `prestazioni` inside that need — never from the facility
+name nor from referral offers ("Orientamento ai servizi"). See `structured_offers`.
+
+The vocabulary is the approved v0.3 proposal (.scratch/taxonomy/proposal.md §13), not the
 canonical taxonomy; offers can be switched off with `"enabled": false`.
 """
 
@@ -29,7 +34,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-VOCABULARY = Path(__file__).with_name("taxonomy_v0_2.json")
+VOCABULARY = Path(__file__).with_name("taxonomy_v0_3.json")
 TIME_RANGE = re.compile(r"(\d{1,2})[.:](\d{2})\s*[-–]\s*(\d{1,2})[.:](\d{2})")
 
 
@@ -59,6 +64,9 @@ def compile_vocabulary(data: dict[str, Any]) -> dict[str, Any]:
     data["_not_offers"] = _compile(data.get("not_offer_phrases"))
     data["_reserved"] = _compile(data.get("reserved_words"))
     data["_needs"] = {n["code"]: n for n in data["needs"]}
+    data["_offers"] = {o["code"]: o for o in data["offers"]}
+    for rule in (data.get("structured") or {}).get("need_overrides", []):
+        rule["_names"] = _compile(rule.get("names"))
     return data
 
 
@@ -136,6 +144,59 @@ def meal_times(card: dict[str, Any], text: str) -> list[dict[str, str]]:
     return list(found.values())
 
 
+def _offer(code: str, basis: str, interpreted: bool = False) -> dict[str, Any]:
+    """One offer entry of the vocabulary with its basis."""
+    item = vocabulary()["_offers"][code]
+    return {"code": code, "need": item["need"], "label": item["label"], "basis": basis, "interpreted": interpreted}
+
+
+def structured_offers(card: dict[str, Any]) -> tuple[list[str], list[dict[str, Any]]] | None:
+    """Needs and offers of a structured-source card (type + own prestazioni), else None.
+
+    The need comes from an override (a listed prestazione, or the service's own name such as
+    "CAV …"), else the source type, else the source's own need. Offers are the clusters of the
+    card's own prestazioni that belong to that need; the type's default cluster is added when no
+    prestazione gives one (always, for types listed in `type_offer_always`). Itinerant
+    orientation desks become street presences.
+    """
+    vocab = vocabulary()
+    rules = vocab.get("structured") or {}
+    if card.get("source_code") not in rules.get("sources", []):
+        return None
+    natives = card.get("native_classifications") or {}
+    kind = natives.get("tipologia")
+    names = [p.get("nome") for p in natives.get("prestazioni") or [] if isinstance(p, dict) and p.get("nome")]
+    title = fold(card.get("name") or card.get("facility_name") or "")
+    need, forced = None, None
+    for rule in rules.get("need_overrides", []):
+        if set(rule.get("prestazioni", [])) & set(names) or (rule.get("_names") and rule["_names"].search(title)):
+            need, forced = rule["need"], (rule.get("offer"), rule["basis"])
+            break
+    source_need = (card.get("category") or {}).get("slug")
+    need = need or rules["type_need"].get(kind or "") or vocab["source_need_fallback"].get(source_need or "")
+    if not need:
+        return None
+    offers: list[dict[str, Any]] = []
+    if forced and forced[0]:
+        offers.append(_offer(forced[0], forced[1]))
+    for name in names:
+        code = rules["prestazioni"].get(name)
+        if code and vocab["_offers"][code]["need"] == need and code not in {o["code"] for o in offers}:
+            offers.append(_offer(code, f"prestazione della fonte: {name}"))
+    for code, dropped in rules.get("excludes", {}).items():
+        if code in {o["code"] for o in offers}:
+            offers = [o for o in offers if o["code"] not in dropped]
+    default = rules["type_offer"].get(kind or "")
+    if card.get("itinerant_source") and need in rules.get("itinerant_offer", {}):
+        default = rules["itinerant_offer"][need]
+        offers = [o for o in offers if o["code"] != rules["type_offer"].get(kind or "")]
+        offers.insert(0, _offer(default, "servizio itinerante della fonte"))
+    elif default and vocab["_offers"][default]["need"] == need and default not in {o["code"] for o in offers} \
+            and (not offers or kind in rules.get("type_offer_always", [])):
+        offers.insert(0, _offer(default, f"tipo della fonte: {kind}"))
+    return [need], offers
+
+
 def apply(card: dict[str, Any]) -> dict[str, Any]:
     """Add offers, needs, primary category, audiences, access tags and meal times to a card."""
     vocab = vocabulary()
@@ -143,9 +204,10 @@ def apply(card: dict[str, Any]) -> dict[str, Any]:
     title = fold(f"{card.get('service_title') or ''} {card.get('name') or ''}")
     text = card_text(card)
     source_need = (card.get("category") or {}).get("slug")
+    structured = structured_offers(card)
     offers = []
     overriding = False
-    for item in vocab["offers"]:
+    for item in vocab["offers"] if structured is None else []:
         if item.get("enabled", True) is False:
             continue
         if hit := _match(item, kind, title, text):
@@ -156,12 +218,16 @@ def apply(card: dict[str, Any]) -> dict[str, Any]:
         source_need = None
     needs: list[str] = []
     by_type = [o["need"] for o in offers if o["basis"].startswith("tipo della fonte")]
+    if any(vocab["_offers"][o["code"]].get("replaces_source_need") for o in offers if o["basis"].startswith("tipo della fonte")):
+        source_need = None  # e.g. an anti-violence centre listed under "ascolto" belongs to Violenza only (v0.3)
     fallback = vocab["source_need_fallback"].get(source_need or "")
     # Source needs of a same-source group (a placemark repeated per layer) are kept too.
-    grouped = [] if overriding else [vocab["source_need_fallback"].get(n, n if n in vocab["_needs"] else None) for n in card.get("needs") or []]
+    grouped = [] if overriding or source_need is None else [vocab["source_need_fallback"].get(n, n if n in vocab["_needs"] else None) for n in card.get("needs") or []]
     for need in by_type + ([fallback] if fallback else []) + grouped + [o["need"] for o in offers]:
         if need and need not in needs:
             needs.append(need)
+    if structured is not None:
+        needs, offers = structured
     basic = {o["need"] for o in offers} & set(vocab["multiservice"]["basic_needs"])
     placed = bool((card.get("place") or {}).get("address") or (card.get("place") or {}).get("geometry"))
     if "multiservizi" not in needs and len(basic) >= vocab["multiservice"]["min_basic_needs"] and placed:
@@ -169,9 +235,9 @@ def apply(card: dict[str, Any]) -> dict[str, Any]:
         offers.append({"code": "piu_servizi", "need": "multiservizi", "label": "Più servizi di base nello stesso luogo",
                        "basis": "regola: " + ", ".join(sorted(basic)), "interpreted": True})
     if not needs:
-        needs = ["ascolto_aiuto"]
-        offers.append({"code": "associazioni", "need": "ascolto_aiuto", "label": "Associazioni e orientamento",
-                       "basis": "nessuna regola: assegnato per difetto", "interpreted": True})
+        default = vocab["default_offer"]
+        needs = [default["need"]]
+        offers.append(_offer(default["code"], "nessuna regola: assegnato per difetto", True))
     primary = vocab["_needs"][needs[0]]
     category = next(c for c in need_categories() if c["slug"] == primary["code"])
     reserved = bool(vocab["_reserved"] and vocab["_reserved"].search(text))
@@ -199,7 +265,7 @@ def apply(card: dict[str, Any]) -> dict[str, Any]:
     card.update({
         "source_category": card.get("category"), "category": category, "category_id": category["id"],
         "needs": needs, "offers": offers, "audiences": audiences, "access_tags": access,
-        "meal_times": meal_times(card, text) if any(o["code"] == "pasto" for o in offers) else [],
+        "meal_times": meal_times(card, text) if any(o["code"] in vocab["meal_times"]["offers"] for o in offers) else [],
         "taxonomy_version": vocab["version"],
     })
     return card

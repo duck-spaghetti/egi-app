@@ -51,10 +51,10 @@ class MapSourceTests(unittest.TestCase):
         rows = [subject("h1", "Mensa", {}), map_row("a", "Mense", "matched_house"),
                 map_row("b", "Socialità volontariato e tempo libero", "matched_house")]
         by_id = {s["id"]: s for s in services(rows)}
-        self.assertEqual(by_id["a"]["category"]["slug"], "mangiare")  # taxonomy v0.2 tile
+        self.assertEqual(by_id["a"]["category"]["slug"], "mangiare")  # taxonomy tile
         self.assertEqual(by_id["a"]["source_category"]["slug"], "cibo")
         self.assertEqual(by_id["a"]["category"]["slug"], by_id["h1"]["category"]["slug"])
-        self.assertEqual(by_id["b"]["category"]["slug"], "ascolto_aiuto")  # "Stare insieme" dropped (user, 2026-11-09)
+        self.assertEqual(by_id["b"]["category"]["slug"], "orientamento")  # "Stare insieme" dropped (user, 2026-11-09); v0.3 name
         self.assertEqual(by_id["b"]["source_category"]["slug"], "socialita")
         self.assertEqual(by_id["a"]["native_classifications"]["tipologia"], "Mense")
         self.assertEqual({c["slug"] for c in categories(rows)}, {"cibo", "socialita"})
@@ -127,7 +127,7 @@ class MapSourceTests(unittest.TestCase):
         self.assertEqual([c["id"] for c in cards], ["a"])
         card = cards[0]
         self.assertEqual((card["category"]["slug"], card["service_title"]), ("salute", "Rilascio STP/ENI · Ospedale"))
-        self.assertEqual(card["needs"], ["salute", "istruzione_lavoro"])  # the group's source needs survive the taxonomy
+        self.assertEqual(card["needs"], ["salute", "lavoro"])  # the group's source needs survive the taxonomy
         self.assertEqual(card["source_category"]["slug"], "curarmi")
         self.assertEqual(card["native_classifications"]["tipologia"], "Rilascio STP/ENI")
         self.assertEqual(card["access_raw"], {"stp": True})
