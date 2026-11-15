@@ -733,7 +733,9 @@ function filteredPois(now = new Date()) {
   if (state.userLoc) list=list.map(p=>({...p,_dist:p.raw?.placement?.section!=="directory" && Number.isFinite(p.latitude) && Number.isFinite(p.longitude) ? distanceKm(state.userLoc,{lat:p.latitude,lng:p.longitude}) : null}));
   return list.sort((a,b)=>{
     const distance=state.filters.order==="distance" && state.userLoc ? (a._dist??Infinity)-(b._dist??Infinity) : 0;
-    return (Number.isNaN(distance)?0:distance) || a.title.localeCompare(b.title,"it") || String(a.id).localeCompare(String(b.id));
+    // "Nome" sorts by the title the card shows (layout r3), then by facility.
+    return (Number.isNaN(distance)?0:distance) || serviceTitle(a).localeCompare(serviceTitle(b),"it")
+      || String(a.raw?.facility_name || "").localeCompare(String(b.raw?.facility_name || ""),"it") || String(a.id).localeCompare(String(b.id));
   });
 }
 
