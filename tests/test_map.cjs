@@ -112,8 +112,25 @@ vm.runInContext(`
   const many=Array.from({length:8},(_,i)=>row(String(10+i),'bus',i+1)); many[7].night=true;
   const groups=many.map((r,i)=>({stop_name:'Stop '+i,modes:['bus'],walk_min:r.walk_min,distance_m:r.distance_m,wheelchair:'unknown',lines:[r]}));
   const html=renderTransitRows({availability:'available',lines:many,stops:groups});
-  if((html.match(/class="transit-stop-group"/g)||[]).length!==8 || !html.includes('Altre 4 fermate') || !html.includes('notturna') || (html.match(/data-focus-stop=/g)||[]).length!==8) throw Error('stop groups, overflow or night tag wrong');
-  if(!html.includes('linea d’aria') || !html.includes('Le partenze dal tuo punto di riferimento')) throw Error('estimate not qualified');
+  // Layout r3: the nearest stop is named first, the other seven sit under "Altre 7 fermate".
+  if(!html.includes('Fermata più vicina') || !html.includes('Fermata Stop 0') || (html.match(/class="transit-stop-group"/g)||[]).length!==7 || !html.includes('Altre 7 fermate') || !html.includes('notturna') || (html.match(/data-focus-stop=/g)||[]).length!==8) throw Error('nearest stop, overflow or night tag wrong');
+  if(!html.includes('linea d’aria')) throw Error('estimate not qualified');
+  // With a user position, a stop served by a line that also stops near the user is preferred.
+  const linked=renderTransitRows({availability:'available',lines:many,stops:groups},{stops:[{stop_name:'Casa mia',modes:['bus'],lines:[many[3]]}]});
+  if(!linked.includes('Fermata collegata a te') || !linked.includes('Fermata Stop 3') || !linked.includes('passa anche da Casa mia')) throw Error('user-connected stop not preferred');
+  if(!renderTransitRows({availability:'available',lines:many,stops:groups},{stops:[{stop_name:'Lontano',modes:['bus'],lines:[row('999','bus',1)]}]}).includes('Fermata più vicina')) throw Error('unconnected origin changed the nearest stop');
+  // Service sheet r3 helpers: title, de-duplicated prestazioni, today line, action bar.
+  const svc={id:'s1',title:'Igiene personale',address:'Via X 1',contacts:[{type:'phone',value:'Tel. 06.1',dial:'061'}],latitude:41.9,longitude:12.5,
+    raw:{category:{slug:'lavarsi'},offers:[{code:'docce',need:'lavarsi',label:'Docce',basis:'prestazione della fonte: Doccia'}],
+         native_classifications:{prestazioni:[{nome:'Doccia'},{nome:'Barbiere'},{nome:'Livello A1'}]},course_facts:{levels:['A1']},placement:{section:'services'}}};
+  if(serviceTitle(svc)!=='Docce') throw Error('title is not the main offer');
+  if(uncoveredPrestazioni(svc.raw).join(',')!=='Barbiere') throw Error('covered prestazioni or course levels repeated');
+  if(serviceTitle({...svc,raw:{offers:[]}})!=='Igiene personale') throw Error('title fallback lost');
+  const bar=renderServiceBar(svc);
+  if(!bar.includes('Chiama') || !bar.includes('tel:061') || !bar.includes('Indicazioni') || bar.indexOf('Chiama')>bar.indexOf('Indicazioni')) throw Error('action bar wrong');
+  if(!renderServiceBar({...svc,contacts:[{type:'email',value:'a@b.it'}]}).includes('Scrivi')) throw Error('e-mail fallback missing in action bar');
+  if(todayHours({days:[{day:'lun',intervals:[{label:'09:00 – 12:00'}]}]},at('2026-11-09T10:00:00Z'))!=='Oggi 09:00 – 12:00') throw Error('today hours wrong');
+  if(todayHours({days:[],raw_text:'lun 9-12'})!=='Orari nella sezione Orari') throw Error('text hours not pointed to the section');
   if(!renderTransitRows({availability:'outside_calendar'}).includes('non disponibile per oggi')) throw Error('outside calendar not explained');
   if(!renderTransitRows({availability:'available',lines:[]}).includes('Nessuna linea')) throw Error('empty result not explained');
   const bounds=(w,s,e,n)=>({getWest:()=>w,getSouth:()=>s,getEast:()=>e,getNorth:()=>n});
@@ -129,7 +146,7 @@ vm.runInContext(`
   if(TransportLayer.popupHtml({kind:'stop',transport_type:'bus',name:'<b>x',routes:[]}).includes('<b>x')) throw Error('stop name not escaped in popup');
   const twoLines=[row('49','bus',2,{route_id:'49"x'}),row('64','bus',2)];
   const focusHtml=renderTransitRows({availability:'available',lines:twoLines,stops:[{stop_name:'Piazza',modes:['bus'],walk_min:2,distance_m:80,wheelchair:'unknown',lines:twoLines}]});
-  if(!focusHtml.includes('Mostra tutte le 2 linee') || !focusHtml.includes('data-focus-route="*"') || focusHtml.includes('49"x"') || (focusHtml.match(/class="line-chip-button"/g)||[]).length!==2 || !focusHtml.includes('Fermata Piazza') || !focusHtml.includes('2 linee')) throw Error('stop group with clickable lines wrong or route id not escaped');
+  if(!focusHtml.includes('data-focus-stop="0"') || focusHtml.includes('49"x"') || (focusHtml.match(/class="line-chip-button"/g)||[]).length!==2 || !focusHtml.includes('Fermata Piazza')) throw Error('nearest stop with clickable lines wrong or route id not escaped');
   if(TransportLayer.focusLineStyle('bus',null,'49').color!==TransportLayer.colorForLine('49') || TransportLayer.focusLineStyle('bus',null,'49').weight<=TransportLayer.lineStyle('bus').weight) throw Error('focused bus lines not distinct and strong');
   if(TransportLayer.focusLineStyle('metro','#E27439','A').color!=='#E27439') throw Error('focused metro lost official colour');
   const mid=TransportLayer.lineLabelPoint({type:'LineString',coordinates:[[12.4,41.8],[12.5,41.9],[12.6,42]]});
@@ -155,7 +172,7 @@ vm.runInContext(`
   if(!TransportLayer.wheelchairText('unknown').includes('non indicata') || !TransportLayer.wheelchairText('yes').includes('Accessibile')) throw Error('wheelchair text wrong');
   const r49=row('49','bus',2,{next:[{headsign:'Termini',times:[{time:'08:00',in_min:10}]},{headsign:'Ostia',times:[]}]});
   const rowHtml=renderTransitRows({availability:'available',lines:[r49],stops:[{stop_name:'X',modes:['bus'],walk_min:2,distance_m:80,wheelchair:'yes',lines:[r49]}]});
-  if(rowHtml.includes('08:00') || rowHtml.includes('nessun’altra corsa oggi') || !rowHtml.includes('accessibile in sedia a rotelle') || !rowHtml.includes('<details class="destination-transit">')) throw Error('destination leaked countdowns or lost collapsed accessibility');
+  if(rowHtml.includes('08:00') || rowHtml.includes('nessun’altra corsa oggi') || !rowHtml.includes('accessibile in sedia a rotelle')) throw Error('destination leaked countdowns or lost accessibility');
   if(!transitLine({...r49,origin:true}).includes('08:00 (tra 10 min)')) throw Error('origin lost departures');
   const live=TransportLayer.directionTimes({realtime:[{time:'22:07',in_min:6,delay_min:4}],times:[{time:'22:03',in_min:2}]});
   if(!live.live || live.text!=='22:07 (tra 6 min · +4′)') throw Error('realtime text wrong: '+live.text);

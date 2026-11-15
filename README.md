@@ -264,6 +264,30 @@ The subsequent UI refinement integrates the discovery controls, shows every colo
 
 The discovery panel also offers **Aperti ora**, combining with existing filters in map/list and refreshing membership with the source opening status. Unknown or ambiguous hours are excluded while active. See [open-now checks](docs/open-now-execution.md).
 
+### Service sheet layout r3 (2026-11-15)
+
+Approved in [card-layout plan](../.scratch/card-layout/plan.md) (proposals r1–r3). The detail
+sheet (`openDetail` in `map.js`) has:
+
+- a **fixed header** instead of "Scheda servizio": category, title (the card's main offer
+  cluster, else the source's service name), facility · address, coloured hours status with
+  today's hours and an amber "orari da verificare" flag, "Organizzato da", source chips with
+  the single "da verificare" flag, "Segnala errore" and close; it condenses to one line while
+  scrolling;
+- **anchors** (Informazioni, Orari, Contatti, Come arrivare) on one scrolling page, tracking the
+  section in view;
+- **Informazioni**: Cosa offre (source prestazioni only when not already an offer or a course
+  level), Per chi, Come si accede, printed access text, course levels, source description
+  (collapsed beyond ~260 characters), other services at the place;
+- **Come arrivare**: the nearest stop named first; with a reference position, the nearest stop
+  served by a line that also stops near the user ("Autobus 16 passa anche da Termini…"); other
+  stops under "Altre N fermate";
+- **Fonti e aggiornamenti** at the end: the only place detailing reliability (data date,
+  position method, organisation role, merged records, interpreted labels) and original data;
+- a **fixed bar**: Chiama (or Scrivi / Sito web when there is no phone) and Indicazioni.
+
+The service chooser for several services at one point keeps the plain sheet head.
+
 ### Helpinet v0.3 fields (2026-11-15)
 
 From importer normalization v0.3 ([plan](../.scratch/taxonomy/v0.3-plan.md), task T3); older runs

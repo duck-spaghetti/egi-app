@@ -348,7 +348,6 @@ function renderFilters() {
 
 
 /* "Vicino a": lines near a service's place (see app/backend/transit_nearby.py). */
-const TRANSIT_STOPS_SHOWN = 4;
 const TRANSIT_NOTE = "Tempi a piedi stimati in linea d’aria (+30%, 4 km/h). Bus, metro e tram: Roma Servizi per la Mobilità; treni: Trenitalia (NeTEx, NAP nazionale); ferrovie senza orari: © OpenStreetMap contributors (ODbL 1.0), servizio odierno non verificato. Le corse soppresse non sono indicate. Accessibilità indicata solo dove la fonte la dichiara.";
 
 async function loadTransitSummaries() {
@@ -390,7 +389,7 @@ function transitBadge(poi) {
 
 function transitSectionShell(poi) {
   if (!transitEligible(poi)) return "";
-  return `<section class="detail-section transit-near" data-transit-place="${escapeHtml(poi.place_id)}"><h3>Vicino a</h3><p class="source-note">Cerco fermate e linee vicine…</p></section>`;
+  return `<div class="transit-near" data-transit-place="${escapeHtml(poi.place_id)}"><p class="source-note">Cerco fermate e linee vicine…</p></div>`;
 }
 
 function modeName(mode) {
@@ -431,7 +430,30 @@ function transitStopGroup(group, index, alerts = []) {
   return `<li class="transit-stop-group"><div class="transit-stop-head"><span class="transit-stop-icon">${icon}</span><span class="transit-text"><span class="transit-stop">${place} ${escapeHtml(group.stop_name)}</span><span class="transit-meta">circa ${group.walk_min} min a piedi · ${group.distance_m} m in linea d’aria · ${count} ${count === 1 ? "linea" : "linee"}${wheelchair}</span></span><button type="button" class="transit-row-focus" data-focus-stop="${index}" aria-label="Mostra sulla mappa le linee di ${escapeHtml(group.stop_name)}">Mostra linee</button></div><details class="stop-lines"><summary>Linee e dettagli</summary>${TransportLayer.alertsHtml(stopAlerts(group, alerts), new Set(group.lines.map(line => line.route_id)))}<ul class="transit-lines">${group.lines.map(transitLine).join("")}</ul></details></li>`;
 }
 
-function renderTransitRows(data) {
+/** The stop to name first: the nearest, or the nearest served by a line that also stops near the user. */
+function nearestStopChoice(stops, origin) {
+  if (!stops.length) return null;
+  const routes = new Map();
+  (origin?.stops || []).forEach(g => g.lines.forEach(line => { if (!routes.has(line.route_id)) routes.set(line.route_id, {line, from: g}); }));
+  for (const g of stops) {
+    const shared = g.lines.find(line => routes.has(line.route_id));
+    if (shared) return {group: g, link: {line: shared, from: routes.get(shared.route_id).from}};
+  }
+  return {group: stops[0], link: null};
+}
+
+function nearestStopHtml(choice, index, alerts = []) {
+  const g = choice.group;
+  const link = choice.link;
+  const mode = g.modes.includes("metro") ? "Stazione metro" : g.modes.includes("rail") ? "Stazione" : g.modes.length === 1 && g.modes[0] === "tram" ? "Fermata tram" : "Fermata";
+  return `<div class="nearest-stop"><p class="service-key">${link ? "Fermata collegata a te" : "Fermata più vicina"}</p>
+    <p class="nearest-stop-name"><strong>${escapeHtml(mode)} ${escapeHtml(g.stop_name)}</strong> · ${g.walk_min} min a piedi${g.wheelchair === "yes" ? ' · <span class="wheelchair-tag">accessibile in sedia a rotelle</span>' : ""}</p>
+    <div class="nearest-stop-lines">${g.lines.map(line => `<button type="button" class="line-chip-button" data-focus-route="${escapeHtml(line.route_id)}" aria-label="Mostra ${escapeHtml(modeName(line.mode))} ${escapeHtml(line.code)} sulla mappa">${lineChip(line)}</button>`).join("")}<button type="button" class="transit-row-focus" data-focus-stop="${index}">Mostra linee</button></div>
+    ${TransportLayer.alertsHtml(stopAlerts(g, alerts), new Set(g.lines.map(line => line.route_id)))}
+    ${link ? `<p class="nearest-stop-link">${escapeHtml(modeName(link.line.mode))} ${escapeHtml(link.line.code)} passa anche da ${escapeHtml(link.from.stop_name)}, vicino alla tua posizione.</p>` : ""}</div>`;
+}
+
+function renderTransitRows(data, origin = null) {
   const head = "";
   if (data.availability !== "available") {
     const reason = data.availability === "outside_calendar" ? "Orario dei trasporti non disponibile per oggi." : "Dati sui trasporti non disponibili al momento.";
@@ -441,11 +463,13 @@ function renderTransitRows(data) {
   const stops = data.stops || [];
   if (!lines.length) return `${head}<p>Nessuna linea con fermate nei dati disponibili entro 500 m (metro e treni entro 800 m).</p><p class="source-note">${TRANSIT_NOTE}</p>`;
   const alerts = data.alerts || [];
-  const shown = stops.slice(0, TRANSIT_STOPS_SHOWN).map((g, i) => transitStopGroup(g, i, alerts)).join("");
-  const rest = stops.slice(TRANSIT_STOPS_SHOWN);
-  const more = rest.length ? `<details class="transit-more-lines"><summary>Altre ${rest.length} fermate</summary><ul class="transit-list">${rest.map((g, i) => transitStopGroup(g, i + TRANSIT_STOPS_SHOWN, alerts)).join("")}</ul></details>` : "";
+  const choice = nearestStopChoice(stops, origin);
+  if (!choice) return `<p>Nessuna fermata nei dati disponibili.</p>`;
+  const chosen = stops.indexOf(choice.group);
+  const rest = stops.map((g, i) => [g, i]).filter(([, i]) => i !== chosen);
   const all = `<button type="button" class="transit-focus-all" data-focus-route="*">Mostra tutte le ${lines.length} linee sulla mappa</button>`;
-  return `<details class="destination-transit"><summary>Trasporti nelle vicinanze · ${stops.length} fermate${stops.length ? ` · la più vicina a ${stops[0].distance_m} m` : ""}</summary>${all}<ul class="transit-list">${shown}</ul>${more}<p class="source-note">Fermate vicino al servizio. Le partenze dal tuo punto di riferimento sono in Posizione. ${TRANSIT_NOTE}</p></details>`;
+  const more = rest.length ? `<details class="transit-more-lines"><summary>Altre ${rest.length} fermate</summary>${all}<ul class="transit-list">${rest.map(([g, i]) => transitStopGroup(g, i, alerts)).join("")}</ul><p class="source-note">${TRANSIT_NOTE}</p></details>` : `<p class="source-note">${TRANSIT_NOTE}</p>`;
+  return `${nearestStopHtml(choice, chosen, alerts)}${more}`;
 }
 
 async function loadTransitDetail(poi) {
@@ -459,9 +483,17 @@ async function loadTransitDetail(poi) {
   } catch (_error) {
     data = { availability: "unavailable", lines: [] };
   }
+  // With a reference position, prefer a stop whose line also serves the user (layout r3).
+  let origin = null;
+  if (state.userLoc && data.availability === "available") {
+    try {
+      const response = await fetch(`/api/preview/transit/origin?${new URLSearchParams({lat: state.userLoc.lat, lon: state.userLoc.lng})}`);
+      if (response.ok) origin = await response.json();
+    } catch (_error) { origin = null; }
+  }
   // The sheet may already show another service.
   if (!node.isConnected || node.dataset.transitPlace !== String(poi.place_id)) return;
-  node.innerHTML = renderTransitRows(data);
+  node.innerHTML = renderTransitRows(data, origin);
   node.querySelectorAll("[data-focus-route]").forEach(button => button.addEventListener("click", () => {
     const id = button.dataset.focusRoute;
     focusTransit(poi, id === "*" ? data.lines : data.lines.filter(row => row.route_id === id));
@@ -768,42 +800,222 @@ function listOpeningStatus(poi) {
   };
 }
 
+/**
+ * Service sheet (layout r3, 2026-11-15): a fixed header with what matters first, anchors
+ * to four sections on one scrolling page, a fixed call/directions bar, and the single
+ * reliability panel at the end ("Fonti e aggiornamenti"). See .scratch/card-layout/plan.md.
+ */
 async function openDetail(id) {
   const poi=state.pois.find(p=>String(p.id)===String(id));
   if (!poi) return showToast("Servizio non disponibile");
-  const raw=poi.raw || {};
-  const cat=resolveCategory(poi) || {};
-  const siblings=sameSourceGroup(poi).filter(p=>p.id!==poi.id);
-  const prestations=raw.native_classifications?.prestazioni || [];
-  const summary=raw.derived_summary;
-  const description=raw.description || summary?.text || "Descrizione non disponibile";
-  const icon=normalizeCategoryIconPath(cat.icon_path);
-  document.querySelector("#sheet-detail .sheet-head h2").textContent="Scheda servizio";
-  document.getElementById("detail-body").innerHTML=`
-    ${categoryBadge(cat)}
-    <h2 class="detail-name">${escapeHtml(poi.title)}</h2>
-    ${(raw.facility_name || raw.name) === poi.title ? "" : `<p class="facility-name">Presso ${escapeHtml(raw.facility_name || raw.name || "Gruppo da verificare")}</p>`}
-    <p class="detail-address">${escapeHtml(poi.address || raw.placement?.label || "Indirizzo non indicato")}</p>
-    ${sourceCode(poi) === "helpinet" || raw.organization_raw ? `<p class="detail-organization"><strong>Organizzazione indicata:</strong> ${escapeHtml(raw.organization_raw || "Non indicata")}</p>` : ""}
-    <p class="source-note">${escapeHtml(raw.placement?.label || "Posizione da verificare")}${sourceCode(poi) === "helpinet" ? " · Ruolo dell’organizzazione da verificare." : ""}</p>
-    ${openingBadge(poi)}
-    ${renderDetailHeaderActions(poi)}
-    ${raw.freshness ? `<p class="freshness-note${raw.freshness.stale ? " stale" : ""}">${escapeHtml(raw.freshness.label)}</p>` : ""}
-    <p class="source-note">${escapeHtml(sourceName(poi))} · dati non revisionati.${raw.itinerant_source?" Servizio itinerante: il punto della fonte non è una sede fissa verificata.":""}</p>
-    ${renderPositionNote(raw)}
-    ${transitSectionShell(poi)}
-    <section class="detail-section"><h3>Descrizione</h3><p${raw.sources?.[0]?.source_kind==="document"?' class="source-printed-text"':""}>${escapeHtml(description)}</p>${!raw.description && summary?.text?'<span class="derived-label">Sintesi ricavata dai campi della fonte · non descrizione originale</span>':""}</section>
-    ${renderOffers(raw)}
-    <section class="detail-section"><h3>${raw.source_code && raw.source_code!=="helpinet" ? "Temi indicati dalla fonte" : "Prestazioni indicate dalla fonte"}</h3><div class="service-chips">${prestations.map(v=>`<span class="service-chip">${escapeHtml(v.nome)}</span>`).join("") || "Non indicati dalla fonte"}</div></section>
-    ${raw.source_code && raw.source_code!=="helpinet" && !raw.access_display?.sections?.length && !raw.access_display?.texts?.length ? "" : `<section class="detail-section"><h3>Accesso e destinatari</h3>${renderSourceAccess(raw.access_display)}</section>`}
-    <section class="detail-section"><h3>Orari del servizio</h3>${renderSourceHours(raw.hours_display)}</section>
-    <section class="detail-section"><h3>Contatti di questo servizio</h3>${renderContacts(poi.contacts || [])}</section>
-    ${siblings.length?`<section class="detail-section"><h3>Altri servizi presso ${escapeHtml(raw.facility_name || "questo gruppo")}</h3><p class="source-note">Collegamento provvisorio dal gruppo Helpinet. Ogni scheda mantiene orari, accesso e contatti indipendenti.</p>${siblings.map(serviceButton).join("")}</section>`:""}
-    <details class="detail-section"><summary>Provenienza e dati originali</summary>${renderProvenance(poi)}<pre class="source-evidence">${escapeHtml(JSON.stringify({record:raw.source_locator,gruppo:raw.source_group,sintesi:raw.derived_summary,campi_originali:raw.source_values,posizione:raw.position,da_verificare:raw.review_required},null,2))}</pre></details>`;
+  const sheet=document.getElementById("sheet-detail");
+  sheet.classList.add("service-mode");
+  document.getElementById("detail-top").innerHTML=renderServiceHeader(poi);
+  document.getElementById("detail-body").innerHTML=[
+    renderInfoSection(poi), renderHoursSection(poi), renderContactsSection(poi),
+    renderArriveSection(poi), renderSourcesSection(poi)].join("");
+  document.getElementById("detail-bar").innerHTML=renderServiceBar(poi);
   bindServiceButtons();
+  bindServiceSheet(poi);
   void loadTransitDetail(poi);
   document.querySelector("#sheet-detail .sheet-body").scrollTop=0;
   openSheet("sheet-detail");
+  document.querySelector("#detail-top .service-close")?.focus();
+}
+
+const SERVICE_SECTIONS=[["info","Informazioni"],["orari","Orari"],["contatti","Contatti"],["arrivare","Come arrivare"]];
+
+/** Main offer cluster of the card's primary need, else the source's service name. */
+function serviceTitle(poi) {
+  const raw=poi.raw || {};
+  const primary=raw.category?.slug || raw.needs?.[0];
+  const offer=(raw.offers || []).find(o=>o.need===primary && o.code!=="associazioni") || (raw.offers || []).find(o=>o.code!=="associazioni");
+  return offer?.label || poi.title;
+}
+
+/** Today's declared intervals in Rome time, e.g. "Oggi 19:00 – 08:00 (del giorno dopo)". */
+function todayHours(display, now=new Date()) {
+  const structured=display?.days?.some(d=>d.intervals?.length);
+  if (!structured) return display?.raw_text || display?.scoped?.length ? "Orari nella sezione Orari" : "";
+  const day=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Rome",weekday:"short"}).format(now);
+  const key=["lun","mar","mer","gio","ven","sab","dom"][["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].indexOf(day)];
+  const today=display.days.find(d=>d.day===key);
+  return today?.intervals?.length ? `Oggi ${today.intervals.map(i=>i.label).join(", ")}` : "Oggi non indicato";
+}
+
+/** Hours that deserve the separate amber flag: corrections, conflicts, review notes. */
+function hoursNeedReview(display) {
+  if (!display) return false;
+  return Boolean((display.warnings || []).length || (display.days || []).some(d=>d.issues?.length || d.intervals?.some(i=>i.review_note)));
+}
+
+function sourceNames(poi) {
+  const names=(poi.raw?.sources || []).map(s=>s.source_name).filter(Boolean);
+  return names.length ? [...new Set(names)] : [sourceName(poi)];
+}
+
+function renderServiceHeader(poi) {
+  const raw=poi.raw || {};
+  const cat=resolveCategory(poi) || {};
+  const facility=raw.facility_name || raw.name || "";
+  const address=poi.address || "";
+  const status=sourceOpeningStatus(raw.hours_display);
+  const today=todayHours(raw.hours_display);
+  const report=reportErrorAction(poi);
+  return `<header class="service-head">
+    <div class="service-head-row">${categoryBadge(cat)}<button type="button" class="service-close" data-close-service aria-label="Chiudi la scheda">Chiudi</button></div>
+    <h2 class="service-title">${escapeHtml(serviceTitle(poi))}</h2>
+    <p class="service-where">${facility ? `<strong>${escapeHtml(facility)}</strong>` : ""}${facility && address ? " · " : ""}${escapeHtml(address || (facility ? "" : raw.placement?.label || ""))}</p>
+    <p class="service-status ${status.kind}" data-opening-service="${escapeHtml(poi.id)}"><strong>${escapeHtml(status.label)}</strong>${today ? `<span class="service-today">${escapeHtml(today)}</span>` : ""}${hoursNeedReview(raw.hours_display) ? '<span class="flag-hours">orari da verificare</span>' : ""}<small hidden></small></p>
+    <div class="service-extra">
+      ${raw.organization_raw ? `<p class="service-line"><span class="service-key">Organizzato da</span> ${escapeHtml(raw.organization_raw)}</p>` : ""}
+      <p class="service-line service-sources"><span class="service-key">Fonti</span> ${sourceNames(poi).map(n=>`<span class="source-chip">${escapeHtml(n)}</span>`).join("")}<button type="button" class="flag-data" data-jump="fonti">da verificare</button>${report ? `<a class="service-report" href="${escapeHtml(report.href)}">Segnala errore</a>` : ""}</p>
+    </div>
+  </header>
+  <nav class="service-anchors" aria-label="Sezioni della scheda">${SERVICE_SECTIONS.map(([id,label],i)=>`<button type="button" data-jump="${id}" class="${i===0 ? "on" : ""}">${label}</button>`).join("")}</nav>`;
+}
+
+function chipList(items, interpreted=new Set()) {
+  return `<div class="service-chips">${items.map(x=>`<span class="service-chip${interpreted.has(x) ? " interpreted" : ""}">${escapeHtml(x)}</span>`).join("")}</div>`;
+}
+
+/** Labels in order, without repeats (case-insensitive). */
+function uniqueLabels(labels) {
+  const seen=new Set();
+  return labels.filter(x=>{const k=String(x || "").toLowerCase().trim(); if (!k || seen.has(k)) return false; seen.add(k); return true;});
+}
+
+/** Source prestazioni not already shown as an offer ("Doccia" is covered by "Docce"). */
+function uncoveredPrestazioni(raw) {
+  const offers=raw.offers || [];
+  const covered=new Set(offers.flatMap(o=>[o.label,String(o.basis || "").replace(/^(prestazione|tipo) della fonte: /,"")]).map(x=>String(x).toLowerCase()));
+  const levels=(raw.course_facts?.levels || []).map(l=>String(l).toLowerCase());  // shown as "Livelli dei corsi"
+  return uniqueLabels((raw.native_classifications?.prestazioni || []).map(p=>p.nome))
+    .filter(n=>!covered.has(n.toLowerCase()) && !levels.some(l=>n.toLowerCase().includes(l)));
+}
+
+function renderInfoSection(poi) {
+  const raw=poi.raw || {};
+  const interpreted=new Set([...(raw.offers || []),...(raw.audiences || []),...(raw.access_tags || [])].filter(x=>x.interpreted).map(x=>x.label));
+  const offers=uniqueLabels((raw.offers || []).filter(o=>o.code!=="associazioni" || raw.offers.length===1).map(o=>o.label));
+  const extra=uncoveredPrestazioni(raw);
+  const sections=raw.access_display?.sections || [];
+  const entries=code=>(sections.find(s=>s.code===code)?.entries || []).map(e=>e.label);
+  const forWhom=uniqueLabels([...entries("audience"),...(raw.audiences || []).map(a=>a.label)]);
+  const access=uniqueLabels([...entries("procedure"),...entries("documents"),...entries("cost"),...(raw.access_tags || []).map(a=>a.label)]);
+  const texts=raw.access_display?.texts || [];
+  const levels=raw.course_facts?.levels || [];
+  const description=raw.description || "";
+  const siblings=sameSourceGroup(poi).filter(p=>p.id!==poi.id);
+  const printed=raw.sources?.[0]?.source_kind==="document" ? ' class="source-printed-text"' : "";
+  return `<section class="detail-section service-section" id="sec-info"><h3>Informazioni</h3>
+    ${offers.length ? `<h4>Cosa offre</h4>${chipList(offers, interpreted)}` : ""}
+    ${extra.length ? `<p class="service-also"><span class="service-key">Indicato anche dalla fonte</span> ${escapeHtml(extra.join(" · "))}</p>` : ""}
+    ${forWhom.length ? `<h4>Per chi</h4>${chipList(forWhom, interpreted)}` : ""}
+    ${access.length ? `<h4>Come si accede</h4>${chipList(access, interpreted)}` : ""}
+    ${texts.map(t=>`<h4>${escapeHtml(t.title)}</h4><p class="source-hours-text">${escapeHtml(t.text)}</p>`).join("")}
+    ${levels.length ? `<h4>Livelli dei corsi</h4>${chipList(levels)}` : ""}
+    ${description ? (description.length > 260
+      ? `<details class="service-description"><summary><span class="service-key">Descrizione della fonte</span> ${escapeHtml(description.slice(0,160))}…</summary><p${printed}>${escapeHtml(description)}</p></details>`
+      : `<h4>Descrizione della fonte</h4><p${printed}>${escapeHtml(description)}</p>`) : ""}
+    ${siblings.length ? `<h4>Altri servizi qui</h4>${siblings.map(serviceButton).join("")}` : ""}
+  </section>`;
+}
+
+function renderHoursSection(poi) {
+  const raw=poi.raw || {};
+  const display=raw.hours_display;
+  const known=Boolean(display?.days?.some(d=>d.intervals?.length) || display?.raw_text || display?.scoped?.length);
+  const meals=(raw.meal_times || []).map(m=>m.label);
+  const status=sourceOpeningStatus(display);
+  const quiet=display ? {...display, note: (display.days ? "Giorni non indicati: orario sconosciuto." : "")} : display;
+  return `<section class="detail-section service-section" id="sec-orari"><h3>Orari</h3>
+    ${known ? renderSourceHours(quiet) : "<p>La fonte non indica orari.</p>"}
+    ${meals.length ? `<h4>Pasti</h4>${chipList(meals)}` : ""}
+    ${!known || hoursNeedReview(display) || status.kind==="unknown" ? '<p class="service-advice">Chiama prima di andare: gli orari potrebbero non essere aggiornati.</p>' : ""}
+  </section>`;
+}
+
+function renderContactsSection(poi) {
+  const contacts=(poi.contacts || []).filter(c=>c?.is_active!==false);
+  return `<section class="detail-section service-section" id="sec-contatti"><h3>Contatti</h3>
+    ${contactActions(contacts).length ? renderContacts(contacts) : "<p>La fonte non indica contatti.</p>"}
+  </section>`;
+}
+
+function renderArriveSection(poi) {
+  const raw=poi.raw || {};
+  const facility=raw.facility_name || raw.name || "";
+  // Say how the point was found only when it is not the source's own point or a house number.
+  const precise=["source_point"].includes(raw.placement?.status) || /house/.test(raw.placement?.status || "");
+  const where=raw.itinerant_source ? "Servizio itinerante: il punto indicato non è una sede fissa." : precise ? "" : raw.placement?.label || "";
+  return `<section class="detail-section service-section" id="sec-arrivare"><h3>Come arrivare</h3>
+    <p>${facility ? `<strong>${escapeHtml(facility)}</strong><br>` : ""}${escapeHtml(poi.address || "Indirizzo non indicato")}</p>
+    ${where ? `<p class="service-note">${escapeHtml(where)}</p>` : ""}
+    ${transitSectionShell(poi)}
+  </section>`;
+}
+
+/** The only place that details how reliable the card is (one flag in the header). */
+function renderSourcesSection(poi) {
+  const raw=poi.raw || {};
+  const interpreted=[...(raw.offers || []),...(raw.audiences || []),...(raw.access_tags || [])].filter(x=>x.interpreted);
+  const items=[
+    raw.freshness?.label,
+    raw.placement?.label ? `Posizione: ${raw.placement.label}.` : "",
+    raw.position?.match ? `Posizione ricavata dall’indirizzo con Nominatim (© OpenStreetMap contributors): ${raw.position.match}.` : "",
+    sourceCode(poi)==="helpinet" ? "Ruolo dell’organizzazione indicata non verificato." : "",
+    raw.hours_display?.note ? `Orari: ${raw.hours_display.note}` : "",
+    raw.merged_from?.length ? `Scheda composta da ${raw.merged_from.length} schede della fonte che descrivono lo stesso servizio.` : "",
+    interpreted.length ? `Etichette ricavate dal testo della fonte (da verificare): ${interpreted.map(x=>`${x.label} (${x.basis})`).join("; ")}.` : "",
+  ].filter(Boolean);
+  return `<details class="detail-section service-section service-sources-panel" id="sec-fonti"><summary><h3>Fonti e aggiornamenti</h3></summary>
+    ${renderProvenance(poi)}
+    <p class="service-key">Dati non revisionati da EGI: verifica con chi eroga il servizio.</p>
+    <ul class="service-reliability">${items.map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul>
+    <details><summary>Dati originali</summary><pre class="source-evidence">${escapeHtml(JSON.stringify({record:raw.source_locator,gruppo:raw.source_group,sintesi:raw.derived_summary,campi_originali:raw.source_values,posizione:raw.position,da_verificare:raw.review_required,schede_unite:raw.merged_from},null,2))}</pre></details>
+  </details>`;
+}
+
+/** Fixed bar: call first (or e-mail / website), then directions. */
+function renderServiceBar(poi) {
+  const actions=contactActions((poi.contacts || []).filter(c=>c?.is_active!==false));
+  const reach=actions.find(a=>a.kind==="phone") || actions.find(a=>a.kind==="email") || actions.find(a=>a.kind==="website");
+  const go=directionsAction(poi);
+  const label={phone:"Chiama",email:"Scrivi",website:"Sito web"};
+  const buttons=[
+    reach ? `<a class="service-bar-btn primary ${reach.kind}" href="${escapeHtml(reach.href)}"${reach.external ? ' target="_blank" rel="noopener noreferrer"' : ""}><span class="contact-action-icon">${contactActionIcon(reach)}</span>${label[reach.kind]}</a>` : "",
+    go ? `<a class="service-bar-btn${reach ? "" : " primary"}" href="${escapeHtml(go.href)}" target="_blank" rel="noopener noreferrer"><span class="contact-action-icon">${contactActionIcon(go)}</span>Indicazioni</a>` : "",
+  ].filter(Boolean);
+  return buttons.join("");
+}
+
+/** Close, anchors, the header's data flag, and the compact header while scrolling. */
+function bindServiceSheet(poi) {
+  const top=document.getElementById("detail-top");
+  const body=document.getElementById("detail-body");
+  top.querySelector("[data-close-service]")?.addEventListener("click",closeSheets);
+  const mark=id=>top.querySelectorAll(".service-anchors [data-jump]").forEach(b=>b.classList.toggle("on",b.dataset.jump===id));
+  let jumpedAt=0;
+  const jump=id=>{
+    const target=document.getElementById(`sec-${id}`);
+    if (!target) return;
+    if (target.tagName==="DETAILS") target.open=true;
+    if (SERVICE_SECTIONS.some(([key])=>key===id)) mark(id);
+    jumpedAt=Date.now();
+    body.scrollTo({top:target.offsetTop-body.offsetTop-4,behavior:"smooth"});
+  };
+  top.querySelectorAll("[data-jump]").forEach(b=>b.addEventListener("click",()=>jump(b.dataset.jump)));
+  body.onscroll=()=>{
+    top.classList.toggle("compact", body.scrollTop>24);
+    // Keep the requested section while the jump scrolls, and at the end, where a short last
+    // section cannot reach the top.
+    if (Date.now()-jumpedAt<1000) return;
+    const atEnd=body.scrollTop+body.clientHeight>=body.scrollHeight-2;
+    const edge=atEnd ? body.scrollTop+body.clientHeight-60 : body.scrollTop+40;
+    const passed=SERVICE_SECTIONS.filter(([id])=>{const el=document.getElementById(`sec-${id}`);return el && el.offsetTop-body.offsetTop<=edge;});
+    mark((passed[passed.length-1] || SERVICE_SECTIONS[0])[0]);
+  };
 }
 
 function resolveLocalizedContent(poi, currentLanguageCode) {
@@ -1803,7 +2015,7 @@ const SOURCE_KIND_TEXT = {
 function renderProvenance(poi) {
   const raw = poi.raw || {};
   const src = raw.sources?.[0] || {};
-  if (sourceCode(poi) === "helpinet") return `<p>Osservazione locale: ${escapeHtml(raw.observed_at || "—")}. Acquisizione originale sconosciuta.</p>`;
+  if (sourceCode(poi) === "helpinet") return `<p>Helpinet · <a href="https://helpinet.app/app/" target="_blank" rel="noopener">helpinet.app</a>. Copia locale del ${escapeHtml((raw.observed_at || "—").slice(0, 10))}; data di raccolta originale non nota.</p>`;
   const kind = SOURCE_KIND_TEXT[src.source_kind] || SOURCE_KIND_TEXT.map_export;
   const link = src.source_url ? ` · <a href="${escapeHtml(src.source_url)}" target="_blank" rel="noopener">${kind.link}</a>` : "";
   return `<p>${escapeHtml(src.source_title || src.source_name || "Fonte")}${link}. ${kind.acquired} ${escapeHtml(raw.original_retrieved_at || "—")}.</p>${src.attribution?`<p class="source-note">${escapeHtml(src.attribution)}. Licenza di riuso non stabilita: solo preview locale.</p>`:""}`;
@@ -1838,6 +2050,9 @@ function bindServiceButtons() {
 
 function openServiceChooser(items, matched = new Set(items.map(p=>p.id))) {
   if (items.length === 1) return openDetail(items[0].id);
+  document.getElementById("sheet-detail").classList.remove("service-mode");
+  document.getElementById("detail-top").innerHTML = "";
+  document.getElementById("detail-bar").innerHTML = "";
   document.querySelector("#sheet-detail .sheet-head h2").textContent = "Scegli il servizio";
   document.getElementById("detail-body").innerHTML = `<h2>${escapeHtml(items[0].raw?.facility_name || "Gruppo della fonte")}</h2><p>${items.length} servizi con questa posizione. Scegli una scheda.</p>${items.map(p=>serviceButton(p,matched.has(p.id))).join("")}<p class="source-note">Servizi nella stessa posizione secondo le fonti; ogni servizio mantiene le proprie caratteristiche.</p>`;
   bindServiceButtons();
@@ -1958,7 +2173,7 @@ function updateOpeningBadges() {
     const poi=state.pois.find(p=>String(p.id)===el.dataset.openingService);
     if (!poi) return;
     const status=sourceOpeningStatus(poi.raw?.hours_display);
-    el.className=`source-opening ${status.kind}`;
+    el.className=`${el.classList.contains("service-status") ? "service-status" : "source-opening"} ${status.kind}`;
     el.querySelector("strong").textContent=status.label;
     el.querySelector("small").textContent=status.note;
   });
