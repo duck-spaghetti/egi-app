@@ -146,10 +146,11 @@ approved on 2026-11-09; v0.3 on 2026-11-15 during the source-by-source review
 - Quick paths: Violenza e protezione, Stanotte non so dove dormire, Lavarmi e mangiare
   oggi, Appena arrivato / senza documenti. The emergency sheet links to the help lines.
 
-Measured on 2026-11-15 (2,257 services, Helpinet run helpinet-02): Helpinet services have one
-need each — Salute 66, Mangiare 46, Orientamento 43, Lavarsi 31, Documenti 30, Lavoro 24,
-Violenza 21, Dormire 19, Vestiti e coperte 17, Istruzione 17, Multiservizi 1; e.g. Dipendenze
-29 (22 Alcoholics Anonymous groups), pasto sul posto 28 / da asporto 12 / cibo da cucinare 7.
+Measured on 2026-11-15 with Helpinet run helpinet-03 (2,251 cards; 309 Helpinet after six
+merges, all placed): one need each — Salute 66, Mangiare 45, Orientamento 43, Documenti 30,
+Lavarsi 27, Lavoro 24, Violenza 20, Dormire 19, Vestiti e coperte 17, Istruzione 17,
+Multiservizi 1; e.g. Dipendenze 29 (22 Alcoholics Anonymous groups), pasto sul posto 27 / da
+asporto 12 / cibo da cucinare 7.
 This is a presentation mapping, not the canonical taxonomy (egi_database).
 
 ## Limits
