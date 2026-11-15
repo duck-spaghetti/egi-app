@@ -784,7 +784,19 @@ function renderList(list) {
     const siblings=sameSourceGroup(poi).length;
     const distance=state.userLoc ? (poi._dist==null ? "Distanza non disponibile" : poi._dist<1?`${Math.round(poi._dist*1000)} m`:`${poi._dist.toFixed(1)} km`) : "";
     const icon=normalizeCategoryIconPath(poi.category_icon_path);
-    return `<button type="button" class="poi-item" data-id="${escapeHtml(poi.id)}"><span class="marker-stripe" style="background:${poi.category_color}"></span><span class="info"><span class="service-list-title"><span class="name">${escapeHtml(poi.title)}</span></span><span class="facility-name">${escapeHtml(facilityLine(poi))}${siblings>1?` · ${siblings} servizi`:""}</span><span class="meta">${categoryBadge(resolveCategory(poi))}${distance?`<span class="dist">${escapeHtml(distance)}</span>`:""}</span>${openingBadge(poi)}${transitBadge(poi)}<span class="source-note">${escapeHtml(sourceName(poi))} · ${escapeHtml(raw.placement?.label || "Posizione da verificare")}${raw.itinerant_source?" · Itinerante":""}</span></span></button>`;
+    // Same hierarchy as the service sheet header (layout r3): category, title, place, hours, who.
+    const facility=raw.facility_name || raw.name || "";
+    const status=sourceOpeningStatus(raw.hours_display);
+    const today=todayHours(raw.hours_display);
+    const who=[raw.organization_raw, ...sourceNames(poi)].filter(Boolean);
+    return `<button type="button" class="poi-item" data-id="${escapeHtml(poi.id)}"><span class="marker-stripe" style="background:${poi.category_color}"></span><span class="info">
+      <span class="meta">${categoryBadge(resolveCategory(poi))}${distance?`<span class="dist">${escapeHtml(distance)}</span>`:""}${raw.itinerant_source?'<span class="dist">Itinerante</span>':""}</span>
+      <span class="service-list-title"><span class="name">${escapeHtml(serviceTitle(poi))}</span></span>
+      <span class="facility-name">${facility ? `<strong>${escapeHtml(facility)}</strong>` : ""}${facility && poi.address ? " · " : ""}${escapeHtml(poi.address || "")}${siblings>1?` · ${siblings} servizi qui`:""}</span>
+      <span class="service-status ${status.kind}" data-opening-service="${escapeHtml(poi.id)}"><strong>${escapeHtml(status.label)}</strong>${today ? `<span class="service-today">${escapeHtml(today)}</span>` : ""}<small hidden></small></span>
+      ${transitBadge(poi)}
+      <span class="list-who">${escapeHtml(who.join(" · "))} · <span class="list-flag">da verificare</span></span>
+    </span></button>`;
   }).join("");
   wrap.querySelectorAll(".poi-item").forEach(el=>el.addEventListener("click",()=>openDetail(el.dataset.id)));
 }
@@ -836,11 +848,11 @@ function serviceTitle(poi) {
 /** Today's declared intervals in Rome time, e.g. "Oggi 19:00 – 08:00 (del giorno dopo)". */
 function todayHours(display, now=new Date()) {
   const structured=display?.days?.some(d=>d.intervals?.length);
-  if (!structured) return display?.raw_text || display?.scoped?.length ? "Orari nella sezione Orari" : "";
+  if (!structured) return display?.raw_text || display?.scoped?.length ? "Orari indicati come testo" : "";
   const day=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Rome",weekday:"short"}).format(now);
   const key=["lun","mar","mer","gio","ven","sab","dom"][["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].indexOf(day)];
   const today=display.days.find(d=>d.day===key);
-  return today?.intervals?.length ? `Oggi ${today.intervals.map(i=>i.label).join(", ")}` : "Oggi non indicato";
+  return today?.intervals?.length ? `Oggi ${today.intervals.map(i=>i.label).join(", ")}` : "";  // closed today: the status says it
 }
 
 /** Hours that deserve the separate amber flag: corrections, conflicts, review notes. */
@@ -928,7 +940,7 @@ function renderHoursSection(poi) {
   const known=Boolean(display?.days?.some(d=>d.intervals?.length) || display?.raw_text || display?.scoped?.length);
   const meals=(raw.meal_times || []).map(m=>m.label);
   const status=sourceOpeningStatus(display);
-  const quiet=display ? {...display, note: (display.days ? "Giorni non indicati: orario sconosciuto." : "")} : display;
+  const quiet=display ? {...display, note: ""} : display;
   return `<section class="detail-section service-section" id="sec-orari"><h3>Orari</h3>
     ${known ? renderSourceHours(quiet) : "<p>La fonte non indica orari.</p>"}
     ${meals.length ? `<h4>Pasti</h4>${chipList(meals)}` : ""}
@@ -2025,7 +2037,9 @@ function renderSourceHours(display) {
   if (!display) return '<p>Orari non indicati.</p>';
   if ("raw_text" in display && display.scoped?.length) return `<p class="source-note">${escapeHtml(display.note)}</p>${display.scoped.map(b=>`<div class="access-section">${b.title?`<h4>${escapeHtml(b.title)}</h4>`:""}${b.labels.length?`<div class="service-chips">${b.labels.map(l=>`<span class="service-chip">${escapeHtml(l.kind)}: ${escapeHtml(l.text)}${l.interpreted?" (interpretazione in revisione)":""}</span>`).join("")}</div>`:""}<p class="source-hours-text">${escapeHtml(b.text)}</p></div>`).join("")}`;
   if ("raw_text" in display) return `<p class="source-note">${escapeHtml(display.note)}</p>${display.raw_text?`<p class="source-hours-text">${escapeHtml(display.raw_text)}</p>`:""}`;
-  return `<p class="source-note">${escapeHtml(display.note)}</p><div class="source-week">${display.days.map(day=>`<div class="source-day"><strong>${escapeHtml(day.label)}</strong><span>${day.intervals.length ? day.intervals.map(v=>`<span>${escapeHtml(v.label)}${v.review_note ? ` <small>${escapeHtml(v.review_note)}</small>`:""}</span>`).join("<br>") : '<span class="unknown-value">Non indicato</span>'}${day.issues.length && !day.intervals.length ? `<small>${escapeHtml(day.issues.join("; "))}</small>`:""}</span></div>`).join("")}</div>${(display.warnings || []).map(w=>`<p class="source-note">${escapeHtml(w)}</p>`).join("")}`;
+  // Days without hours are closed when the source declares other days (user, 2026-11-15).
+  const empty=display.days.some(d=>d.intervals.length) ? '<span class="unknown-value">Chiuso</span>' : '<span class="unknown-value">Non indicato</span>';
+  return `${display.note ? `<p class="source-note">${escapeHtml(display.note)}</p>` : ""}<div class="source-week">${display.days.map(day=>`<div class="source-day"><strong>${escapeHtml(day.label)}</strong><span>${day.intervals.length ? day.intervals.map(v=>`<span>${escapeHtml(v.label)}${v.review_note ? ` <small>${escapeHtml(v.review_note)}</small>`:""}</span>`).join("<br>") : empty}${day.issues.length && !day.intervals.length ? `<small>${escapeHtml(day.issues.join("; "))}</small>`:""}</span></div>`).join("")}</div>${(display.warnings || []).map(w=>`<p class="source-note">${escapeHtml(w)}</p>`).join("")}`;
 }
 
 function renderSourceAccess(display) {
@@ -2151,12 +2165,13 @@ function sourceOpeningStatus(display, now = new Date()) {
   }
   const upcoming=merged.find(([a])=>a>minute);
   if (upcoming) return {kind:"closed",label:`Chiuso ora · apre oggi alle ${String(Math.floor(upcoming[0]/60)).padStart(2,"0")}:${String(upcoming[0]%60).padStart(2,"0")}`,note:unknown.note};
-  // Empty days do not prove closure; later declarations are labelled as such.
+  // A day without declared hours counts as closed when the source declares other days
+  // (user decision, 2026-11-15); with no structured hours at all the status stays unknown.
   for (let offset=1;offset<=7;offset++) {
     const candidate=display.days.find(d=>d.day===keys[(dayIndex+offset)%7]);
     if (candidate?.issues?.length) continue;
     const next=(candidate?.intervals || []).filter(i=>!i.review_note && span(i)!==null).sort((a,b)=>a.opens_raw.localeCompare(b.opens_raw))[0];
-    if (next) return {kind:ranges.length ? "closed" : "unknown",label:ranges.length ? `Chiuso ora · apre ${candidate.label} alle ${next.opens_raw}` : `Orario da verificare · prossima apertura indicata: ${candidate.label} ${next.opens_raw}`,note:`${unknown.note} · nessuna chiusura dedotta nei giorni mancanti`};
+    if (next) return {kind:"closed",label:`Chiuso ora · apre ${offset===1 ? "domani" : candidate.label.toLowerCase()} alle ${next.opens_raw}`,note:`${unknown.note} · giorni senza orari considerati chiusi`};
   }
   return unknown;
 }

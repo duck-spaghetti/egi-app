@@ -1559,3 +1559,11 @@ html[dir="rtl"] .sheet-back-head .arrow,
 .service-bar-btn.primary { background:var(--ink);color:#fff; }
 .service-bar-btn .contact-action-icon img { width:18px;height:18px; }
 .service-bar-btn.primary .contact-action-icon img { filter:invert(1); }
+
+/* List cards follow the service sheet header (layout r3). */
+.poi-item .service-status { margin:6px 0 2px;font-size:13px; }
+.poi-item .facility-name { margin:2px 0 4px;font-size:13px; }
+.poi-item .facility-name strong { color:var(--ink);font-weight:600; }
+.poi-item .meta { margin:0 0 4px;align-items:center;gap:8px; }
+.list-who { display:block;font-size:12px;color:var(--ink-faint);margin-top:4px; }
+.list-flag { color:#805d14; }

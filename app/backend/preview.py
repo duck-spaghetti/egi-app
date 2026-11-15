@@ -530,7 +530,7 @@ def source_hours(weekly: dict[str, Any] | None, raw: Any, source_name: str) -> d
     """Weekly hours when the source text parsed completely, otherwise the text as is."""
     if weekly:
         display = weekly_hours(weekly)
-        display["note"] = f"Orari dichiarati da {source_name}, letti dal testo originale; giorni non indicati: orario sconosciuto."
+        display["note"] = f"Orari dichiarati da {source_name}, letti dal testo originale; giorni senza orari: considerati chiusi."
         display["raw_text_original"] = raw
         display["opening_note"] = f"Orari {source_name} non revisionati · fuso Europe/Rome"
         return display

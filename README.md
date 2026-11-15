@@ -288,6 +288,13 @@ sheet (`openDetail` in `map.js`) has:
 
 The service chooser for several services at one point keeps the plain sheet head.
 
+**List cards** follow the same hierarchy: category (and distance), title, facility · address,
+hours status with today's hours, transit badge, organiser · sources · "da verificare".
+
+**Days without hours** (user decision, 2026-11-15): when a source declares structured hours
+for some days, the other days count as closed ("Chiuso ora · apre domani alle 15:15"; week
+table "Chiuso"); a service without structured hours stays "Orario non disponibile".
+
 ### Helpinet v0.3 fields (2026-11-15)
 
 From importer normalization v0.3 ([plan](../.scratch/taxonomy/v0.3-plan.md), task T3); older runs

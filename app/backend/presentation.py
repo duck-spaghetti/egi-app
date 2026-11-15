@@ -195,7 +195,7 @@ def weekly_hours(raw: Any, corrections: list[dict[str, Any]] | None = None) -> d
         "open_now": None,
         "warnings": warnings,
         "extra_fields": extra,
-        "note": "Orari dichiarati da Helpinet; ambito e completezza da verificare. Giorni non indicati: orario sconosciuto.",
+        "note": "Orari dichiarati da Helpinet; ambito e completezza da verificare. Giorni senza orari: considerati chiusi.",
     }
 
 

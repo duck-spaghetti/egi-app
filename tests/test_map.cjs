@@ -67,7 +67,12 @@ vm.runInContext(`
   if(sourceOpeningStatus(schedule,at('2026-11-09T15:59:00Z')).kind!=='open') throw Error('orange shown too early');
   const summer=sourceOpeningStatus(hours([['09:00','18:00']]),at('2026-07-06T07:00:00Z'));
   if(summer.kind!=='open') throw Error('Rome summer timezone ignored');
-  if(sourceOpeningStatus(hours([]),at('2026-11-09T09:00:00Z')).kind!=='unknown') throw Error('missing day became closed');
+  if(sourceOpeningStatus(hours([]),at('2026-11-09T09:00:00Z')).kind!=='unknown') throw Error('no structured hours became closed');
+  // A day without hours counts as closed when other days are declared (user, 2026-11-15).
+  const mondays={days:[{day:'lun',label:'Lunedì',intervals:[{opens_raw:'15:15',closes_raw:'17:00',review_note:null}],issues:[]},{day:'dom',label:'Domenica',intervals:[],issues:[]}]};
+  const sunday=sourceOpeningStatus(mondays,at('2026-11-15T18:00:00Z'));
+  if(sunday.kind!=='closed' || sunday.label!=='Chiuso ora · apre domani alle 15:15') throw Error('undeclared day not closed: '+sunday.label);
+  if(sourceOpeningStatus(mondays,at('2026-11-12T18:00:00Z')).label!=='Chiuso ora · apre lunedì alle 15:15') throw Error('next opening day wrong');
   if(sourceOpeningStatus(hours([['22:00','02:00']],['ambiguous']),at('2026-11-09T22:00:00Z')).kind!=='unknown') throw Error('ambiguous overnight opening invented');
   // Night shelter 19:00–08:00 (Helpinet): open in the evening and, from Monday's interval, early on Tuesday.
   const night={days:[{day:'lun',label:'Lunedì',intervals:[{opens_raw:'19:00',closes_raw:'08:00',review_note:null,overnight:true}],issues:[]},
@@ -130,7 +135,8 @@ vm.runInContext(`
   if(!bar.includes('Chiama') || !bar.includes('tel:061') || !bar.includes('Indicazioni') || bar.indexOf('Chiama')>bar.indexOf('Indicazioni')) throw Error('action bar wrong');
   if(!renderServiceBar({...svc,contacts:[{type:'email',value:'a@b.it'}]}).includes('Scrivi')) throw Error('e-mail fallback missing in action bar');
   if(todayHours({days:[{day:'lun',intervals:[{label:'09:00 – 12:00'}]}]},at('2026-11-09T10:00:00Z'))!=='Oggi 09:00 – 12:00') throw Error('today hours wrong');
-  if(todayHours({days:[],raw_text:'lun 9-12'})!=='Orari nella sezione Orari') throw Error('text hours not pointed to the section');
+  if(todayHours({days:[],raw_text:'lun 9-12'})!=='Orari indicati come testo') throw Error('text hours not named');
+  if(todayHours({days:[{day:'lun',intervals:[{label:'09:00 – 12:00'}]},{day:'mar',intervals:[]}]},at('2026-11-10T10:00:00Z'))!=='') throw Error('closed day repeated in the today line');
   if(!renderTransitRows({availability:'outside_calendar'}).includes('non disponibile per oggi')) throw Error('outside calendar not explained');
   if(!renderTransitRows({availability:'available',lines:[]}).includes('Nessuna linea')) throw Error('empty result not explained');
   const bounds=(w,s,e,n)=>({getWest:()=>w,getSouth:()=>s,getEast:()=>e,getNorth:()=>n});
