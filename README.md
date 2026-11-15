@@ -443,8 +443,8 @@ Also fixed: "Scegli punto" threw `poi is not defined` (a stray line from `3a6bad
 - **Positions:** they come only from the address (importer rule); CAP-only and
   municipality-only results are never shown.
 - **Freshness:** every card says how current the source declares itself to be. Declarations
-  older than 18 months at acquisition are highlighted; Helpinet and undated sources say the
-  date is unknown. The banner reads "non sempre aggiornati". Data are imported as is, and
+  older than 18 months at acquisition are highlighted; Helpinet v0.3 shows an upper bound
+  ("dati del 9 maggio 2026 o precedenti"); undated sources say the date is unknown. The banner reads "non sempre aggiornati". Data are imported as is, and
   reviewers enrich, clean, deduplicate and verify with the providers.
 
 ### Duplicate review page (2026-11-09)
