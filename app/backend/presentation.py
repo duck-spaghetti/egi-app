@@ -116,8 +116,14 @@ def access_sections(flags: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def weekly_hours(raw: Any) -> dict[str, Any]:
-    """Expose readable original weekday intervals and diagnostics without open-now claims."""
+def weekly_hours(raw: Any, corrections: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """Expose readable weekday intervals and diagnostics without open-now claims.
+
+    An interval ending before it starts crosses midnight (a night shelter 19:00–08:00,
+    user decision 2026-11-15) and is marked `overnight`; 00:00–23:59 reads as 24 hours.
+    `raw` may be the importer's curated hours; `corrections` are listed as warnings so the
+    source's own value stays visible.
+    """
     raw = raw if isinstance(raw, dict) else {}
     rows = []
     warnings = []
@@ -139,17 +145,24 @@ def weekly_hours(raw: Any) -> dict[str, Any]:
                 and bool(CLOCK.fullmatch(end))
             )
             note = None
+            overnight = valid and end < start
+            label = f'{start or "?"} – {end or "?"}'
             if not valid:
                 note = "Formato orario da verificare"
-            elif end <= start:
-                note = "Possibile orario notturno o incongruenza: da verificare"
+            elif end == start:
+                note = "Apertura e chiusura coincidono: da verificare"
+            elif overnight:
+                label += " (del giorno dopo)"
+            elif (start, end) == ("00:00", "23:59"):
+                label = "Aperto 24 ore"
             if note:
                 issues.append(note)
             intervals.append(
                 {
                     "opens_raw": start,
                     "closes_raw": end,
-                    "label": f'{start or "?"} – {end or "?"}',
+                    "label": label,
+                    "overnight": overnight,
                     "review_note": note,
                     "raw": interval,
                 }
@@ -162,6 +175,13 @@ def weekly_hours(raw: Any) -> dict[str, Any]:
                 "state": "declared" if intervals else "unknown",
                 "issues": issues,
             }
+        )
+    days = dict(DAYS)
+    for item in corrections or []:
+        source, fixed = item.get("raw") or {}, item.get("corrected") or {}
+        warnings.append(
+            f'{days.get(item.get("day"), item.get("day"))}: la fonte indica {source.get("inizio")} – {source.get("fine")}, '
+            f'letto come {fixed.get("inizio")} – {fixed.get("fine")} (correzione in revisione).'
         )
     extra = {key: value for key, value in raw.items() if key not in dict(DAYS)}
     if extra:
@@ -179,11 +199,21 @@ def weekly_hours(raw: Any) -> dict[str, Any]:
     }
 
 
-def placement(payload: dict[str, Any], point: dict[str, Any] | None) -> dict[str, str]:
-    """Classify directory eligibility from explicit delivery mode, never missing geometry."""
+def placement(payload: dict[str, Any], point: dict[str, Any] | None, derived: bool = False) -> dict[str, str]:
+    """Classify directory eligibility from explicit delivery mode, never missing geometry.
+
+    `derived`: the point is a same-group sibling's at the same address (importer v0.3).
+    """
     mode = payload.get("delivery_mode")
     if mode in {"telephone", "online"}:
         return {"section": "directory", "status": mode, "label": "Servizio a distanza"}
+    if point is not None and derived:
+        return {
+            "section": "services",
+            "status": "source_group_sibling",
+            "label": "Coordinate di un altro servizio della stessa struttura allo stesso indirizzo · da verificare",
+            "issue": "ok",
+        }
     if point is not None:
         return {
             "section": "services",

@@ -1397,7 +1397,9 @@ function contactHref(contact) {
   const type = String(contact.type || contact.contact_type || "").toLowerCase();
   const value = String(contact.value || contact.contact_value || "").trim();
   if (!value) return null;
-  if (type === "phone" || type === "fax") return `tel:${value.replaceAll(" ", "")}`;
+  // Helpinet v0.3 gives a dialable number (`dial`); null means the value is not a number.
+  if ((type === "phone" || type === "fax") && "dial" in contact) return contact.dial ? `tel:${contact.dial}` : null;
+  if (type === "phone" || type === "fax") return `tel:${value.replace(/[^\d+]/g, "")}`;
   if (type === "email") return `mailto:${value}`;
   if (type === "whatsapp") return `https://wa.me/${value.replace(/\D/g, "")}`;
   if (type === "website" || type === "social" || type === "telegram") {
@@ -1916,12 +1918,18 @@ function sourceOpeningStatus(display, now = new Date()) {
   const minute=Number(parts.hour)*60+Number(parts.minute);
   const intervals=day?.intervals || [];
   if (day?.issues?.length || intervals.some(i=>i.review_note)) return {...unknown,label:"Orari da verificare"};
-  const ranges=intervals.map(i=>[parseClockMinutes(i.opens_raw),parseClockMinutes(i.closes_raw)]).filter(([a,b])=>a!==null && b!==null && b>a).sort((a,b)=>a[0]-b[0]);
-  if (ranges.length!==intervals.length) return {...unknown,label:"Orari da verificare"};
+  // An interval ending before it starts crosses midnight (night shelters); 23:59 closes the day.
+  const span=i=>{const a=parseClockMinutes(i.opens_raw);let b=parseClockMinutes(i.closes_raw);if(a===null||b===null)return null;if(b===1439)b=1440;return b>a?{today:[a,b]}:b<a?{today:[a,1440],next:[0,b]}:null;};
+  const spans=intervals.map(span);
+  if (spans.some(x=>x===null)) return {...unknown,label:"Orari da verificare"};
+  const yesterday=display.days.find(d=>d.day===keys[(dayIndex+6)%7]);
+  const carried=yesterday?.issues?.length ? [] : (yesterday?.intervals || []).map(span).filter(x=>x?.next).map(x=>x.next);
+  const ranges=[...spans.map(x=>x.today),...carried].sort((a,b)=>a[0]-b[0]);
   // Merge overlapping or adjacent intervals before finding the closing boundary.
   const merged=[];
   ranges.forEach(([a,b])=>{const last=merged[merged.length-1];if(last && a<=last[1]) last[1]=Math.max(last[1],b);else merged.push([a,b]);});
   const active=merged.find(([a,b])=>a<=minute && minute<b);
+  if (active && active[1]===1440) return {kind:"open",label:"Aperto ora",note:unknown.note};  // continues past midnight
   if (active) {
     const remaining=active[1]-minute;
     return {kind:remaining<=60 ? "closing" : "open",label:remaining<=60?`Aperto ora · chiude alle ${String(Math.floor(active[1]/60)).padStart(2,"0")}:${String(active[1]%60).padStart(2,"0")}`:"Aperto ora",note:unknown.note};
@@ -1932,7 +1940,7 @@ function sourceOpeningStatus(display, now = new Date()) {
   for (let offset=1;offset<=7;offset++) {
     const candidate=display.days.find(d=>d.day===keys[(dayIndex+offset)%7]);
     if (candidate?.issues?.length) continue;
-    const next=(candidate?.intervals || []).filter(i=>!i.review_note && parseClockMinutes(i.opens_raw)!==null && parseClockMinutes(i.closes_raw)>parseClockMinutes(i.opens_raw)).sort((a,b)=>a.opens_raw.localeCompare(b.opens_raw))[0];
+    const next=(candidate?.intervals || []).filter(i=>!i.review_note && span(i)!==null).sort((a,b)=>a.opens_raw.localeCompare(b.opens_raw))[0];
     if (next) return {kind:ranges.length ? "closed" : "unknown",label:ranges.length ? `Chiuso ora · apre ${candidate.label} alle ${next.opens_raw}` : `Orario da verificare · prossima apertura indicata: ${candidate.label} ${next.opens_raw}`,note:`${unknown.note} · nessuna chiusura dedotta nei giorni mancanti`};
   }
   return unknown;

@@ -3,6 +3,10 @@
 Rows come from app.backend.subjects (PostgreSQL source evidence); this module
 only adapts them and creates no canonical entities or publication decisions. Native classification
 keys are presentation groups, not an adopted EGI taxonomy.
+
+Helpinet normalization v0.3 fields are read when present (older runs lack them): curated hours,
+dialable phone numbers, positions from same-group siblings, the data-age upper bound and
+same-service merges (`helpinet_card`, `merge_cards`).
 """
 
 from __future__ import annotations
@@ -12,7 +16,7 @@ import re
 from typing import Any
 
 from . import taxonomy
-from .presentation import access_sections, weekly_hours, placement
+from .presentation import AUDIENCE, DAYS, access_sections, weekly_hours, placement
 
 LANGUAGES = [
     {
@@ -181,13 +185,118 @@ def source_point(position: dict[str, Any]) -> dict[str, Any] | None:
     return {"type": "Point", "coordinates": [lng, lat]}
 
 
+def derived_point(payload: dict[str, Any]) -> dict[str, Any] | None:
+    """Point of a same-group sibling at the same address (importer v0.3), else None."""
+    derived = (payload.get("location") or {}).get("derived_position") or {}
+    return source_point({"coordinate": {"lat": derived.get("lat"), "lng": derived.get("lng")}}) if derived else None
+
+
+def helpinet_contacts(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Card contacts; a phone gets one entry per dialable number (`dial`), raw value kept.
+
+    "0667105197/98" becomes two entries; a value the importer could not read stays as
+    text without a link (`dial` None). Older runs have no `normalized` field.
+    """
+    result = []
+    for c in payload["contacts"]:
+        numbers = c.get("normalized") if c["channel"] == "phone" and "normalized" in c else None
+        if numbers is None:
+            result.append({"type": c["channel"], "value": c["value"], "label": None, "is_active": True})
+        elif not numbers:
+            result.append({"type": c["channel"], "value": c["value"], "dial": None, "label": "Numero da verificare", "is_active": True})
+        else:
+            for number in numbers:
+                result.append({"type": c["channel"], "value": c["value"] if len(numbers) == 1 else number,
+                               "dial": number, "label": None, "is_active": True})
+    return result
+
+
+def data_as_of(fresh: dict[str, Any] | None, observed_at: str | None) -> dict[str, Any]:
+    """Freshness from an upper bound on the data date (Helpinet v0.3), else the generic note."""
+    if not fresh or not fresh.get("latest"):
+        return freshness(None, observed_at)
+    latest = fresh["latest"]
+    acquired = (observed_at or "")[:10] or None
+    year, month, day = (int(x) for x in latest.split("-"))
+    months = (int(acquired[:4]) - year) * 12 + (int(acquired[5:7]) - month) if acquired else None
+    when = f"{day} {MONTHS[month - 1]} {year}"
+    age = f" (circa {months} mesi prima dell'acquisizione)" if months else ""
+    return {"declared": f"{when} o precedenti", "months_old": months, "acquired": acquired, "stale": bool(months and months >= 18),
+            "label": f"Dati del {when} o precedenti{age}; la data esatta di raccolta non è nota. Da verificare con chi eroga il servizio."}
+
+
+def merge_cards(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Show a service the source published twice as one card (importer v0.3 `merge`).
+
+    The secondary record is hidden (it stays in the database); the primary card shows each
+    record's hours labelled by its own audience, the union of contacts, access flags and
+    prestazioni, and a warning when two records give different hours for the same audience.
+    """
+    by_locator = {c["source_locator"]: c for c in cards}
+    result = []
+    for card in cards:
+        merge = card.pop("_merge", None) or {}
+        if merge.get("role") == "merged_into" and merge.get("primary") + ":subject" in by_locator:
+            continue
+        if merge.get("role") == "primary":
+            members = [by_locator.get(m + ":subject") for m in merge["members"]]
+            members = [m for m in members if m is not None]
+            if len(members) > 1:
+                _combine(card, members, merge)
+        result.append(card)
+    return result
+
+
+def _combine(card: dict[str, Any], members: list[dict[str, Any]], merge: dict[str, Any]) -> None:
+    """Fold member cards into the primary card (see `merge_cards`)."""
+    variants = merge.get("variants") or []
+    common = set.intersection(*(set(v.get("access_true", [])) for v in variants)) if variants else set()
+    days: dict[str, dict[str, Any]] = {d["day"]: {**d, "intervals": [], "issues": []} for d in members[0]["hours_display"]["days"]}
+    warnings: list[str] = []
+    labels = []
+    def signature(member: dict[str, Any]) -> list[Any]:
+        return [[(i["opens_raw"], i["closes_raw"]) for i in d["intervals"]] for d in member["hours_display"]["days"]]
+    distinct = len({repr(signature(m)) for m in members}) > 1
+    seen: set[str] = set()
+    for index, (member, variant) in enumerate(zip(members, variants or [{}] * len(members))):
+        if repr(signature(member)) in seen:
+            continue  # same hours published twice (e.g. a record missing only the email)
+        seen.add(repr(signature(member)))
+        own = [AUDIENCE.get(code, code) for code in sorted(set(variant.get("access_true", [])) - common) if code in AUDIENCE]
+        label = (", ".join(own) or f"versione {chr(65 + index)} della fonte") if distinct else None
+        if label:
+            labels.append(label)
+        for day in member["hours_display"]["days"]:
+            target = days[day["day"]]
+            target["intervals"] += [{**i, "label": f'{i["label"]} · {label}' if label else i["label"], "audience": label} for i in day["intervals"]]
+            target["issues"] += day["issues"]
+            target["state"] = "declared" if target["intervals"] else "unknown"
+        warnings += member["hours_display"].get("warnings", [])
+    if "hours_differ_for_same_audience" in merge.get("conflicts", []):
+        warnings.append("La fonte pubblica questo servizio due volte con orari diversi: da verificare.")
+    flags = {k: v for m in members for k, v in (m.get("access_raw") or {}).items() if v is True}
+    natives = dict(card["native_classifications"])
+    natives["prestazioni"] = list({p.get("nome"): p for m in members for p in m["native_classifications"].get("prestazioni") or []}.values())
+    contacts = list({(c["type"], c.get("dial") or c["value"]): c for m in members for c in m["contacts"]}.values())
+    card.update({
+        "hours_display": {**card["hours_display"], "days": [days[k] for k, _ in DAYS], "warnings": warnings,
+                          "note": (f"Orari dichiarati da Helpinet in {len(members)} schede dello stesso servizio ({'; '.join(labels)}); da verificare."
+                                   if labels else card["hours_display"]["note"])},
+        "access_raw": {**card["access_raw"], **flags},
+        "access_display": access_sections({**card["access_raw"], **flags}),
+        "native_classifications": natives,
+        "contacts": contacts,
+        "merged_from": [m["source_locator"] for m in members],
+    })
+
+
 def services(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Adapt source subjects to existing map cards while labelling all data unreviewed.
 
     Each card is then placed in the need-first presentation taxonomy (`taxonomy.apply`);
     the source's own need stays in `source_category`.
     """
-    return [taxonomy.apply(card) for card in _source_cards(rows)]
+    return [taxonomy.apply(card) for card in merge_cards(_source_cards(rows))]
 
 
 def _source_cards(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -203,6 +312,8 @@ def _source_cards(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         p = row["payload"]
         code = group_code(row)
         position = p["location"]["source_position"]
+        point = source_point(position) or derived_point(p)
+        derived = source_point(position) is None and point is not None
         result.append(
             {
                 "id": row["id"],
@@ -216,8 +327,8 @@ def _source_cards(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "derived_summary": p.get("derived_summary"),
                 "source_values": p.get("source_values", {}),
                 "access_display": access_sections(p["access"]["raw_flags"]),
-                "hours_display": weekly_hours(p["hours"]["raw_value"]),
-                "placement": placement(p, source_point(position)),
+                "hours_display": weekly_hours(p["hours"].get("corrected_value") or p["hours"]["raw_value"], p["hours"].get("corrections")),
+                "placement": placement(p, point, derived),
                 "delivery_mode": p.get("delivery_mode"),
                 "name": p["name"],
                 "description": p["description"],
@@ -226,7 +337,7 @@ def _source_cards(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "run_id": row["run_id"],
                 "observed_at": row["observed_at"],
                 "original_retrieved_at": None,
-                "freshness": freshness(None, row.get("observed_at")),
+                "freshness": data_as_of(p.get("data_as_of"), row.get("observed_at")),
                 "category": by_code[code],
                 "category_id": by_code[code]["id"],
                 "subcategory": None,
@@ -236,25 +347,18 @@ def _source_cards(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "cost_note": None,
                 "hours": [],
                 "hours_raw": p["hours"]["raw_value"],
-                "contacts": [
-                    {
-                        "type": c["channel"],
-                        "value": c["value"],
-                        "label": None,
-                        "is_active": True,
-                    }
-                    for c in p["contacts"]
-                ],
+                "contacts": helpinet_contacts(p),
                 "place": {
                     "id": (p.get("source_group") or {}).get("external_key")
                     or row["id"],
                     "name": (p.get("source_group") or {}).get("name") or p["name"],
                     "address": p["location"]["address_raw"],
-                    "geometry": source_point(position),
+                    "geometry": point,
                     "contacts": [],
                     "is_protected_address": False,
                 },
                 "source_code": "helpinet",
+                "_merge": p.get("merge"),
                 "sources": [
                     {
                         "source_name": "Helpinet",
@@ -268,7 +372,7 @@ def _source_cards(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "native_classifications": p["source_classifications"],
                 "review_required": p["review_required"],
                 "itinerant_source": position.get("itinerante") is True,
-                "coordinate_status": "source_unverified",
+                "coordinate_status": "source_group_sibling_unverified" if derived else "source_unverified",
                 "is_active": True,
             }
         )
@@ -591,6 +695,8 @@ def debug_positions(rows: list[dict[str, Any]], source_code: str) -> dict[str, A
         else:
             shown = source_point(p["location"]["source_position"] or {})
             status = "source_point" if shown else "no_position"
+            if shown is None and (shown := derived_point(p)):
+                status = "source_group_sibling"
             lat, lon = (shown["coordinates"][1], shown["coordinates"][0]) if shown else (None, None)
             extra = {"ambiguous": False}
             layer = p["source_classifications"].get("tipologia")

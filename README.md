@@ -263,6 +263,25 @@ The subsequent UI refinement integrates the discovery controls, shows every colo
 
 The discovery panel also offers **Aperti ora**, combining with existing filters in map/list and refreshing membership with the source opening status. Unknown or ambiguous hours are excluded while active. See [open-now checks](docs/open-now-execution.md).
 
+### Helpinet v0.3 fields (2026-11-15)
+
+From importer normalization v0.3 ([plan](../.scratch/taxonomy/v0.3-plan.md), task T3); older runs
+render as before.
+
+- **Overnight hours**: an interval ending before it starts crosses midnight ("19:00 – 08:00
+  (del giorno dopo)") and counts as open in the evening and, from the previous day, until it
+  closes; 00:00–23:59 reads "Aperto 24 ore". Equal start and end stay "da verificare".
+- **Curated hours** (`hours.corrected_value`) are shown, with the source's own value as a
+  warning (Ceccano Thursday).
+- **Phones** link to the dialable `normalized` numbers ("0667105197/98" → two entries); a
+  value the importer cannot read stays as text without a link.
+- **Positions** of a same-group sibling at the same address are shown with their own label
+  (`placement.status` `source_group_sibling`).
+- **Data date**: "Dati del 9 maggio 2026 o precedenti" from `data_as_of`.
+- **Merged services**: a record marked `merged_into` is hidden; the primary card lists each
+  record's hours labelled by its own audience (e.g. "· Uomini", "· Donne"), unions contacts,
+  access flags and prestazioni, warns about conflicting hours, and keeps `merged_from`.
+
 ### Cycle lanes
 
 `GET /api/preview/cycleways?west&south&east&north&zoom` returns OpenStreetMap cycle

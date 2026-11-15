@@ -69,6 +69,16 @@ vm.runInContext(`
   if(summer.kind!=='open') throw Error('Rome summer timezone ignored');
   if(sourceOpeningStatus(hours([]),at('2026-11-09T09:00:00Z')).kind!=='unknown') throw Error('missing day became closed');
   if(sourceOpeningStatus(hours([['22:00','02:00']],['ambiguous']),at('2026-11-09T22:00:00Z')).kind!=='unknown') throw Error('ambiguous overnight opening invented');
+  // Night shelter 19:00–08:00 (Helpinet): open in the evening and, from Monday's interval, early on Tuesday.
+  const night={days:[{day:'lun',label:'Lunedì',intervals:[{opens_raw:'19:00',closes_raw:'08:00',review_note:null,overnight:true}],issues:[]},
+                     {day:'mar',label:'Martedì',intervals:[],issues:[]}]};
+  if(sourceOpeningStatus(night,at('2026-11-09T21:00:00Z')).label!=='Aperto ora') throw Error('overnight evening not open');
+  if(sourceOpeningStatus(night,at('2026-11-10T05:00:00Z')).kind!=='open' || sourceOpeningStatus(night,at('2026-11-10T06:30:00Z')).label!=='Aperto ora · chiude alle 08:00') throw Error('overnight morning not carried to the next day');
+  if(sourceOpeningStatus(night,at('2026-11-10T07:30:00Z')).kind==='open') throw Error('overnight interval did not close at 08:00');
+  if(sourceOpeningStatus(night,at('2026-11-09T16:00:00Z')).label!=='Chiuso ora · apre oggi alle 19:00') throw Error('overnight opening countdown broken');
+  if(sourceOpeningStatus(hours([['00:00','23:59']]),at('2026-11-09T22:30:00Z')).kind!=='open') throw Error('24-hour day closed before midnight');
+  if(contactAction({type:'phone',value:'Tel. 06.88815720',dial:'0688815720'}).href!=='tel:0688815720') throw Error('dialable number not used');
+  if(contactAction({type:'phone',value:'Tel. 06.88815720'}).href!=='tel:0688815720') throw Error('raw phone link not cleaned');
   if(contactAction({type:'phone',value:'06 123456'}).label!=='06 123456' || contactAction({type:'email',value:'info@example.org'}).label!=='info@example.org') throw Error('contact values replaced by generic actions');
   if(contactAction({type:'email',value:'info@example.org',label:'Segreteria'}).label!=='Segreteria') throw Error('explicit contact label lost');
   const samePoint=make('same','Sportello',[12.5,41.9],2,'Ascolto',9,true);

@@ -70,8 +70,58 @@ def subject(identifier: str, name: str, hours: dict) -> dict:
 class PresentationTests(unittest.TestCase):
     """Check unknowns and independent source claims without changing database policy."""
 
-    def test_weekly_hours_missing_days_are_unknown_and_overnight_is_flagged(self):
-        """Readable source intervals never create a closed day or definite open-now claim."""
+    def v03_pair(self):
+        """Two Helpinet v0.3 records of one shower service, for men and for women."""
+        men = subject("m", "Igiene personale", {"lun": [{"inizio": "09:00", "fine": "11:00"}]})
+        women = subject("w", "Igiene personale", {"mar": [{"inizio": "09:00", "fine": "11:00"}]})
+        for row, flag in [(men, "uomo"), (women, "donna")]:
+            row["source_locator"] = f"helpinet:service:{row['id']}:subject"
+            row["payload"]["access"]["raw_flags"] = {"appuntamento": True, flag: True}
+            row["payload"]["contacts"] = [{"channel": "phone", "value": "Tel. 06.88815720", "normalized": ["0688815720"], "valid": True}]
+            row["payload"]["data_as_of"] = {"latest": "2026-05-09", "kind": "upper_bound"}
+        variants = [{"locator": "helpinet:service:m", "access_true": ["appuntamento", "uomo"], "prestazioni": ["Pasto"]},
+                    {"locator": "helpinet:service:w", "access_true": ["appuntamento", "donna"], "prestazioni": ["Pasto"]}]
+        men["payload"]["merge"] = {"role": "primary", "members": ["helpinet:service:m", "helpinet:service:w"], "variants": variants, "conflicts": []}
+        women["payload"]["merge"] = {"role": "merged_into", "primary": "helpinet:service:m"}
+        return men, women
+
+    def test_v03_merged_service_shows_hours_per_audience(self):
+        """One card for a service the source published twice; the other record stays in the DB."""
+        cards = services(list(self.v03_pair()))
+        self.assertEqual([c["id"] for c in cards], ["m"])
+        days = {d["day"]: [i["label"] for i in d["intervals"]] for d in cards[0]["hours_display"]["days"]}
+        self.assertEqual(days["lun"], ["09:00 – 11:00 · Uomini"])
+        self.assertEqual(days["mar"], ["09:00 – 11:00 · Donne"])
+        self.assertTrue(cards[0]["access_raw"]["uomo"] and cards[0]["access_raw"]["donna"])
+        self.assertEqual(cards[0]["merged_from"], ["helpinet:service:m:subject", "helpinet:service:w:subject"])
+        self.assertEqual(len(cards[0]["contacts"]), 1)  # same number in both records
+
+    def test_v03_phones_data_date_and_sibling_position(self):
+        """Dialable numbers keep the raw value; data date upper bound; derived point labelled."""
+        men, _ = self.v03_pair()
+        men["payload"].pop("merge")
+        men["payload"]["contacts"].append({"channel": "phone", "value": "0667105197/98", "normalized": ["0667105197", "0667105198"], "valid": True})
+        men["payload"]["location"]["derived_position"] = {"lat": 41.95, "lng": 12.53, "method": "same_source_group_and_address"}
+        card = services([men])[0]
+        self.assertEqual([(c["value"], c["dial"]) for c in card["contacts"]],
+                         [("Tel. 06.88815720", "0688815720"), ("0667105197", "0667105197"), ("0667105198", "0667105198")])
+        self.assertTrue(card["freshness"]["label"].startswith("Dati del 9 maggio 2026 o precedenti (circa 6 mesi"))
+        self.assertEqual(card["place"]["geometry"], {"type": "Point", "coordinates": [12.53, 41.95]})
+        self.assertEqual(card["placement"]["status"], "source_group_sibling")
+
+    def test_v03_curated_hours_shown_with_the_source_value(self):
+        """The corrected interval is used; the source's own value appears as a warning."""
+        row = subject("c", "Lavoro", {"gio": [{"inizio": "14:00", "fine": "13:30"}]})
+        row["payload"]["hours"].update({
+            "corrected_value": {"gio": [{"inizio": "13:30", "fine": "14:00"}]},
+            "corrections": [{"day": "gio", "index": 0, "raw": {"inizio": "14:00", "fine": "13:30"}, "corrected": {"inizio": "13:30", "fine": "14:00"}}],
+        })
+        display = services([row])[0]["hours_display"]
+        self.assertEqual(display["days"][3]["intervals"][0]["label"], "13:30 – 14:00")
+        self.assertIn("la fonte indica 14:00 – 13:30", display["warnings"][0])
+
+    def test_weekly_hours_missing_days_are_unknown_and_overnight_crosses_midnight(self):
+        """Readable source intervals never create a closed day; 22–02 ends the next day (2026-11-15)."""
         display = weekly_hours(
             {
                 "lun": [{"inizio": "18:00", "fine": "20:00"}],
@@ -81,7 +131,12 @@ class PresentationTests(unittest.TestCase):
         )
         self.assertEqual(display["days"][0]["intervals"][0]["label"], "18:00 – 20:00")
         self.assertEqual(display["days"][1]["state"], "unknown")
-        self.assertTrue(display["days"][4]["issues"])
+        self.assertEqual(display["days"][4]["issues"], [])
+        overnight = display["days"][4]["intervals"][0]
+        self.assertTrue(overnight["overnight"])
+        self.assertEqual(overnight["label"], "22:00 – 02:00 (del giorno dopo)")
+        self.assertEqual(weekly_hours({"lun": [{"inizio": "00:00", "fine": "23:59"}]})["days"][0]["intervals"][0]["label"], "Aperto 24 ore")
+        self.assertTrue(weekly_hours({"lun": [{"inizio": "09:00", "fine": "09:00"}]})["days"][0]["issues"])
         self.assertIsNone(display["open_now"])
         self.assertFalse(display["complete"])
         self.assertTrue(display["warnings"])
