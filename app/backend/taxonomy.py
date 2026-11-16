@@ -272,7 +272,7 @@ def apply(card: dict[str, Any]) -> dict[str, Any]:
 
 
 def public_vocabulary() -> dict[str, Any]:
-    """Labels, paths and meal slots for the interface (no compiled rules)."""
+    """Labels, paths, meal slots and course levels for the interface (no compiled rules)."""
     vocab = vocabulary()
     return {
         "version": vocab["version"], "needs": need_categories(),
@@ -281,4 +281,5 @@ def public_vocabulary() -> dict[str, Any]:
         "access": [{"code": a["code"], "label": a["label"]} for a in vocab["access"]],
         "meal_times": [{"code": m["code"], "label": m["label"]} for m in vocab["meal_times"]["slots"]],
         "paths": vocab["paths"],
+        "course_levels": vocab.get("course_levels", []),
     }

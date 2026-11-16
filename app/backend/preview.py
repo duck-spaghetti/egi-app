@@ -581,7 +581,7 @@ def map_service(row: dict[str, Any], category: dict[str, Any]) -> dict[str, Any]
     weekly = (p.get("hours") or {}).get("weekly")
     site_group = ({"external_key": entity["key"], "name": p.get("name"), "raw_fields": {}, "service_count": len(entity.get("members") or [])}
                   if entity.get("mode") == "site_address" and len(entity.get("members") or []) > 1 else None)
-    return {
+    card = {
         "id": row["id"],
         "place_id": row["id"],
         "service_title": classification.get("display_name") or p.get("name") or layer or "Servizio",
@@ -659,6 +659,113 @@ def map_service(row: dict[str, Any], category: dict[str, Any]) -> dict[str, Any]
         "itinerant_source": False,
         "coordinate_status": "geocoded_candidate_unverified" if point else "not_positioned",
         "is_active": True,
+    }
+    if p.get("site_page"):  # Scuolemigranti sede page (importer 0.4): courses, enrolment, page date
+        extra = course_fields(p, row, source_name)
+        extra["access_raw"] = {**card["access_raw"], **extra["access_raw"]}
+        card.update(extra)
+    return card
+
+
+DAY_SHORT = {"lun": "Lun", "mar": "Mar", "mer": "Mer", "gio": "Gio", "ven": "Ven", "sab": "Sab", "dom": "Dom"}
+COURSE_FLAGS = {"online": "Corsi online", "online_e_presenza": "Corsi anche online", "solo_donne": "Solo donne"}
+
+
+def course_hours(p: dict[str, Any]) -> dict[str, Any]:
+    """Lesson times by level from a sede page (Scuolemigranti decisions 3, 4 and 6, 2026-11-16).
+
+    `kind` tells the map how to read the card: "lessons" (next lesson, never "Aperto ora"),
+    "office" (reception hours as printed; CPIA say enrolment is at the secretariat) or "none".
+    `days` carries each session as an interval labelled with its level, so today's lessons show.
+    """
+    hours = p.get("hours") or {}
+    facts = p.get("course_facts") or {}
+    cpia = bool(facts.get("cpia"))
+    courses, rows = [], {key: [] for key, _ in DAYS}
+    for course in hours.get("courses") or []:
+        level = course.get("level") or "Livello non indicato"
+        sessions = []
+        for s in course.get("sessions") or []:
+            sessions.append(f'{", ".join(DAY_SHORT[d] for d in s["days"])} {s["start"]} – {s["end"]}')
+            for day in s["days"]:
+                rows[day].append({"opens_raw": s["start"], "closes_raw": s["end"], "label": f'{s["start"]} – {s["end"]} · {level}',
+                                  "level": level, "overnight": False, "review_note": None, "raw": s["raw"]})
+        courses.append({"level": level, "sessions": sessions + course.get("unparsed_times", []), "note": course.get("note_raw"),
+                        "flags": [COURSE_FLAGS[f] for f in course.get("flags", []) if f in COURSE_FLAGS], "summer": course.get("summer")})
+    days = [{"day": key, "label": label, "intervals": sorted(rows[key], key=lambda i: i["opens_raw"]),
+             "state": "declared" if rows[key] else "unknown", "issues": []} for key, label in DAYS]
+    office = hours.get("office_text")
+    if courses:
+        kind, status = "lessons", None
+    elif office:
+        kind, status = "office", ("Iscrizioni e informazioni in segreteria" if cpia else "Orari di segreteria indicati")
+    else:
+        kind, status = "none", ("Orario non disponibile — contatta la segreteria" if cpia else "Orari delle lezioni non indicati")
+    return {
+        "kind": kind, "status_label": status, "days": days, "courses": courses, "office_text": office, "cpia": cpia,
+        "warnings": [], "raw_text_original": hours.get("raw_value"),
+        "note": "Orari delle lezioni dalla pagina della sede su scuolemigranti.org; non sono orari di apertura.",
+        "opening_note": "Orari delle lezioni · fuso Europe/Rome",
+    }
+
+
+def page_freshness(fresh: dict[str, Any] | None, observed_at: str | None) -> dict[str, Any]:
+    """Data date = the sede page's modification date; older than the threshold → "dato da verificare"."""
+    acquired = (observed_at or "")[:10] or None
+    if not fresh or not fresh.get("page_modified"):
+        return {"declared": None, "months_old": None, "acquired": acquired, "stale": True,
+                "label": "La pagina della sede non indica quando è stata aggiornata: dato da verificare."}
+    year, month, day = (int(x) for x in fresh["page_modified"].split("-"))
+    when = f"{day} {MONTHS[month - 1]} {year}"
+    months = fresh.get("months_before_capture")
+    stale = bool(fresh.get("stale"))
+    label = f"Pagina della sede aggiornata il {when}"
+    if stale:
+        label += f" ({months} mesi prima dell'acquisizione, oltre {fresh.get('stale_after_months', 12)}): dato da verificare."
+    else:
+        label += ". Da verificare con chi organizza il corso."
+    return {"declared": when, "months_old": months, "acquired": acquired, "stale": stale, "label": label}
+
+
+def course_fields(p: dict[str, Any], row: dict[str, Any], source_name: str) -> dict[str, Any]:
+    """Card fields of a Scuolemigranti site with its sede page (overrides of `map_service`)."""
+    facts = p.get("course_facts") or {}
+    page = p.get("site_page") or {}
+    flags = facts.get("flags") or []
+    stated = [o["name"] for o in p.get("offers_stated") or []]
+    prestazioni = [{"id": f"offer:{name}", "nome": name} for name in stated]
+    prestazioni += [{"id": f"flag:{f}", "nome": COURSE_FLAGS[f]} for f in flags if f in COURSE_FLAGS]
+    contacts = []
+    for c in p.get("contacts", []):
+        if c.get("role") == "source_page":
+            continue  # the page link is in Fonti, not among the service's own contacts
+        value = c.get("normalized") if c["channel"] == "website" and c.get("normalized") else c["value"]
+        entry = {"type": c["channel"], "value": value, "label": None, "is_active": True}
+        if c["channel"] == "phone" and c.get("normalized"):
+            entry["dial"] = c["normalized"].replace("+39", "", 1) if c["normalized"].startswith("+39") else c["normalized"]
+        contacts.append(entry)
+    claims = {"donna": True} if "solo_donne" in flags else {}
+    if flags and {"online", "online_e_presenza"} & set(flags):
+        claims["corsi_online"] = True
+    return {
+        "hours_display": course_hours(p),
+        "freshness": page_freshness(p.get("data_as_of"), row.get("observed_at")),
+        "declared_update": None,
+        "description": p.get("description"),
+        "contacts": contacts,
+        "access_raw": {**claims},
+        "course_levels": facts.get("level_codes") or [],
+        "course_flags": flags,
+        "summer_closure": bool(facts.get("summer_closure")),
+        "enrolment": p.get("enrolment"),
+        "site_page_url": page.get("url"),
+        "organization_url": (p.get("organization_claim") or {}).get("url"),
+        "native_classifications": {"tipologia": "Corsi linguistici", "layer": p.get("layer"),
+                                   "prestazioni": prestazioni + [{"id": f"level:{lv}", "nome": f"Livello {lv}"} for lv in facts.get("levels") or []],
+                                   "layer_path": (p.get("source_classifications") or {}).get("layer_path")},
+        "sources": [{"source_name": source_name, "source_title": "Rete Scuolemigranti — pagina della sede",
+                     "source_url": page.get("url") or row.get("dataset_url"), "attribution": row.get("source_attribution"),
+                     "source_kind": row.get("source_kind"), "is_primary": True}],
     }
 
 

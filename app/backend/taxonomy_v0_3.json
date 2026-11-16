@@ -779,6 +779,13 @@
    "types": [
     "Unità di strada"
    ]
+  },
+  {
+   "code": "online",
+   "label": "Corsi anche online",
+   "claims": [
+    "corsi_online"
+   ]
   }
  ],
  "meal_times": {
@@ -864,7 +871,8 @@
  "structured": {
   "_doc": "Sources with their own service type and offer list (S1, user rule 2026-11-15): a card enters one need, from its type (or a listed override), and its clusters come only from its own type and prestazioni within that need; facility names and referral offers do not assign needs.",
   "sources": [
-   "helpinet"
+   "helpinet",
+   "scuolemigranti"
   ],
   "type_need": {
    "Sportello sociale": "orientamento",
@@ -1012,7 +1020,8 @@
    "Supporto lavoro": "cercare_lavoro",
    "Formazione": "formazione",
    "Corsi Formazione Lavoro": "formazione",
-   "Attività": "aggregazione"
+   "Attività": "aggregazione",
+   "Scuola e licenza media": "scuola"
   },
   "_prestazioni_without_cluster": [
    "Accoglienza",
@@ -1054,5 +1063,43 @@
     "pasto"
    ]
   }
- }
+ },
+ "course_levels": [
+  {
+   "code": "analfabeti",
+   "label": "Analfabeti"
+  },
+  {
+   "code": "base",
+   "label": "Base"
+  },
+  {
+   "code": "a1",
+   "label": "A1"
+  },
+  {
+   "code": "a2",
+   "label": "A2"
+  },
+  {
+   "code": "b1",
+   "label": "B1"
+  },
+  {
+   "code": "b2",
+   "label": "B2"
+  },
+  {
+   "code": "c1",
+   "label": "C1"
+  },
+  {
+   "code": "c2",
+   "label": "C2"
+  },
+  {
+   "code": "avanzato",
+   "label": "Avanzato"
+  }
+ ]
 }

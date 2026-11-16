@@ -12,9 +12,9 @@ const state = {
   cityOptions: [],
   filters: {
     cats: new Set(), offersOff: new Set(),
-    q: "", source: "", issue: "", access: "", audience: "", meal: "", section: "all", order: "name", openNow: false,
+    q: "", source: "", issue: "", access: "", audience: "", meal: "", level: "", section: "all", order: "name", openNow: false,
   },
-  taxonomy: {needs: [], offers: [], audiences: [], access: [], meal_times: [], paths: []},
+  taxonomy: {needs: [], offers: [], audiences: [], access: [], meal_times: [], paths: [], course_levels: []},
   view: "map",
   userLoc: null,
   city: context.cityName || "Roma",
@@ -189,7 +189,7 @@ function bindUi() {
   document.getElementById("sos-directory")?.addEventListener("click", () => document.getElementById("open-directory").click());
   document.getElementById("open-directory").addEventListener("click", () => {
     state.filters.section="directory";
-    state.filters.q=""; state.filters.source=""; state.filters.issue=""; state.filters.access=""; state.filters.audience=""; state.filters.meal="";
+    state.filters.q=""; state.filters.source=""; state.filters.issue=""; state.filters.access=""; state.filters.audience=""; state.filters.meal=""; state.filters.level="";
     state.filters.openNow=false; state.filters.cats=new Set(); state.filters.offersOff=new Set();
     document.getElementById("section-filter").value="directory";
     document.getElementById("service-query").value="";
@@ -331,7 +331,7 @@ function updateViewToggle() {
 /** "Azzera filtri": back to every service, as when the map opens (filters r4). The source
  * selector is a debugging aid kept across resets (user, 2026-11-16; removed in the final app). */
 function resetFilters() {
-  Object.assign(state.filters, {cats: new Set(), offersOff: new Set(), q: "", issue: "", access: "", audience: "", meal: "", section: "all", openNow: false});
+  Object.assign(state.filters, {cats: new Set(), offersOff: new Set(), q: "", issue: "", access: "", audience: "", meal: "", level: "", section: "all", openNow: false});
   document.getElementById("service-query").value = "";
   document.getElementById("open-now-filter").checked = false;
   document.getElementById("section-filter").value = "all";
@@ -353,6 +353,7 @@ function activeFilterLabels(withSource = true) {
     f.issue ? selectedLabel("issue-filter", f.issue) : "",
     f.audience ? selectedLabel("audience-filter", f.audience) : "",
     f.meal ? ((state.taxonomy.meal_times || []).find(m => m.code === f.meal) || {}).label || f.meal : "",
+    f.level ? `Livello ${courseLevelLabel(f.level)}` : "",
     f.access ? selectedLabel("access-filter", f.access) : "",
     f.section !== "all" ? document.getElementById("section-filter")?.selectedOptions?.[0]?.textContent : "",
   ].filter(Boolean);
@@ -566,6 +567,7 @@ function renderCatGrid() {
         state.filters.cats.delete(slug);
         (state.taxonomy.offers || []).filter(o => o.need === slug).forEach(o => state.filters.offersOff.delete(o.code));
         if (slug === "mangiare") state.filters.meal = "";
+        if (slug === "istruzione") state.filters.level = "";
       } else state.filters.cats.add(slug);
       renderCatGrid();
       renderSearchOptions();
@@ -585,6 +587,7 @@ function renderOfferGroups() {
   if (hint) hint.hidden = f.cats.size > 0;
   const counts = state.facets?.offer || new Map();
   const mealCounts = state.facets?.meal || new Map();
+  const levelCounts = state.facets?.level || new Map();
   wrap.innerHTML = state.categories.filter(c => f.cats.has(c.slug)).map(c => {
     const offers = (state.taxonomy.offers || []).filter(o => o.need === c.slug && counts.get(o.code));
     const chips = offers.map(o => {
@@ -593,7 +596,10 @@ function renderOfferGroups() {
     }).join("");
     const meals = c.slug === "mangiare" ? (state.taxonomy.meal_times || []).filter(m => mealCounts.get(m.code) || f.meal === m.code) : [];
     const meal = meals.length ? `<label class="offer-meal">Pasto <select data-meal><option value="">Qualsiasi</option>${meals.map(m => `<option value="${escapeHtml(m.code)}"${f.meal === m.code ? " selected" : ""}>${escapeHtml(m.label)} (${mealCounts.get(m.code) || 0})</option>`).join("")}</select></label>` : "";
-    return `<div class="offer-group"><h4>${escapeHtml(categoryCaption(c.label || c.slug))}</h4><div class="offer-chips">${chips || '<span class="source-note">Nessuna prestazione con i filtri attivi.</span>'}</div>${meal}</div>`;
+    // Course level (Scuolemigranti, user 2026-11-16): only sites that state that level.
+    const levels = c.slug === "istruzione" ? (state.taxonomy.course_levels || []).filter(l => levelCounts.get(l.code) || f.level === l.code) : [];
+    const level = levels.length ? `<label class="offer-meal">Livello del corso <select data-level><option value="">Qualsiasi</option>${levels.map(l => `<option value="${escapeHtml(l.code)}"${f.level === l.code ? " selected" : ""}>${escapeHtml(l.label)} (${levelCounts.get(l.code) || 0})</option>`).join("")}</select></label>` : "";
+    return `<div class="offer-group"><h4>${escapeHtml(categoryCaption(c.label || c.slug))}</h4><div class="offer-chips">${chips || '<span class="source-note">Nessuna prestazione con i filtri attivi.</span>'}</div>${meal}${level}</div>`;
   }).join("");
   wrap.querySelectorAll("[data-offer]").forEach(b => b.addEventListener("click", () => {
     const code = b.dataset.offer;
@@ -601,6 +607,7 @@ function renderOfferGroups() {
     refresh();
   }));
   wrap.querySelector("[data-meal]")?.addEventListener("change", e => { f.meal = e.target.value; refresh(); });
+  wrap.querySelector("[data-level]")?.addEventListener("change", e => { f.level = e.target.value; refresh(); });
 }
 
 function renderLanguageList() {
@@ -721,6 +728,7 @@ function facetValues(poi, facet) {
   if (facet === "offer") return (raw.offers || []).map(o => o.code);
   if (facet === "audience") return (raw.audiences || []).map(a => a.code);
   if (facet === "meal") return (raw.meal_times || []).map(m => m.code);
+  if (facet === "level") return raw.course_levels || [];
   if (facet === "issue") return raw.placement?.issue && raw.placement.issue !== "ok" && raw.placement.issue !== "manual" ? [raw.placement.issue] : [];
   if (facet === "access") return raw.access_tags ? raw.access_tags.map(a => a.code) : Object.entries(raw.access_raw || {}).filter(([, v]) => v === true).map(([k]) => k);
   return [];
@@ -744,6 +752,7 @@ function passesFilters(p, skip = null, now = new Date(), terms = searchTerms()) 
     if (skip !== facet && f[facet] && !facetValues(p, facet).includes(f[facet])) return false;
   }
   if (skip !== "meal" && f.meal && f.cats.has("mangiare") && !facetValues(p, "meal").includes(f.meal)) return false;
+  if (skip !== "level" && f.level && f.cats.has("istruzione") && !facetValues(p, "level").includes(f.level)) return false;
   if (terms.length && !terms.every(term => searchableService(p).includes(term))) return false;
   const section = p.raw?.placement?.section;
   if (f.section === "directory" && section !== "directory") return false;
@@ -756,10 +765,10 @@ function passesFilters(p, skip = null, now = new Date(), terms = searchTerms()) 
 /** Per-facet counts: each value counted under all the other active filters. */
 function facetCounts(now = new Date()) {
   const terms = searchTerms();
-  const counts = {cats: new Map(), source: new Map(), issue: new Map(), offer: new Map(), access: new Map(), audience: new Map(), meal: new Map(), shown: 0};
+  const counts = {cats: new Map(), source: new Map(), issue: new Map(), offer: new Map(), access: new Map(), audience: new Map(), meal: new Map(), level: new Map(), shown: 0};
   for (const p of state.pois) {
     if (passesFilters(p, null, now, terms)) counts.shown++;
-    for (const facet of ["cats", "source", "issue", "offer", "access", "audience", "meal"]) {
+    for (const facet of ["cats", "source", "issue", "offer", "access", "audience", "meal", "level"]) {
       if (!passesFilters(p, facet, now, terms)) continue;
       for (const v of facetValues(p, facet)) counts[facet].set(v, (counts[facet].get(v) || 0) + 1);
     }
@@ -933,6 +942,12 @@ function sourceNames(poi) {
   return names.length ? [...new Set(names)] : [sourceName(poi)];
 }
 
+/** Course-site flags in the header: old page (decision 5) and stated summer closure. */
+function courseFlags(raw) {
+  if (!raw.site_page_url) return "";
+  return `${raw.freshness?.stale ? '<span class="flag-hours">dato da verificare · pagina non aggiornata da oltre 12 mesi</span>' : ""}${raw.summer_closure ? '<span class="flag-hours">chiusa in estate</span>' : ""}`;
+}
+
 function renderServiceHeader(poi) {
   const raw=poi.raw || {};
   const cat=resolveCategory(poi) || {};
@@ -947,7 +962,7 @@ function renderServiceHeader(poi) {
     <h2 class="service-title">${escapeHtml(serviceTitle(poi))}</h2>
     <p class="service-kind">${escapeHtml(serviceKind(poi))}</p>
     <p class="service-where">${escapeHtml(address || raw.placement?.label || "")}</p>
-    <p class="service-status ${status.kind}" data-opening-service="${escapeHtml(poi.id)}"><strong>${escapeHtml(status.label)}</strong>${today ? `<span class="service-today">${escapeHtml(today)}</span>` : ""}${hoursNeedReview(raw.hours_display) ? '<span class="flag-hours">orari da verificare</span>' : ""}<small hidden></small></p>
+    <p class="service-status ${status.kind}" data-opening-service="${escapeHtml(poi.id)}"><strong>${escapeHtml(status.label)}</strong>${today ? `<span class="service-today">${escapeHtml(today)}</span>` : ""}${hoursNeedReview(raw.hours_display) ? '<span class="flag-hours">orari da verificare</span>' : ""}${courseFlags(raw)}<small hidden></small></p>
     <div class="service-extra">
       ${organiser ? `<p class="service-line"><span class="service-key">Organizzato da</span> ${escapeHtml(organiser)}</p>` : ""}
       <p class="service-line service-sources"><span class="service-key">Fonti</span> ${sourceNames(poi).map(n=>`<span class="source-chip">${escapeHtml(n)}</span>`).join("")}<button type="button" class="flag-data" data-jump="fonti">da verificare</button>${report ? `<a class="service-report" href="${escapeHtml(report.href)}">Segnala errore</a>` : ""}</p>
@@ -1000,9 +1015,25 @@ function renderInfoSection(poi) {
   </section>`;
 }
 
+/** Lesson times by level, enrolment, reception hours and summer closure of a course site. */
+function renderCourseHours(raw) {
+  const display=raw.hours_display;
+  const enrol=raw.enrolment;
+  const enrolState=enrol?.state==="aperte" ? "Iscrizioni aperte" : enrol?.state==="chiuse" ? "Iscrizioni chiuse" : "";
+  const courses=(display.courses || []).map(c=>`<div class="source-day course-row"><strong>${escapeHtml(c.level)}</strong><span>${c.sessions.map(s=>`<span>${escapeHtml(s)}</span>`).join("<br>") || '<span class="unknown-value">Orario non indicato</span>'}${c.note ? `<small>${escapeHtml(c.note)}</small>` : ""}${c.flags.length ? `<small>${escapeHtml(c.flags.join(" · "))}</small>` : ""}</span></div>`).join("");
+  return `${courses ? `<h4>Orari delle lezioni</h4><div class="source-week">${courses}</div>` : ""}
+    ${display.kind==="office" && display.cpia ? "<p>Iscrizioni e informazioni in segreteria.</p>" : ""}
+    ${display.office_text ? `<h4>${display.cpia ? "Orari di ricevimento" : "Segreteria"}</h4><p class="source-hours-text">${escapeHtml(display.office_text)}</p>` : ""}
+    ${display.kind==="none" ? `<p>${escapeHtml(display.status_label)}.</p>` : ""}
+    ${enrolState || enrol?.start_text ? `<h4>Iscrizioni</h4>${enrolState ? `<p><strong>${escapeHtml(enrolState)}</strong>${enrol.text ? ` — <span class="source-hours-text">${escapeHtml(enrol.text)}</span>` : ""}</p>` : ""}${enrol?.start_text ? `<p>${escapeHtml(enrol.start_text)}</p>` : ""}` : ""}
+    ${raw.summer_closure ? '<p class="source-note">La sede indica una chiusura estiva.</p>' : ""}
+    <p class="service-advice">Contatta la sede prima di andare: iscrizioni, posti e date vanno verificati.</p>`;
+}
+
 function renderHoursSection(poi) {
   const raw=poi.raw || {};
   const display=raw.hours_display;
+  if (["lessons","office","none"].includes(display?.kind)) return `<section class="detail-section service-section" id="sec-orari"><h3>Orari</h3>${renderCourseHours(raw)}</section>`;
   const known=Boolean(display?.days?.some(d=>d.intervals?.length) || display?.raw_text || display?.scoped?.length);
   const meals=(raw.meal_times || []).map(m=>m.label);
   const status=sourceOpeningStatus(display);
@@ -2157,7 +2188,37 @@ function categoryBadge(category) {
   return `<span class="category-badge" style="background:${escapeHtml(c.color || "#555")}">${url?`<img src="${escapeHtml(url)}" alt="">`:""}<span>${escapeHtml(categoryCaption(c.label || c.slug))}</span></span>`;
 }
 
+function courseLevelLabel(code) {
+  return ((state.taxonomy.course_levels || []).find(l => l.code === code) || {}).label || code;
+}
+
+/** Next lesson from now in Rome time, e.g. "Prossima lezione: oggi 18:00 (A1)" (within 7 days). */
+function nextLesson(display, now = new Date()) {
+  const parts=Object.fromEntries(new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Rome",weekday:"short",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(now).map(p=>[p.type,p.value]));
+  const dayIndex=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].indexOf(parts.weekday);
+  const keys=["lun","mar","mer","gio","ven","sab","dom"];
+  const minute=Number(parts.hour)*60+Number(parts.minute);
+  for (let offset=0;offset<=7;offset++) {
+    const day=(display.days || []).find(d=>d.day===keys[(dayIndex+offset)%7]);
+    const next=(day?.intervals || []).filter(i=>{const a=parseClockMinutes(i.opens_raw);return a!==null && (offset>0 || a>minute);})
+      .sort((a,b)=>a.opens_raw.localeCompare(b.opens_raw))[0];
+    if (next) return `${offset===0 ? "oggi" : offset===1 ? "domani" : day.label.toLowerCase()} ${next.opens_raw}${next.level ? ` (${next.level})` : ""}`;
+  }
+  return null;
+}
+
+/** Courses are not desks: their status is the next lesson or the secretariat, never "Aperto ora". */
+function courseStatus(display, now = new Date()) {
+  const note=display.opening_note || "";
+  if (display.kind==="lessons") {
+    const next=nextLesson(display, now);
+    return {kind:"lessons",label:next ? `Prossima lezione: ${next}` : "Orari delle lezioni da verificare",note};
+  }
+  return {kind:display.kind==="office" ? "office" : "unknown",label:display.status_label || "Orario non disponibile",note};
+}
+
 function sourceOpeningStatus(display, now = new Date()) {
+  if (["lessons","office","none"].includes(display?.kind)) return courseStatus(display, now);
   // Calculated from source intervals in Rome time, without asserting completeness.
   const unknown={kind:"unknown",label:"Orario non disponibile",note:display?.opening_note || "Orari Helpinet non revisionati · fuso Europe/Rome"};
   if (!display?.days || !Number.isFinite(now.getTime())) return unknown;

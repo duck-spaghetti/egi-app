@@ -229,6 +229,23 @@ vm.runInContext(`
   if(!TransportLayer.routePopupHtml({...untimed,code:'Metromare'}).includes('OpenStreetMap') || TransportLayer.routePopupHtml({...untimed,code:'Metromare'}).includes('Percorso programmato')) throw Error('OSM route presented as scheduled');
   const osmOnly=TransportLayer.statusText({availability:'available',osm_rail:{availability:'available'},sources:[{availability:'unavailable'},{availability:'available',untimed:true}]});
   if(!osmOnly.includes('senza orari') || osmOnly.includes('Rete programmata')) throw Error('untimed-only status claims a calendar');
+  // Course sites (Scuolemigranti, 2026-11-16): next lesson, never "Aperto ora"; secretariat for CPIA; level filter.
+  const lessons={kind:'lessons',opening_note:'',days:['lun','mar','mer','gio','ven','sab','dom'].map((d,i)=>({day:d,label:['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica'][i],intervals:d==='mar'||d==='gio'?[{opens_raw:'18:00',closes_raw:'20:00',level:'A1'}]:[],issues:[]}))};
+  // Tuesday 2026-11-10 19:00 Rome, during the lesson: status is the next one (Thursday), not open.
+  let lesson=sourceOpeningStatus(lessons,at('2026-11-10T18:00:00Z'));
+  if(lesson.kind!=='lessons' || lesson.label!=='Prossima lezione: giovedì 18:00 (A1)') throw Error('next lesson wrong: '+lesson.label);
+  if(sourceOpeningStatus(lessons,at('2026-11-10T08:00:00Z')).label!=='Prossima lezione: oggi 18:00 (A1)') throw Error('same-day lesson');
+  if(sourceOpeningStatus(lessons,at('2026-11-09T08:00:00Z')).label!=='Prossima lezione: domani 18:00 (A1)') throw Error('next-day lesson');
+  if(sourceOpeningStatus({kind:'office',status_label:'Iscrizioni e informazioni in segreteria',days:[]}).label!=='Iscrizioni e informazioni in segreteria') throw Error('CPIA secretariat');
+  const course=(id,levels)=>({...make(id,id,[12.5,41.9],1,'Corsi',7,false),raw:{...make(id,id,[12.5,41.9],1,'Corsi',7,false).raw,needs:['istruzione'],offers:[{code:'italiano',need:'istruzione',label:'Corsi di italiano'}],course_levels:levels,hours_display:lessons}});
+  const c1=course('c1',['a1','b1']), c2=course('c2',['base']);
+  state.pois=[c1,c2]; state.filters.cats=new Set(['istruzione']); state.filters.level='a1';
+  if(filteredPois().map(p=>p.id).join(',')!=='c1') throw Error('level filter');
+  if(facetCounts().level.get('base')!==1) throw Error('level counts must ignore the level filter itself');
+  state.filters.openNow=true; state.filters.level='';
+  if(filteredPois(at('2026-11-10T18:00:00Z')).length!==0) throw Error('a lesson in progress counted as open now');
+  state.filters.openNow=false; state.filters.cats=new Set(); state.pois=[missing,far,near,remote];
+
   // Regression: a multi-service map pin must open the service chooser (broke in F1).
   const twoAtSite=twoSiteFixture();
   openServiceChooser(twoAtSite);

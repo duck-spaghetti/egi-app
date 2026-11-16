@@ -1514,6 +1514,8 @@ html[dir="rtl"] .sheet-back-head .arrow,
 .service-status { display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin:8px 0 4px;font-size:14px; }
 .service-status strong::before { content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:#8a8a8a;margin-inline-end:7px; }
 .service-status.open strong { color:#266044; } .service-status.open strong::before { background:#28784c; }
+.service-status.lessons strong { color:#1e4f7a; } .service-status.lessons strong::before { background:#2b6cb0; }
+.course-row small { display:block; }
 .service-status.closing strong { color:#805d14; } .service-status.closing strong::before { background:#b66b00; }
 .service-status.closed strong { color:#9b2c25; } .service-status.closed strong::before { background:#b5342c; }
 .service-status.unknown strong { color:var(--ink-soft); }
