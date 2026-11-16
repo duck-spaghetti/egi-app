@@ -56,6 +56,10 @@ vm.runInContext(`
   if(filteredPois().map(p=>p.id).sort().join(',')!=='both,parcel') throw Error('switched-off offer not applied');
   const oc=facetCounts();
   if(oc.offer.get('pasto')!==2 || oc.offer.get('pacco')!==2) throw Error('offer counts must ignore the offers filter itself');
+  // "Azzera filtri" keeps the debugging source selector (user, 2026-11-16).
+  state.filters.source='helpinet'; state.filters.q='x';
+  if(activeFilterLabels(false).join()!=='Cibo,1 prestazione esclusa,“x”') throw Error('reset visibility counts the kept source: '+activeFilterLabels(false).join());
+  state.filters.source=''; state.filters.q='';
   state.filters.offersOff=new Set(); state.filters.cats=new Set(); state.pois=[missing,far,near,remote];
 
   const hours=(ranges,issues=[])=>({days:[{day:'lun',label:'Lunedì',intervals:ranges.map(([a,b])=>({opens_raw:a,closes_raw:b,review_note:null})),issues}]});

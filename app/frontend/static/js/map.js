@@ -328,9 +328,10 @@ function updateViewToggle() {
   viewToggleLabel.textContent = showMapAction ? t("map.map_view") : t("map.list");
 }
 
-/** "Azzera filtri": back to every service, as when the map opens (filters r4). */
+/** "Azzera filtri": back to every service, as when the map opens (filters r4). The source
+ * selector is a debugging aid kept across resets (user, 2026-11-16; removed in the final app). */
 function resetFilters() {
-  Object.assign(state.filters, {cats: new Set(), offersOff: new Set(), q: "", source: "", issue: "", access: "", audience: "", meal: "", section: "all", openNow: false});
+  Object.assign(state.filters, {cats: new Set(), offersOff: new Set(), q: "", issue: "", access: "", audience: "", meal: "", section: "all", openNow: false});
   document.getElementById("service-query").value = "";
   document.getElementById("open-now-filter").checked = false;
   document.getElementById("section-filter").value = "all";
@@ -339,16 +340,16 @@ function resetFilters() {
   refresh();
 }
 
-/** Filters that differ from "every service" (the bar shows "Azzera filtri" when any). */
-function activeFilterLabels() {
+/** Filters that differ from "every service"; `withSource` false leaves out the kept source. */
+function activeFilterLabels(withSource = true) {
   const f = state.filters;
   const needLabel = Object.fromEntries((state.taxonomy.needs || []).map(n => [n.slug, n.label]));
   return [
     ...[...f.cats].map(slug => categoryCaption(needLabel[slug] || slug)),
-    f.offersOff.size ? `${f.offersOff.size} prestazioni escluse` : "",
+    f.offersOff.size ? `${f.offersOff.size} ${f.offersOff.size === 1 ? "prestazione esclusa" : "prestazioni escluse"}` : "",
     f.q?.trim() ? `“${f.q.trim()}”` : "",
     f.openNow ? "Aperti ora" : "",
-    f.source ? selectedLabel("source-filter", f.source) : "",
+    f.source && withSource ? selectedLabel("source-filter", f.source) : "",
     f.issue ? selectedLabel("issue-filter", f.issue) : "",
     f.audience ? selectedLabel("audience-filter", f.audience) : "",
     f.meal ? ((state.taxonomy.meal_times || []).find(m => m.code === f.meal) || {}).label || f.meal : "",
@@ -698,7 +699,7 @@ function selectedLabel(id, fallback) {
 function renderActiveFilters() {
   const chips = activeFilterLabels();
   const reset = document.getElementById("reset-filters");
-  if (reset) reset.hidden = !chips.length;
+  if (reset) reset.hidden = !activeFilterLabels(false).length;  // the source survives a reset
   const summary = document.getElementById("active-filter-summary");
   if (!summary) return;
   summary.innerHTML = chips.length
