@@ -878,7 +878,10 @@
   "_doc": "Sources with their own service type and offer list (S1, user rule 2026-11-15): a card enters one need, from its type (or a listed override), and its clusters come only from its own type and prestazioni within that need; facility names and referral offers do not assign needs.",
   "sources": [
    "helpinet",
-   "scuolemigranti"
+   "scuolemigranti",
+   "regione-lazio-stp-eni",
+   "regione-lazio-ambulatori-stp-eni",
+   "ministero-salute-consultori"
   ],
   "type_need": {
    "Sportello sociale": "orientamento",
@@ -912,7 +915,10 @@
    "Abbigliamento": "vestiti_coperte",
    "Riparo": "vestiti_coperte",
    "Kit": "vestiti_coperte",
-   "Servizi di pubbliche relazioni": "multiservizi"
+   "Servizi di pubbliche relazioni": "multiservizi",
+   "Rilascio STP/ENI": "salute",
+   "Pediatria": "salute",
+   "Ginecologia e ostetricia": "salute"
   },
   "type_offer": {
    "Sportello sociale": "centro_ascolto",
@@ -945,7 +951,10 @@
    "Abbigliamento": "vestiti",
    "Riparo": "coperte",
    "Kit": "coperte",
-   "Servizi di pubbliche relazioni": "aggregazione"
+   "Servizi di pubbliche relazioni": "aggregazione",
+   "Rilascio STP/ENI": "stp_eni",
+   "Pediatria": "pediatria",
+   "Ginecologia e ostetricia": "consultorio"
   },
   "type_offer_always": [
    "Centro per l'Impiego",

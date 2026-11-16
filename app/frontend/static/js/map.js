@@ -1346,7 +1346,7 @@ function renderContacts(contacts) {
       ${[...actions].sort((a, b) => (order[a.kind] || 9) - (order[b.kind] || 9)).map((action) => `
         <li><a class="contact-row ${action.kind}" href="${escapeHtml(action.href)}"${action.external ? ' target="_blank" rel="noopener noreferrer"' : ""}${action.kind === "website" ? ` title="${escapeHtml(action.href)}"` : ""}>
           <span class="contact-action-icon">${contactActionIcon(action)}</span>
-          <span class="contact-row-text"><span class="contact-row-value">${escapeHtml(action.label)}</span><small>${escapeHtml(kinds[action.kind] || kinds.other)}</small></span>
+          <span class="contact-row-text"><span class="contact-row-value">${escapeHtml(action.label)}</span><small>${escapeHtml([kinds[action.kind] || kinds.other, action.note].filter(Boolean).join(" · "))}</small></span>
           <span class="contact-row-go" aria-hidden="true">›</span>
         </a></li>
       `).join("")}
@@ -1618,6 +1618,7 @@ function contactAction(contact) {
       kind: "phone",
       href,
       label: String(contact.label || "").trim() || value,
+      note: contact.source_note || "",  // e.g. "da GrIS Lazio (dicembre 2024)" on Ministero consultori
       external: false,
       priority: 1,
     };

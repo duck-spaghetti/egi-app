@@ -89,6 +89,8 @@ PRESENTATION = {
 # EGI taxonomy and the original layer stays visible as the service type.
 MAP_LAYER_GROUPS = {
     "gris-lazio-simm": {"*": "curarmi"},
+    "regione-lazio-stp-eni": {"*": "curarmi"},
+    "regione-lazio-ambulatori-stp-eni": {"*": "curarmi"},
     "scuolemigranti": {"*": "istruzione"},
     "programma-integra": {
         "Casa": "dormire",
@@ -105,6 +107,8 @@ MAP_LAYER_GROUPS = {
 MAP_POINT_STATUSES = {"matched_house", "matched_street", "matched_poi", "manual"}
 SOURCE_SHORT_NAMES = {
     "gris-lazio-simm": "GrIS Lazio",
+    "regione-lazio-stp-eni": "Regione Lazio",
+    "regione-lazio-ambulatori-stp-eni": "Regione Lazio",
     "scuolemigranti": "Scuolemigranti",
     "programma-integra": "Programma Integra",
     "ministero-salute-consultori": "Ministero della Salute",
@@ -115,6 +119,12 @@ SOURCE_SHORT_NAMES = {
 }
 MONTHS = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio",
           "agosto", "settembre", "ottobre", "novembre", "dicembre"]
+
+
+# Sources replaced by better ones stay in the database as evidence but are not shown
+# (user, 2026-11-16: the Regione Lazio lists replace GrIS; its consultori phones live on in
+# the Ministero cards).
+RETIRED_SOURCES = {"gris-lazio-simm"}
 
 
 def is_map_row(row: dict[str, Any]) -> bool:
@@ -131,6 +141,8 @@ def is_visible(row: dict[str, Any]) -> bool:
     without these fields are all visible.
     """
     p = row["payload"]
+    if row.get("source_code") in RETIRED_SOURCES:
+        return False
     if (p.get("classification") or {}).get("display") == "excluded":
         return False
     entity = p.get("entity") or {}
@@ -559,6 +571,19 @@ def freshness(update: dict[str, Any] | None, observed_at: str | None) -> dict[st
     return {"declared": when, "months_old": months, "acquired": acquired, "stale": stale, "label": text + " Da verificare con chi eroga il servizio."}
 
 
+def map_contact(c: dict[str, Any]) -> dict[str, Any]:
+    """A map-export contact; one added from another source says which (e.g. a GrIS phone)."""
+    entry = {"type": c["channel"], "value": c.get("normalized") if c["channel"] == "website" and c.get("normalized") else c["value"],
+             "label": None, "is_active": True}
+    if (other := c.get("from_source")):
+        name = SOURCE_SHORT_NAMES.get(other.get("source_code"), other.get("source_code"))
+        year, _, month = (other.get("data_date") or "").partition("-")
+        when = f" ({MONTHS[int(month) - 1]} {year})" if month else ""
+        entry["source_note"] = f"da {name}{when}"
+        entry["source_match"] = other.get("match")
+    return entry
+
+
 def map_service(row: dict[str, Any], category: dict[str, Any]) -> dict[str, Any]:
     """Adapt a map-export service and its geocoded candidate to the card shape."""
     p = row["payload"]
@@ -621,11 +646,7 @@ def map_service(row: dict[str, Any], category: dict[str, Any]) -> dict[str, Any]
         "cost_note": None,
         "hours": [],
         "hours_raw": (p.get("hours") or {}).get("raw_value"),
-        "contacts": [
-            {"type": c["channel"], "value": c.get("normalized") if c["channel"] == "website" and c.get("normalized") else c["value"],
-             "label": None, "is_active": True}
-            for c in p.get("contacts", [])
-        ],
+        "contacts": [map_contact(c) for c in p.get("contacts", [])],
         "place": {
             "id": row["id"],
             "name": p.get("name"),
@@ -839,6 +860,8 @@ def source_list(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     seen: dict[str, dict[str, Any]] = {}
     for row in rows:
         code = row.get("source_code", "helpinet")
+        if code in RETIRED_SOURCES:
+            continue
         entry = seen.setdefault(code, {"code": code, "name": SOURCE_SHORT_NAMES.get(code, row.get("source_name") or "Helpinet"),
                                        "dataset_url": row.get("dataset_url"), "services": 0})
         entry["services"] += 1
