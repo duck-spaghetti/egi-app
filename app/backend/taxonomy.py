@@ -244,9 +244,14 @@ def apply(card: dict[str, Any]) -> dict[str, Any]:
     raw_flags = card.get("access_raw") if isinstance(card.get("access_raw"), dict) else {}
     claims = {code for code, value in raw_flags.items() if value is True}  # Helpinet lists false flags too
     claims |= {e["code"] for s in (card.get("access_display") or {}).get("sections", []) for e in s.get("entries", []) if e.get("value") is True}
+    # Sources whose "per chi" and access facets were decided from stated facts only (Scuolemigranti:
+    # solo donne, online, CPIA free; user 2026-11-16) get no labels from words of the page text.
+    stated_only = card.get("source_code") in (vocab.get("structured") or {}).get("facets_from_claims_only", [])
+    def from_text(item: dict[str, Any]) -> tuple[str, bool] | None:
+        return None if stated_only else _match(item, kind, title, text)
     audiences = []
     for item in vocab["audiences"]:
-        hit = ("indicazione della fonte", False) if claims & set(item.get("claims", [])) else _match(item, kind, title, text)
+        hit = ("indicazione della fonte", False) if claims & set(item.get("claims", [])) else from_text(item)
         if hit:
             audiences.append({"code": item["code"], "label": item["label"], "basis": hit[0], "interpreted": hit[1], "reserved_hint": reserved})
     access = []
@@ -259,7 +264,7 @@ def apply(card: dict[str, Any]) -> dict[str, Any]:
         elif card.get("delivery_mode") in item.get("delivery", []):
             hit = ("modalità indicata dalla fonte", False)
         else:
-            hit = _match(item, kind, title, text)
+            hit = from_text(item)
         if hit:
             access.append({"code": item["code"], "label": item["label"], "basis": hit[0], "interpreted": hit[1]})
     card.update({

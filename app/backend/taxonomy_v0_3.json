@@ -1062,7 +1062,10 @@
    "pasto_asporto": [
     "pasto"
    ]
-  }
+  },
+  "facets_from_claims_only": [
+   "scuolemigranti"
+  ]
  },
  "course_levels": [
   {

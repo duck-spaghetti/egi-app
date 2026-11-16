@@ -394,6 +394,14 @@ latest succeeded child `geocode` run; the cache probe covers all those run IDs.
   need group (GrIS → Curarmi; Scuolemigranti → Istruzione; Programma Integra by layer,
   adding the groups Istituzioni and Socialità). This is presentation only; the original
   layer is the service type and help topics are the listed themes.
+- **Course sites (Scuolemigranti with sede pages, 2026-11-16):** `course_fields` in
+  `preview.py` shows lessons by level (`hours_display.kind` "lessons"), CPIA secretariat
+  hours ("office") or none; the map shows "Prossima lezione …" instead of an open/closed
+  status (courses never count as "Aperti ora"), the enrolment wording, the page date with
+  "dato da verificare" after 12 months, a summer-closure flag, and a "Livello del corso"
+  filter under Istruzione (`course_levels` in the vocabulary). Scuolemigranti follows the
+  structured taxonomy rule: Corsi di italiano, plus Scuola e licenza media for CPIA that
+  state it.
 - **Positions:** only non-ambiguous `matched_house`/`matched_street` candidates are map
   points, labelled as estimates from the address (Nominatim, © OpenStreetMap
   contributors). CAP-area, municipality-only, ambiguous and unresolved candidates are

@@ -16,7 +16,7 @@ def course_row(identifier: str, cpia: bool = False, courses: list | None = None,
     p = row["payload"]
     p.update({
         "name": "CPIA 2" if cpia else "CivicoZero",
-        "description": "Le iscrizioni sono aperte.",
+        "description": "Presso il Centro Anziani. Le iscrizioni sono aperte su appuntamento.",
         "declared_update": None,
         "classification": {"display": "shown", "need": "istruzione", "service_type": "Corsi linguistici",
                            "display_name": f"Corsi di italiano · {'CPIA 2' if cpia else 'CivicoZero'}", "access_claims": []},
@@ -51,7 +51,8 @@ class CourseSiteTests(unittest.TestCase):
         self.assertEqual(card["needs"], ["istruzione"])
         self.assertEqual([o["code"] for o in card["offers"]], ["italiano"])
         self.assertEqual(card["course_levels"], ["a1", "b1"])
-        self.assertIn("online", {a["code"] for a in card["access_tags"]})
+        self.assertEqual({a["code"] for a in card["access_tags"]}, {"online"}, "no access labels from page words")
+        self.assertEqual(card["audiences"], [], "no 'per chi' from page words (Centro Anziani)")
         self.assertEqual(card["contacts"], [{"type": "phone", "value": "347 2434799", "label": None, "is_active": True, "dial": "3472434799"}])
         self.assertEqual(card["sources"][0]["source_url"], "https://www.scuolemigranti.org/sedi/a/")
         self.assertFalse(card["freshness"]["stale"])
@@ -62,6 +63,8 @@ class CourseSiteTests(unittest.TestCase):
         self.assertEqual(card["hours_display"]["kind"], "office")
         self.assertEqual(card["hours_display"]["status_label"], "Iscrizioni e informazioni in segreteria")
         self.assertEqual({o["code"] for o in card["offers"]}, {"italiano", "scuola"})
+        women = services([course_row("w", courses=[A1], flags=["solo_donne"])])[0]
+        self.assertEqual([a["code"] for a in women["audiences"]], ["donne"])
         self.assertTrue(card["freshness"]["stale"])
         self.assertIn("dato da verificare", card["freshness"]["label"])
         bare = services([course_row("d", cpia=True)])[0]

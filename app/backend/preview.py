@@ -721,7 +721,7 @@ def page_freshness(fresh: dict[str, Any] | None, observed_at: str | None) -> dic
     stale = bool(fresh.get("stale"))
     label = f"Pagina della sede aggiornata il {when}"
     if stale:
-        label += f" ({months} mesi prima dell'acquisizione, oltre {fresh.get('stale_after_months', 12)}): dato da verificare."
+        label += f" (circa {months} mesi prima dell'acquisizione; soglia {fresh.get('stale_after_months', 12)} mesi): dato da verificare."
     else:
         label += ". Da verificare con chi organizza il corso."
     return {"declared": when, "months_old": months, "acquired": acquired, "stale": stale, "label": label}
