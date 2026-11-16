@@ -139,6 +139,8 @@ class TaxonomyTests(unittest.TestCase):
         self.assertEqual(codes(street["meal_times"]), ["cena"])
         breakfast = taxonomy.apply(helpinet("Centro Atlante", "Distribuzione generi alimentari", "cibo", ["Colazione", "Pranzo"]))
         self.assertEqual(codes(breakfast["offers"]), ["pasto"])
+        canteen = taxonomy.apply(helpinet("S. Giuseppe al Trionfale", "Mensa sociale", "cibo", ["Pranzo", "Pasto da asporto"]))
+        self.assertEqual(sorted(codes(canteen["offers"])), ["pasto", "pasto_asporto"])  # a canteen stays a canteen (user, 2026-11-16)
         market = taxonomy.apply(helpinet("Social Market Jerry Masslo", "Distribuzione generi alimentari", "cibo", ["Distribuzione"]))
         self.assertEqual(codes(market["offers"]), ["cibo_da_cucinare"])
         self.assertEqual(codes(market["offers"][:1]), ["cibo_da_cucinare"])
