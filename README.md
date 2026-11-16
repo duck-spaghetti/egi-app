@@ -400,8 +400,11 @@ latest succeeded child `geocode` run; the cache probe covers all those run IDs.
   status (courses never count as "Aperti ora"), the enrolment wording, the page date with
   "dato da verificare" after 12 months, a summer-closure flag, and a "Livello del corso"
   filter under Istruzione (`course_levels` in the vocabulary). Scuolemigranti follows the
-  structured taxonomy rule: Corsi di italiano, plus Scuola e licenza media for CPIA that
-  state it.
+  structured taxonomy rule with three Istruzione offers (r2): Corsi di italiano (all sites;
+  for CPIA whose page is silent the offer is marked derived), CPIA (the 48 CPIA) and Scuola e
+  licenza media (only when stated). Lessons appear as a week table with levels as labels.
+- **Contacts (all sources, r2):** rows with icon, value and kind (phones, e-mail, websites);
+  website rows name their host. "Segnala errore" is a flag button next to the source chips.
 - **Positions:** only non-ambiguous `matched_house`/`matched_street` candidates are map
   points, labelled as estimates from the address (Nominatim, © OpenStreetMap
   contributors). CAP-area, municipality-only, ambiguous and unresolved candidates are
