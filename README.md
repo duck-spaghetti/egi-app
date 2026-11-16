@@ -403,6 +403,11 @@ latest succeeded child `geocode` run; the cache probe covers all those run IDs.
   structured taxonomy rule with three Istruzione offers (r2): Corsi di italiano (all sites;
   for CPIA whose page is silent the offer is marked derived), CPIA (the 48 CPIA) and Scuola e
   licenza media (only when stated). Lessons appear as a week table with levels as labels.
+- **Migrant health (2026-11-16):** GrIS Lazio/SIMM is retired (`RETIRED_SOURCES`: kept in the
+  database, not shown). STP/ENI offices and clinics come from the Regione Lazio lists
+  (`regione-lazio-stp-eni`, `regione-lazio-ambulatori-stp-eni`), consultori from the Ministero
+  with GrIS phones marked "da GrIS Lazio (dicembre 2024)"; all three use the structured taxonomy
+  rule.
 - **Contacts (all sources, r2):** rows with icon, value and kind (phones, e-mail, websites);
   website rows name their host. "Segnala errore" is a flag button next to the source chips.
 - **Positions:** only non-ambiguous `matched_house`/`matched_street` candidates are map

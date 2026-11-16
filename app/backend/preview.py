@@ -604,14 +604,17 @@ def map_service(row: dict[str, Any], category: dict[str, Any]) -> dict[str, Any]
     chosen = (geocode or {}).get("chosen") or {}
     claims = classification.get("access_claims") or []
     weekly = (p.get("hours") or {}).get("weekly")
-    site_group = ({"external_key": entity["key"], "name": p.get("name"), "raw_fields": {}, "service_count": len(entity.get("members") or [])}
+    # Generic source names ("Rilascio STP/ENI") and regional rows, whose first column is the ASL
+    # (the organiser), give way to the place the normalizer found ("Casa della Salute, Ostia").
+    generic = GENERIC_NAME.match(p.get("name") or "") or p.get("regional_service")
+    place_name = (classification.get("site_hint") if generic else None) or p.get("name")
+    site_group = ({"external_key": entity["key"], "name": place_name, "raw_fields": {}, "service_count": len(entity.get("members") or [])}
                   if entity.get("mode") == "site_address" and len(entity.get("members") or []) > 1 else None)
     card = {
         "id": row["id"],
         "place_id": row["id"],
         "service_title": classification.get("display_name") or p.get("name") or layer or "Servizio",
-        # Generic source names ("Rilascio STP/ENI") give way to the site the normalizer found.
-        "facility_name": (classification.get("site_hint") if GENERIC_NAME.match(p.get("name") or "") else None) or p.get("name"),
+        "facility_name": place_name,
         "source_group": site_group,
         "derived_summary": None,
         "source_values": p.get("source_values", {}),
@@ -619,7 +622,7 @@ def map_service(row: dict[str, Any], category: dict[str, Any]) -> dict[str, Any]
         "hours_display": {**source_hours(weekly, (p.get("hours") or {}).get("raw_value"), source_name), "scoped": scoped_schedules(facts)},
         "placement": place_status,
         "delivery_mode": delivery,
-        "name": p.get("name"),
+        "name": place_name,
         "description": p.get("description") or p.get("offer_text"),
         "offer_text": p.get("offer_text"),
         "data_status": "unreviewed_source_preview",
@@ -649,7 +652,7 @@ def map_service(row: dict[str, Any], category: dict[str, Any]) -> dict[str, Any]
         "contacts": [map_contact(c) for c in p.get("contacts", [])],
         "place": {
             "id": row["id"],
-            "name": p.get("name"),
+            "name": place_name,
             "address": location.get("address_raw"),
             "geometry": point,
             "contacts": [],

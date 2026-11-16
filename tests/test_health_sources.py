@@ -29,6 +29,12 @@ class HealthSourceTests(unittest.TestCase):
     def test_offers_come_from_the_type_only(self):
         card = services([row("r", "regione-lazio-stp-eni", "Rilascio STP/ENI", "c/o ospedale, ambulatorio")])[0]
         self.assertEqual((card["needs"], [o["code"] for o in card["offers"]]), (["salute"], ["stp_eni"]))
+        regional = row("q", "regione-lazio-stp-eni", "Rilascio STP/ENI")
+        regional["payload"].update({"name": "Roma 1", "regional_service": "stp_eni", "organization_claim": {"name_raw": "ASL Roma 1"}})
+        regional["payload"]["classification"]["site_hint"] = "Casa della Salute, Ostia"
+        place = services([regional])[0]
+        self.assertEqual((place["facility_name"], place["place"]["name"], place["organization_raw"]),
+                         ("Casa della Salute, Ostia", "Casa della Salute, Ostia", "ASL Roma 1"))
         clinic = services([row("p", "regione-lazio-ambulatori-stp-eni", "Pediatria")])[0]
         self.assertEqual([o["code"] for o in clinic["offers"]], ["pediatria"])
 
