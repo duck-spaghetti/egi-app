@@ -481,13 +481,19 @@
    "words": "corsi? di lingu[ae] (?!italiana)"
   },
   {
+   "code": "cpia",
+   "need": "istruzione",
+   "label": "CPIA",
+   "words": "\\bcpia\\b|centro provinciale (?:per l'?\\s?)?istruzione (?:degli )?adulti"
+  },
+  {
    "code": "scuola",
    "need": "istruzione",
    "label": "Scuola e licenza media",
    "types": [
     "Scuola"
    ],
-   "words": "licenza media|terza media|\\bcpia\\b"
+   "words": "licenza media|terza media"
   },
   {
    "code": "formazione",
@@ -1021,7 +1027,8 @@
    "Formazione": "formazione",
    "Corsi Formazione Lavoro": "formazione",
    "Attività": "aggregazione",
-   "Scuola e licenza media": "scuola"
+   "Scuola e licenza media": "scuola",
+   "CPIA": "cpia"
   },
   "_prestazioni_without_cluster": [
    "Accoglienza",

@@ -1526,7 +1526,9 @@ html[dir="rtl"] .sheet-back-head .arrow,
 .service-sources { display:flex;flex-wrap:wrap;align-items:center;gap:6px; }
 .source-chip { font-size:12px;padding:2px 8px;border-radius:var(--radius-pill);background:#ede7d9; }
 .flag-data { font:600 11px/1.2 system-ui;padding:3px 8px;border-radius:var(--radius-pill);border:0;background:#f6e3bd;color:#6b4a0c;cursor:pointer; }
-.service-report { margin-inline-start:auto;font-size:12px;color:var(--accent);text-decoration:none;font-weight:600; }
+.service-report { display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;border:1px solid #e3c9c4;background:#fbf1ef; }
+.service-report img { width:14px;height:14px;filter:invert(27%) sepia(64%) saturate(1500%) hue-rotate(345deg) brightness(88%); }
+.service-report:hover, .service-report:focus-visible { background:#f5ddd8; }
 .service-top.compact .service-extra,.service-top.compact .service-today,.service-top.compact .flag-hours,.service-top.compact .category-badge span { display:none; }
 .service-top.compact .service-title { font-size:17px;margin:0; }
 .service-top.compact .service-head { padding-bottom:4px; }
@@ -1589,3 +1591,17 @@ html[dir="rtl"] .sheet-back-head .arrow,
 .filter-bar { flex-shrink:0;display:flex;gap:10px;padding:10px 18px calc(10px + var(--safe-bottom));border-top:1px solid var(--line);background:var(--paper); }
 .filter-bar .btn { flex:1; }
 .filter-bar .btn[hidden] { display:none; }
+
+/* r2 (2026-11-16): lesson week table, level labels, contact rows */
+.lesson-slot { display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin-bottom:4px; }
+.level-chip { display:inline-block;padding:1px 7px;border-radius:999px;background:#e4ece0;color:#2f4a25;font-size:12px;font-weight:600;line-height:1.5; }
+.course-notes { list-style:none;margin:0;padding:0;font-size:13px; }
+.course-notes li { margin:4px 0; }
+.contact-list { list-style:none;margin:0;padding:0;border:1px solid #e2dccf;border-radius:var(--radius-soft);overflow:hidden;background:#fbf9f4; }
+.contact-list li + li { border-top:1px solid #e9e3d7; }
+.contact-row { display:flex;align-items:center;gap:12px;padding:11px 12px;min-height:48px;color:var(--ink);text-decoration:none; }
+.contact-row:hover, .contact-row:focus-visible { background:#f1ece1; }
+.contact-row-text { display:flex;flex-direction:column;min-width:0;flex:1; }
+.contact-row-value { font-weight:600;font-size:14px;overflow-wrap:anywhere; }
+.contact-row-text small { color:var(--ink-faint);font-size:12px; }
+.contact-row-go { color:var(--ink-faint);font-size:20px;line-height:1; }

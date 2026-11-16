@@ -681,18 +681,25 @@ def course_hours(p: dict[str, Any]) -> dict[str, Any]:
     hours = p.get("hours") or {}
     facts = p.get("course_facts") or {}
     cpia = bool(facts.get("cpia"))
-    courses, rows = [], {key: [] for key, _ in DAYS}
+    courses, rows = [], {key: {} for key, _ in DAYS}
     for course in hours.get("courses") or []:
         level = course.get("level") or "Livello non indicato"
         sessions = []
         for s in course.get("sessions") or []:
             sessions.append(f'{", ".join(DAY_SHORT[d] for d in s["days"])} {s["start"]} – {s["end"]}')
             for day in s["days"]:
-                rows[day].append({"opens_raw": s["start"], "closes_raw": s["end"], "label": f'{s["start"]} – {s["end"]} · {level}',
-                                  "level": level, "overnight": False, "review_note": None, "raw": s["raw"]})
+                # One row per lesson time; levels taught at that time become its labels (r2 table).
+                slot = rows[day].setdefault((s["start"], s["end"]), {"opens_raw": s["start"], "closes_raw": s["end"],
+                                                                     "label": f'{s["start"]} – {s["end"]}', "levels": [],
+                                                                     "overnight": False, "review_note": None, "raw": []})
+                slot["levels"] += [x for x in (v.strip() for v in level.split(",")) if x and x not in slot["levels"]]
+                slot["raw"].append(s["raw"])
         courses.append({"level": level, "sessions": sessions + course.get("unparsed_times", []), "note": course.get("note_raw"),
                         "flags": [COURSE_FLAGS[f] for f in course.get("flags", []) if f in COURSE_FLAGS], "summer": course.get("summer")})
-    days = [{"day": key, "label": label, "intervals": sorted(rows[key], key=lambda i: i["opens_raw"]),
+    for day in rows.values():
+        for slot in day.values():
+            slot["level"] = ", ".join(slot["levels"])
+    days = [{"day": key, "label": label, "intervals": sorted(rows[key].values(), key=lambda i: i["opens_raw"]),
              "state": "declared" if rows[key] else "unknown", "issues": []} for key, label in DAYS]
     office = hours.get("office_text")
     if courses:
@@ -733,6 +740,7 @@ def course_fields(p: dict[str, Any], row: dict[str, Any], source_name: str) -> d
     page = p.get("site_page") or {}
     flags = facts.get("flags") or []
     stated = [o["name"] for o in p.get("offers_stated") or []]
+    derived = {o["name"]: o.get("basis") or "dedotto" for o in p.get("offers_stated") or [] if o.get("derived")}
     prestazioni = [{"id": f"offer:{name}", "nome": name} for name in stated]
     prestazioni += [{"id": f"flag:{f}", "nome": COURSE_FLAGS[f]} for f in flags if f in COURSE_FLAGS]
     contacts = []
@@ -754,6 +762,7 @@ def course_fields(p: dict[str, Any], row: dict[str, Any], source_name: str) -> d
         "description": p.get("description"),
         "contacts": contacts,
         "access_raw": {**claims},
+        "derived_prestazioni": derived,
         "course_levels": facts.get("level_codes") or [],
         "course_flags": flags,
         "summer_closure": bool(facts.get("summer_closure")),

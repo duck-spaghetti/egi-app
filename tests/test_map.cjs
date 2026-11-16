@@ -8,7 +8,7 @@ let source = fs.readFileSync(path.join(__dirname, '../app/frontend/static/js/map
 // Isolate pure adaptation/filter helpers; real browser bootstrap is checked separately.
 source = source.replace(/init\(\)\.catch\(\(error\) => \{[\s\S]*?\n\}\);/, '');
 const fakeElement = () => ({classList:{add(){},remove(){},toggle(){}}, setAttribute(){}, addEventListener(){}, append(){}, querySelector:()=>null, querySelectorAll:()=>[], innerHTML:'', textContent:'', scrollTop:0, dataset:{}});
-const sandbox = {document:{getElementById:()=>fakeElement(), querySelector:()=>fakeElement(), querySelectorAll:()=>[], createElement:()=>fakeElement()}, window:{EGI_MAP_CONTEXT:{languageCode:'it'},EGI_I18N:{t:(_key,_args,fallback)=>fallback||''}}, console, URLSearchParams};
+const sandbox = {document:{getElementById:()=>fakeElement(), querySelector:()=>fakeElement(), querySelectorAll:()=>[], createElement:()=>fakeElement()}, window:{EGI_MAP_CONTEXT:{languageCode:'it'},EGI_I18N:{t:(_key,_args,fallback)=>fallback||''}}, console, URLSearchParams, URL};
 vm.createContext(sandbox);
 vm.runInContext(transportSource + '\nthis.TransportLayer = TransportLayer;',sandbox);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '../app/frontend/static/js/cycle-layer.js'), 'utf8') + '\nthis.CycleLayer = CycleLayer;',sandbox);
@@ -245,6 +245,12 @@ vm.runInContext(`
   state.filters.openNow=true; state.filters.level='';
   if(filteredPois(at('2026-11-10T18:00:00Z')).length!==0) throw Error('a lesson in progress counted as open now');
   state.filters.openNow=false; state.filters.cats=new Set(); state.pois=[missing,far,near,remote];
+  // r2: website buttons name their host; contacts as rows (phones, e-mail, websites); lesson week with level labels.
+  if(websiteHost('https://www.cpiaroma2.edu.it/index.php?idpag=1')!=='cpiaroma2.edu.it') throw Error('website host');
+  const rows=renderContacts([{type:'website',value:'https://www.cpiaroma2.edu.it/x'},{type:'email',value:'a@b.it'},{type:'phone',value:'06 123',dial:'06123'}]);
+  if(!(rows.indexOf('06 123')<rows.indexOf('a@b.it') && rows.indexOf('a@b.it')<rows.indexOf('cpiaroma2.edu.it')) || !rows.includes('contact-row')) throw Error('contact rows order');
+  const week=renderCourseHours({hours_display:{...lessons,days:lessons.days.map(d=>({...d,intervals:d.intervals.map(i=>({...i,label:'18:00 – 20:00',levels:['A1','B1']}))})),courses:[{level:'A1',sessions:['Mar, Gio 18:00 – 20:00'],note:'Per donne',flags:['Solo donne']}]}});
+  if(!week.includes('Nessuna lezione') || !week.includes('<span class="level-chip">B1</span>') || !week.includes('Note dei corsi')) throw Error('lesson week table');
 
   // Regression: a multi-service map pin must open the service chooser (broke in F1).
   const twoAtSite=twoSiteFixture();

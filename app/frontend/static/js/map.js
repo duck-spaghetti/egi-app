@@ -965,7 +965,7 @@ function renderServiceHeader(poi) {
     <p class="service-status ${status.kind}" data-opening-service="${escapeHtml(poi.id)}"><strong>${escapeHtml(status.label)}</strong>${today ? `<span class="service-today">${escapeHtml(today)}</span>` : ""}${hoursNeedReview(raw.hours_display) ? '<span class="flag-hours">orari da verificare</span>' : ""}${courseFlags(raw)}<small hidden></small></p>
     <div class="service-extra">
       ${organiser ? `<p class="service-line"><span class="service-key">Organizzato da</span> ${escapeHtml(organiser)}</p>` : ""}
-      <p class="service-line service-sources"><span class="service-key">Fonti</span> ${sourceNames(poi).map(n=>`<span class="source-chip">${escapeHtml(n)}</span>`).join("")}<button type="button" class="flag-data" data-jump="fonti">da verificare</button>${report ? `<a class="service-report" href="${escapeHtml(report.href)}">Segnala errore</a>` : ""}</p>
+      <p class="service-line service-sources"><span class="service-key">Fonti</span> ${sourceNames(poi).map(n=>`<span class="source-chip">${escapeHtml(n)}</span>`).join("")}<button type="button" class="flag-data" data-jump="fonti">da verificare</button>${report ? `<a class="service-report" href="${escapeHtml(report.href)}" aria-label="Segnala un errore" title="Segnala un errore"><img src="/static/assets/icons/default/report.svg" alt="" aria-hidden="true"></a>` : ""}</p>
     </div>
   </header>
   <nav class="service-anchors" aria-label="Sezioni della scheda">${SERVICE_SECTIONS.map(([id,label],i)=>`<button type="button" data-jump="${id}" class="${i===0 ? "on" : ""}">${label}</button>`).join("")}</nav>`;
@@ -1020,8 +1020,10 @@ function renderCourseHours(raw) {
   const display=raw.hours_display;
   const enrol=raw.enrolment;
   const enrolState=enrol?.state==="aperte" ? "Iscrizioni aperte" : enrol?.state==="chiuse" ? "Iscrizioni chiuse" : "";
-  const courses=(display.courses || []).map(c=>`<div class="source-day course-row"><strong>${escapeHtml(c.level)}</strong><span>${c.sessions.map(s=>`<span>${escapeHtml(s)}</span>`).join("<br>") || '<span class="unknown-value">Orario non indicato</span>'}${c.note ? `<small>${escapeHtml(c.note)}</small>` : ""}${c.flags.length ? `<small>${escapeHtml(c.flags.join(" · "))}</small>` : ""}</span></div>`).join("");
-  return `${courses ? `<h4>Orari delle lezioni</h4><div class="source-week">${courses}</div>` : ""}
+  // Week table like the other cards (r2): each lesson time with its levels as labels.
+  const week=display.kind==="lessons" ? `<div class="source-week lesson-week">${display.days.map(day=>`<div class="source-day"><strong>${escapeHtml(day.label)}</strong><span>${day.intervals.length ? day.intervals.map(v=>`<span class="lesson-slot"><span>${escapeHtml(v.label)}</span>${(v.levels || []).map(l=>`<span class="level-chip">${escapeHtml(l)}</span>`).join("")}</span>`).join("") : '<span class="unknown-value">Nessuna lezione</span>'}</span></div>`).join("")}</div>` : "";
+  const notes=(display.courses || []).filter(c=>c.note || c.flags.length || !c.sessions.length).map(c=>`<li><span class="level-chip">${escapeHtml(c.level)}</span> ${escapeHtml([c.note, ...c.flags, c.sessions.length ? "" : "orario non indicato"].filter(Boolean).join(" · "))}</li>`).join("");
+  return `${week ? `<h4>Orari delle lezioni</h4>${week}` : ""}${notes ? `<h4>Note dei corsi</h4><ul class="course-notes">${notes}</ul>` : ""}
     ${display.kind==="office" && display.cpia ? "<p>Iscrizioni e informazioni in segreteria.</p>" : ""}
     ${display.office_text ? `<h4>${display.cpia ? "Orari di ricevimento" : "Segreteria"}</h4><p class="source-hours-text">${escapeHtml(display.office_text)}</p>` : ""}
     ${display.kind==="none" ? `<p>${escapeHtml(display.status_label)}.</p>` : ""}
@@ -1336,16 +1338,19 @@ function renderContacts(contacts) {
     return `<p style="margin:0;font-size:14px">${escapeHtml(t("common.not_available"))}</p>`;
   }
 
-  const columnCount = Math.min(actions.length, 4);
+  // Rows (r2 restyle): icon, value, kind; phones, then e-mail, then websites and the rest.
+  const order = {phone: 1, whatsapp: 2, email: 3, telegram: 4, website: 5, other: 6};
+  const kinds = {phone: "Telefono", whatsapp: "WhatsApp", email: "E-mail", telegram: "Telegram", website: "Sito web", other: "Altro"};
   return `
-    <div class="contact-actions" style="--contact-count:${columnCount}">
-      ${actions.map((action) => `
-        <a class="contact-action ${action.kind}" href="${escapeHtml(action.href)}"${action.external ? ' target="_blank" rel="noopener noreferrer"' : ""}>
+    <ul class="contact-list">
+      ${[...actions].sort((a, b) => (order[a.kind] || 9) - (order[b.kind] || 9)).map((action) => `
+        <li><a class="contact-row ${action.kind}" href="${escapeHtml(action.href)}"${action.external ? ' target="_blank" rel="noopener noreferrer"' : ""}${action.kind === "website" ? ` title="${escapeHtml(action.href)}"` : ""}>
           <span class="contact-action-icon">${contactActionIcon(action)}</span>
-          <span class="contact-action-label">${escapeHtml(action.label)}</span>
-        </a>
+          <span class="contact-row-text"><span class="contact-row-value">${escapeHtml(action.label)}</span><small>${escapeHtml(kinds[action.kind] || kinds.other)}</small></span>
+          <span class="contact-row-go" aria-hidden="true">›</span>
+        </a></li>
       `).join("")}
-    </div>
+    </ul>
   `;
 }
 
@@ -1596,6 +1601,11 @@ function contactActions(contacts) {
   return actions.sort((a, b) => a.priority - b.priority);
 }
 
+/** The site a website link opens, e.g. "cpiaroma2.edu.it" (r2: buttons name their address). */
+function websiteHost(href) {
+  try { return new URL(href).hostname.replace(/^www\./i, ""); } catch (_) { return ""; }
+}
+
 function contactAction(contact) {
   const type = String(contact.type || contact.contact_type || "").toLowerCase();
   const value = String(contact.value || contact.contact_value || "").trim();
@@ -1625,7 +1635,7 @@ function contactAction(contact) {
     return {
       kind: "website",
       href,
-      label: type === "social" ? t("map.social_action", {}, "Social") : t("map.website_short_action", {}, "Sito web"),
+      label: type === "social" ? t("map.social_action", {}, "Social") : (websiteHost(href) || t("map.website_short_action", {}, "Sito web")),
       external: true,
       priority: 3,
     };

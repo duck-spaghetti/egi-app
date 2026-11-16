@@ -179,10 +179,11 @@ def structured_offers(card: dict[str, Any]) -> tuple[list[str], list[dict[str, A
     offers: list[dict[str, Any]] = []
     if forced and forced[0]:
         offers.append(_offer(forced[0], forced[1]))
+    derived = card.get("derived_prestazioni") or {}  # name -> basis, e.g. Italian courses of a CPIA (r2)
     for name in names:
         code = rules["prestazioni"].get(name)
         if code and vocab["_offers"][code]["need"] == need and code not in {o["code"] for o in offers}:
-            offers.append(_offer(code, f"prestazione della fonte: {name}"))
+            offers.append(_offer(code, derived[name], True) if name in derived else _offer(code, f"prestazione della fonte: {name}"))
     for code, dropped in rules.get("excludes", {}).items():
         if code in {o["code"] for o in offers}:
             offers = [o for o in offers if o["code"] not in dropped]
