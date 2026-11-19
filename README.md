@@ -10,7 +10,7 @@ Scuolemigranti, Programma Integra), not the approved public directory.
 Routes use `/api/preview`. No canonical entity, editorial approval or publication is
 created. Blank descriptions remain blank; source hours have a separately labelled preview status; coordinates are source claims. Missing coordinates stay in the list.
 
-Local Git uses `main`, without a remote, under the approved consolidation workflow.
+Git uses `main`, origin [duck-spaghetti/egi-app](https://github.com/duck-spaghetti/egi-app) (public, 2026-11-19), under the approved consolidation workflow.
 Current task/approval and dated verification evidence are indexed in the workspace
 [tracker guide](../docs/agents/issue-tracker.md) and
 [post-handoff plan](../.scratch/post-handoff/plan.md). The original draft is reference
