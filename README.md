@@ -441,7 +441,7 @@ these include candidates the normal map hides.
 A photo module (organisation/user submissions, Street View on request, sensitive-service
 exclusion) and a Mapillary test were built and then removed at the user's request; see
 [feasibility](../.scratch/mapillary/feasibility.md). Git history keeps the code
-(`f8cce40`, `36d7f9c`).
+(`05966e9`, `b7ddd53`).
 
 ### Filter counts (2026-11-09)
 
@@ -492,7 +492,7 @@ view (`/map?debug=1`) colours named places and manual fixes. To fix a position, 
 `../egi-importer/curation/positions.csv` (the to-do list comes with every importer
 run) and re-run geocoding.
 
-Also fixed: "Scegli punto" threw `poi is not defined` (a stray line from `3a6bad3`).
+Also fixed: "Scegli punto" threw `poi is not defined` (a stray line from `7978a00`).
 
 ### User decisions applied (2026-11-09, second round)
 

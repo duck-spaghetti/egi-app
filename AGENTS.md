@@ -20,3 +20,9 @@ draft `origin/wip` and remote do not identify this app's branch or delivery targ
 The preview reads source evidence, not the canonical public directory. Canonical
 editorial integration, old CRUD consumers, production deployment and adoption of
 other draft dependencies require their own approved scope.
+
+## Commit attribution
+
+No AI attribution in commits, pull requests or issues (no `Co-Authored-By` trailer for
+Claude, Codex or another assistant, no "Generated with …" line); see the workspace
+[AGENTS.md](../AGENTS.md#commit-attribution).
