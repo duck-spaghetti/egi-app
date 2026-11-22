@@ -112,7 +112,7 @@
     <fieldset class="discovery-path">
       <legend>Trova il servizio</legend>
       <label class="open-now-filter" style="display:flex;align-items:center;gap:9px;margin:0 0 14px;font-weight:600;cursor:pointer"><input id="open-now-filter" type="checkbox" style="width:18px;height:18px;margin:0"> Aperti ora</label>
-      <p class="source-note">Secondo gli orari strutturati delle fonti (Helpinet e GrIS). Con il filtro attivo, gli orari sconosciuti, testuali o ambigui sono esclusi.</p>
+      <p class="source-note">{% if canonical %}Secondo gli orari canonici pubblicati.{% else %}Secondo gli orari strutturati delle fonti (Helpinet e GrIS).{% endif %} Con il filtro attivo, gli orari sconosciuti, testuali o ambigui sono esclusi.</p>
       <div class="discovery-step"><h3>Bisogno</h3><div class="cat-grid" id="cat-grid"></div></div>
       <p class="source-note" id="need-hint">Nessun bisogno scelto: vedi tutti i servizi. Scegli un bisogno per vederne le prestazioni.</p>
       <div class="offer-groups" id="offer-groups"></div>
@@ -305,6 +305,9 @@
 
 <script>
   window.EGI_MAP_CONTEXT = {
+    apiBase: {{ (api_base or '/api/preview')|tojson }},
+    canonical: {{ 'true' if canonical else 'false' }},
+    localLayers: {{ 'true' if local_layers else 'false' }},
     cityId: {{ city.id if city else 'null' }},
     cityName: {{ city.name|tojson if city else '"Roma"' }},
     latitude: {{ city.center_lat if city else '41.9028' }},

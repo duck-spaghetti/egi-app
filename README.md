@@ -16,6 +16,73 @@ Current task/approval and dated verification evidence are indexed in the workspa
 [post-handoff plan](../.scratch/post-handoff/plan.md). The original draft is reference
 history; production/editorial integration is a separate scope.
 
+## A3 canonical local mode
+
+The A3 branch adds a deliberately selected canonical mode alongside the retained
+preview. `EGI_DATA_MODE=canonical` serves only approved PostgreSQL public reads for
+Helpinet and Scuolemigranti. It never falls back to preview evidence on failure.
+Other sources are absent until migrated. Local canonical publication is not an
+Internet launch or confirmation that a service is currently available.
+
+From this checkout, using the approved workspace environment:
+
+```sh
+EGI_DATA_MODE=canonical \
+EGI_DATABASE_URL='host=/ABS/WORKSPACE/.local/a3-db port=65436 dbname=egi_a3_demo user=egi_a3_reader_login' \
+/ABS/WORKSPACE/.local/venvs/app-a3/bin/python -m uvicorn app.backend.main:app \
+  --host 127.0.0.1 --port 8003 --no-access-log
+```
+
+The schema prerequisite is the approved database through `007_linked_supplements`;
+provisioning/loading is separately authorized in the workspace A3 design. Do not
+point this command at the primary preview or provision an arbitrary target.
+`EGI_DB_BACKEND` accepts only `postgres`; `EGI_TERRITORY_CODE` defaults to `roma`.
+`EGI_QUERY_CATALOGUE` can select a trusted local YAML catalogue. Missing settings,
+unsupported backends, duplicate YAML keys and missing operations fail startup
+without echoing secret values. There is no SQLite backend or connection pool.
+
+`directory_settings.py` validates configuration; `directory_db.py` owns bound
+queries, read-only repeatable-read transactions, connection/statement timeouts,
+error mapping and the cache; `public_queries.yaml` holds the named reads.
+`directory.py` adapts public payloads into map/list/detail cards. Canonical routes
+are `/api/public/services`, `/services/{uuid}` under that prefix, `/categories`,
+`/category-translations`, `/taxonomy`, `/areas` and `/languages`. `/health` reports
+`canonical-local`. Store failure returns a safe 503, never a successful empty map.
+
+The cache holds at most eight language snapshots for 60 seconds, invalidated by
+public sequence changes and opening transitions. Linked supplements are reread on
+every request because their review/link decisions can change independently.
+They contain only explicitly approved secondary contacts/conditions with provenance;
+raw assertions, drafts and private contacts are unavailable. Missing points stay
+in the list; unknown days stay unknown across overlapping schedules. Open-now uses
+canonical opening status and refreshes while the map is open. Source attribution,
+original text and translation metadata are retained; UI translation completion is B2.
+
+Canonical mode returns 404 for raw preview/debug/review and benchmark surfaces.
+The existing address-search operation remains available independently of local
+transport. `EGI_LOCAL_LAYERS=1` optionally enables the existing local transport,
+rail and cycle runtime paths (`EGI_TRANSPORT_ROOT`, `EGI_RAIL_ROOT`,
+`EGI_OSM_RAIL_ROOT`, `EGI_CYCLEWAYS_ROOT`). Transit place UUIDs/points come from
+canonical reads; the preview store is not consulted. These layers do not select
+public-launch transport or authorize fresh acquisition/job changes.
+
+For native verification set `EGI_DATABASE_REPO` to the explicit database worktree,
+`EGI_SQITCH` to Sqitch and, if necessary, `PERL5LIB` to its local runtime library.
+Use the A3 Python environment for `python -m unittest discover -s tests -v` and run
+`node tests/test_canonical_map.cjs` in addition to the two existing Node suites.
+The independent native harness creates only `/private/tmp/egi-app-read-*` targets.
+It checks restricted-role reads, HTTP isolation, bound parameters, safe failures,
+publication/withdrawal cache invalidation and fresh secondary review eligibility.
+
+Verified A3: 130 Python tests, six declared skips (five legacy live-preview HTTP
+cases and one sibling-checkout transport fixture); all three Node suites and
+changed-JavaScript syntax checks pass. Real browser checks covered 594 cards,
+188 education results, a Scuolemigranti detail, unknown days, retained local transit,
+Arabic RTL/fallback and return to Italian. This is not mobile or staging acceptance.
+B1 still owns module extraction, city configuration, coordinate/query privacy,
+14-day redacted errors and local fonts/libraries. The local demo disables access
+logs but does not claim that broader privacy work is complete.
+
 ## Setup and start
 
 Use the selected existing FastAPI/Jinja2/Uvicorn stack in a dedicated `.venv`.

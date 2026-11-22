@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import urllib.error
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,7 +12,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.gzip import GZipMiddleware
@@ -31,6 +32,24 @@ from .osm_rail import ROOT as OSM_RAIL_ROOT, nearby_places as osm_nearby_places,
 
 ROOT = Path(__file__).resolve().parents[2]
 app = FastAPI(title="EGI v0.2 — local source preview", version="0.2.0")
+DATA_MODE = os.environ.get("EGI_DATA_MODE", "preview")
+if DATA_MODE not in {"preview", "canonical"}:
+    raise RuntimeError("Unsupported directory data mode")
+CANONICAL = DATA_MODE == "canonical"
+DIRECTORY = None
+LOCAL_LAYERS = os.environ.get("EGI_LOCAL_LAYERS", "0") == "1"
+if CANONICAL:
+    from .directory import router as directory_router
+    from .directory_db import Db, DirectoryUnavailable
+    from .directory_settings import settings
+
+    DIRECTORY = Db(settings())
+    app.include_router(directory_router(DIRECTORY))
+
+    @app.exception_handler(DirectoryUnavailable)
+    async def unavailable_directory(request: Request, error: DirectoryUnavailable):
+        """Expose only a safe store-unavailable response."""
+        return JSONResponse({"detail": "Catalogo non disponibile"}, status_code=503)
 app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=["127.0.0.1", "localhost", "[::1]", "testserver"],
@@ -46,10 +65,17 @@ templates = Jinja2Templates(directory=ROOT / "app/frontend/templates")
 
 @app.middleware("http")
 async def preview_headers(request: Request, call_next):
-    """Mark every response as a private preview and prevent stale cached evidence."""
+    """Isolate the selected directory mode and prevent stale cached responses."""
+    if CANONICAL:
+        path = request.url.path
+        retained = ("/api/preview/transport", "/api/preview/transit/", "/api/preview/cycleways")
+        if path.startswith("/api/preview") and path != "/api/preview/address-search" and not (LOCAL_LAYERS and path.startswith(retained)):
+            return JSONResponse({"detail": "Not found"}, status_code=404)
+        if path in {"/benchmark", "/revisione/doppioni"}:
+            return JSONResponse({"detail": "Not found"}, status_code=404)
     response = await call_next(request)
     response.headers["Cache-Control"] = "no-store"
-    response.headers["X-EGI-Data-Status"] = "unreviewed-source-preview"
+    response.headers["X-EGI-Data-Status"] = "approved-canonical-local" if CANONICAL else "unreviewed-source-preview"
     return response
 
 
@@ -63,6 +89,8 @@ def subject_source() -> SubjectSource:
 
 def subjects(source: SubjectSource = Depends(subject_source)) -> list[dict[str, Any]]:
     """Translate unavailable DB state into an explicit service error instead of an empty map."""
+    if CANONICAL:
+        return []  # retained transit handlers use canonical place_points; never the preview store
     try:
         return source.latest()
     except SubjectSourceUnavailable as exc:
@@ -71,8 +99,9 @@ def subjects(source: SubjectSource = Depends(subject_source)) -> list[dict[str, 
 
 @app.get("/", response_class=HTMLResponse)
 def entry(request: Request):
-    """Render the original language/city wizard with an explicit preview label."""
-    return templates.TemplateResponse(request=request, name="entry.html", context={})
+    """Render the language/city wizard with the selected directory mode."""
+    return templates.TemplateResponse(request=request, name="entry.html", context={
+        "canonical": CANONICAL, "api_base": "/api/public" if CANONICAL else "/api/preview"})
 
 
 @app.get("/map", response_class=HTMLResponse)
@@ -93,6 +122,9 @@ def map_page(request: Request, city_id: int = 1, lang: str = "it"):
         bbox_east=13.7,
         bbox_west=11.5,
     )
+    if CANONICAL:
+        territory = DIRECTORY.snapshot(lang)["territory"]
+        city.name, city.slug = territory["name"], territory["code"]
     return templates.TemplateResponse(
         request=request,
         name="map.html",
@@ -100,6 +132,9 @@ def map_page(request: Request, city_id: int = 1, lang: str = "it"):
             "city": city,
             "language": SimpleNamespace(**language),
             "lang": language["code"],
+            "canonical": CANONICAL,
+            "api_base": "/api/public" if CANONICAL else "/api/preview",
+            "local_layers": LOCAL_LAYERS if CANONICAL else True,
         },
     )
 
@@ -176,7 +211,11 @@ def preview_transport(
 
 
 def place_points(rows: list[dict[str, Any]]) -> dict[str, tuple[float, float]]:
-    """Map each located place of the imported services to its source coordinates."""
+    """Return canonical public points or the retained preview points for local transit."""
+    if CANONICAL:
+        return {place["location_id"]: (place["longitude"], place["latitude"])
+                for service in DIRECTORY.snapshot()["services"] if (place := service.get("place"))
+                and place.get("location_id") and place.get("longitude") is not None and place.get("latitude") is not None}
     points = {}
     for service in services(rows):
         place = service.get("place") or {}
@@ -332,8 +371,11 @@ def category_translations():
 
 
 @app.get("/health")
-def health(rows: list[dict[str, Any]] = Depends(subjects)):
-    """Report the imported subject count; the database is checked at most once per cache TTL."""
+def health(source: SubjectSource = Depends(subject_source)):
+    """Report the selected directory mode and count through its configured reader."""
+    if CANONICAL:
+        return {"status": "ok", "mode": "canonical-local", "services": len(DIRECTORY.snapshot()["services"])}
+    rows = subjects(source)
     return {
         "status": "ok",
         "mode": "local-unreviewed-preview",

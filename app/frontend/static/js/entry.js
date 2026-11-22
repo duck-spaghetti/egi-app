@@ -1,3 +1,4 @@
+const API_BASE = window.EGI_API_BASE || "/api/preview";
 const state = {
   step: 1,
   cycleIdx: 0,
@@ -59,7 +60,7 @@ function bindUi() {
 }
 
 async function loadLanguages() {
-  const response = await fetch("/api/preview/languages");
+  const response = await fetch(`${API_BASE}/languages`);
   const languages = await readJson(response, "lingue");
   state.languages = languages.map((language) => ({
     id: language.id,
@@ -72,7 +73,7 @@ async function loadLanguages() {
 }
 
 async function loadCities() {
-  const response = await fetch("/api/preview/areas");
+  const response = await fetch(`${API_BASE}/areas`);
   const cities = await readJson(response, "città");
   state.cities = cities.map(normalizeArea);
 }

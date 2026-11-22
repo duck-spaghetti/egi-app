@@ -106,11 +106,11 @@ function initMap() {
   map.on("resize", () => map.setMinZoom(Math.max(9, map.getBoundsZoom(cityBounds, true, [18,18]))));
   map.setMaxBounds(cityBounds);
   map.panInsideBounds(cityBounds, { animate: false });
-  CycleLayer.create(map, {
+  if (context.localLayers !== false) CycleLayer.create(map, {
     toggle: document.getElementById("cycle-toggle"),
     status: document.getElementById("cycle-status"),
   });
-  transport = TransportLayer.create(map, {
+  if (context.localLayers !== false) transport = TransportLayer.create(map, {
     toggle: document.getElementById("transport-toggle"),
     status: document.getElementById("transport-status"),
     modes: {
@@ -121,7 +121,7 @@ function initMap() {
     },
   });
   // Local position checks: ?debug=1 adds the one-source view (debug-sources.js).
-  if (DEBUG_MODE && typeof DebugSources !== "undefined") {
+  if (!context.canonical && DEBUG_MODE && typeof DebugSources !== "undefined") {
     DebugSources.create(map, {
       setServicesVisible: visible => visible ? map.addLayer(markersLayer) : map.removeLayer(markersLayer),
       openDetail: id => openDetail(id),
@@ -142,13 +142,13 @@ async function loadData() {
     citiesResponse,
     translationsResponse,
   ] = await Promise.all([
-    fetch("/api/preview/categories?sort_by=sort_order&sort_order=asc&limit=1000"),
+    fetch(`${context.apiBase || "/api/preview"}/categories?sort_by=sort_order&sort_order=asc&limit=1000`),
     fetchPublicServices(),
-    fetch("/api/preview/languages"),
-    fetch("/api/preview/areas"),
-    fetch("/api/preview/category-translations?limit=1000"),
+    fetch(`${context.apiBase || "/api/preview"}/languages`),
+    fetch(`${context.apiBase || "/api/preview"}/areas`),
+    fetch(`${context.apiBase || "/api/preview"}/category-translations?limit=1000`),
   ]);
-  try { state.taxonomy = await readJson(await fetch("/api/preview/taxonomy"), "tassonomia"); } catch (_e) { /* paths and labels optional */ }
+  try { state.taxonomy = await readJson(await fetch(`${context.apiBase || "/api/preview"}/taxonomy`), "tassonomia"); } catch (_e) { /* paths and labels optional */ }
 
   const categories = await readJson(categoriesResponse, "categorie");
   state.languages = await readJson(languagesResponse, "lingue");
@@ -163,8 +163,10 @@ async function loadData() {
     )
   );
   state.pois = services.map(normalizePublicService).filter(Boolean);
-  void loadTransitSummaries();
-  setInterval(loadTransitSummaries, 300000);
+  if (context.localLayers !== false) {
+    void loadTransitSummaries();
+    setInterval(loadTransitSummaries, 300000);
+  }
   state.filters.cats = new Set();  // filters r4: nothing selected = every service
 }
 
@@ -293,7 +295,7 @@ async function fetchPublicServices() {
   });
   // Services without a map point are hidden; the review view (?debug=1) still lists them.
   if (DEBUG_MODE) params.set("include_unplaced", "true");
-  const response = await fetch(`/api/preview/services?${params.toString()}`);
+  const response = await fetch(`${context.apiBase || "/api/preview"}/services?${params.toString()}`);
   return readJson(response, "servizi");
 }
 
@@ -857,6 +859,10 @@ function renderList(list) {
 }
 
 function listOpeningStatus(poi) {
+  if (poi.raw?.canonical_opening) {
+    const status=sourceOpeningStatus(poi.raw.hours_display);
+    return {isOpen:["open","closing"].includes(status.kind),label:status.label,detail:status.note};
+  }
   if (poi.raw?.data_status === "unreviewed_source_preview") {
     return { isOpen: null, label: "Da verificare", detail: `Orari originali ${sourceName(poi)}, non revisionati` };
   }
@@ -991,6 +997,7 @@ function uncoveredPrestazioni(raw) {
 }
 
 function renderInfoSection(poi) {
+  if (poi.raw?.data_status === "approved_canonical_local") return renderCanonicalInfo(poi);
   const raw=poi.raw || {};
   const interpreted=new Set([...(raw.offers || []),...(raw.audiences || []),...(raw.access_tags || [])].filter(x=>x.interpreted).map(x=>x.label));
   const offers=uniqueLabels((raw.offers || []).filter(o=>o.code!=="associazioni" || raw.offers.length===1).map(o=>o.label));
@@ -1033,6 +1040,7 @@ function renderCourseHours(raw) {
 }
 
 function renderHoursSection(poi) {
+  if (poi.raw?.data_status === "approved_canonical_local") return renderCanonicalHours(poi);
   const raw=poi.raw || {};
   const display=raw.hours_display;
   if (["lessons","office","none"].includes(display?.kind)) return `<section class="detail-section service-section" id="sec-orari"><h3>Orari</h3>${renderCourseHours(raw)}</section>`;
@@ -1075,6 +1083,7 @@ function renderOtherServices(poi) {
 
 /** The only place that details how reliable the card is (one flag in the header). */
 function renderSourcesSection(poi) {
+  if (poi.raw?.data_status === "approved_canonical_local") return renderCanonicalSources(poi);
   const raw=poi.raw || {};
   const interpreted=[...(raw.offers || []),...(raw.audiences || []),...(raw.access_tags || [])].filter(x=>x.interpreted);
   const items=[
@@ -2229,6 +2238,7 @@ function courseStatus(display, now = new Date()) {
 }
 
 function sourceOpeningStatus(display, now = new Date()) {
+  if (display?.canonical_opening) return canonicalOpeningStatus(display, now);
   if (["lessons","office","none"].includes(display?.kind)) return courseStatus(display, now);
   // Calculated from source intervals in Rome time, without asserting completeness.
   const unknown={kind:"unknown",label:"Orario non disponibile",note:display?.opening_note || "Orari Helpinet non revisionati · fuso Europe/Rome"};
@@ -2275,6 +2285,7 @@ function openingBadge(poi, now = new Date()) {
 }
 
 function updateOpeningBadges() {
+  if (context.canonical) void refreshCanonicalOpening();
   // Filter membership must change at opening/closing boundaries as well as labels.
   if (state.filters.openNow) refresh();
   document.querySelectorAll("[data-opening-service]").forEach(el=>{
@@ -2285,4 +2296,67 @@ function updateOpeningBadges() {
     el.querySelector("strong").textContent=status.label;
     el.querySelector("small").textContent=status.note;
   });
+}
+
+/** Render canonical state from the calendar-aware SQL result, without source heuristics. */
+function canonicalOpeningStatus(display, now = new Date()) {
+  const opening=display.canonical_opening || {};
+  const note="Orari dichiarati, non disponibilità in tempo reale. Contatta il servizio per conferma.";
+  const transition=opening.next_transition_at ? new Date(opening.next_transition_at) : null;
+  if (transition && transition.getTime()<=now.getTime()) return {kind:"unknown",label:"Aggiornamento degli orari in corso",note};
+  if (opening.status==="open") {
+    const closes=opening.closes_at ? new Date(opening.closes_at) : null;
+    const closing=closes && closes.getTime()>now.getTime() && closes.getTime()-now.getTime()<=3600000;
+    return {kind:closing?"closing":"open",label:closing ? `Aperto ora · chiude alle ${new Intl.DateTimeFormat("it-IT",{timeZone:opening.timezone || "Europe/Rome",hour:"2-digit",minute:"2-digit"}).format(closes)}` : "Aperto ora",note};
+  }
+  if (opening.status==="closed") return {kind:"closed",label:"Chiuso secondo gli orari dichiarati",note};
+  return {kind:"unknown",label:"Orario da verificare",note};
+}
+
+/** Show selected canonical conditions and preserve each supplementary field's source. */
+function renderCanonicalInfo(poi) {
+  const raw=poi.raw;
+  const conditions=(raw.conditions || []).filter(row=>row.text);
+  return `<section class="detail-section service-section" id="sec-info"><h3>Informazioni</h3>
+    ${poi.notes ? `<p>${escapeHtml(poi.notes)}</p>` : "<p>Descrizione non disponibile.</p>"}
+    ${conditions.length ? `<h4>Accesso e indicazioni</h4><ul>${conditions.map(row=>`<li>${escapeHtml(row.text)}${row.source_name ? ` <small>(${escapeHtml(row.source_name)})</small>` : ""}${row.state==="unknown" ? " · da verificare" : ""}</li>`).join("")}</ul>` : ""}
+    ${(raw.offers || []).length ? `<h4>Prestazioni</h4>${chipList(raw.offers.map(row=>row.label))}` : ""}
+    ${(raw.course_levels || []).length ? `<h4>Livelli dichiarati</h4>${chipList(raw.course_levels)}` : ""}
+    ${renderCost(poi)}<p class="service-advice">La pubblicazione locale conserva le indicazioni delle fonti; non certifica la disponibilità del servizio.</p></section>`;
+}
+
+/** Display public revision provenance, without raw assertions or source capture contents. */
+function renderCanonicalSources(poi) {
+  const raw=poi.raw;
+  const sources=(raw.sources || []).map(source=>`<li>${escapeHtml(source.name)}${source.source_url ? ` · <a href="${escapeHtml(normalizeExternalHref(source.source_url) || "#")}" target="_blank" rel="noopener">Fonte</a>` : ""} · acquisita il ${escapeHtml((source.observed_at || "non noto").slice(0,10))}${source.published_at ? ` · data dichiarata ${escapeHtml(source.published_at.slice(0,10))}` : " · data originaria non nota"}</li>`).join("");
+  const linked=(raw.linked_sources || []).map(source=>`<li>${escapeHtml(source.source_name)}: contatti e criteri approvati separatamente, con provenienza conservata.</li>`).join("");
+  return `<details class="detail-section service-section service-sources-panel" id="sec-fonti"><summary><h3>Fonti e aggiornamenti</h3></summary><ul>${sources}${linked}</ul><p>Revisione canonica: ${escapeHtml(raw.revision_id)}.</p><p>La classificazione segue il vocabolario Roma v0.3. Posizioni e orari restano indicazioni delle fonti; contatta chi eroga il servizio.</p></details>`;
+}
+
+let canonicalRefreshInFlight=false;
+/** Refresh canonical opening results while retaining the visitor's filters and selection. */
+async function refreshCanonicalOpening() {
+  if (canonicalRefreshInFlight) return;
+  canonicalRefreshInFlight=true;
+  try {
+    const services=await fetchPublicServices();
+    state.pois=services.map(normalizePublicService).filter(Boolean);
+    refresh();
+    updateOpeningBadges();
+  } catch (_error) {
+    // Keep visible content. Expired opening results become unknown, never freshly open.
+  } finally {
+    canonicalRefreshInFlight=false;
+  }
+}
+
+/** Unknown canonical weekdays stay unknown, including a partially declared week. */
+function renderCanonicalHours(poi) {
+  const days=poi.raw.hours_display?.days || [];
+  const rows=days.map(day=>{
+    const intervals=(day.intervals || []).map(interval=>escapeHtml(interval.label)).join("<br>");
+    const label=intervals || (day.state==="closed" ? "Chiuso" : "Da verificare");
+    return `<tr><th scope="row">${escapeHtml(day.label)}</th><td>${label}</td></tr>`;
+  }).join("");
+  return `<section class="detail-section service-section" id="sec-orari"><h3>Orari dichiarati</h3><table class="hours-table"><tbody>${rows}</tbody></table><p class="service-advice">I giorni non dichiarati restano da verificare. Eccezioni e variazioni possono prevalere sugli orari settimanali.</p></section>`;
 }

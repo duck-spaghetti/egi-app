@@ -1,0 +1,10 @@
+format: egi-public-queries/1
+queries:
+  sequence:
+    postgres: SELECT snapshot_sequence AS value FROM api.public_sequence
+  snapshot:
+    postgres: >-
+      SELECT api.directory_snapshot(territory_id,%(language)s,'{}',statement_timestamp()) AS value
+      FROM api.public_territories WHERE code=%(territory)s
+  supplements:
+    postgres: SELECT api.linked_service_supplements(NULL,%(language)s) AS value
