@@ -113,10 +113,9 @@ export function createMapPage(context, dependencies={}) {
    case 'center':map.center(payload.lat,payload.lng);break;
    case 'pickedReference':origin.set(payload.lat,payload.lng,payload.label);break;
    case 'previewVisibility':map.servicesVisible(payload.visible);break;
-   case 'reference':state.choosingReference=false;state.userLoc=payload;state.filters.order='distance';refresh();map.center(payload.lat,payload.lng);break;
+   case 'reference':state.choosingReference=false;state.userLoc=payload;state.filters.order='distance';refresh();transit.referenceChanged();map.center(payload.lat,payload.lng);break;
    case 'chooseReference':state.choosingReference=true;refresh();shell.close();if(state.view!=='map')shell.toggle();break;
    case 'referenceCleared':refresh();break;
-   case 'cancelOrigin':transit.cancelOrigin();break;
    case 'originTransit':void transit.origin();break;
    case 'transit':state.transitByPlace=payload.places;state.transitAvailability=payload.availability;refresh();break;
    case 'focus':state.focusSiteKey=payload.key;refresh();break;

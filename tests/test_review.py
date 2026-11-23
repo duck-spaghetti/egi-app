@@ -18,6 +18,7 @@ def card(i, source, title, address, lat, lon, kind):
 
 
 class ReviewTests(unittest.TestCase):
+    """Exercise retained overlap grading and private preview review routes."""
     def test_street_key_ignores_case_and_tail(self):
         self.assertEqual(street_key("Consultorio - X Via Duilio Cambellotti, 7 - 00133 Roma"), "via duilio cambellotti 7")
         self.assertEqual(street_key("V. delle Sette Sale, 30, 00184 Roma"), street_key("Via delle Sette Sale 30 – Roma"))
@@ -72,6 +73,7 @@ class ReviewTests(unittest.TestCase):
         self.assertEqual(strongest["group"]["sources"], ["caritas-roma", "helpinet", "roma-solidarieta"])
 
     def test_routes(self):
+        """Keep preview overlap review routes available with the configured subject source."""
         rows = [map_row("x", "Salute", "matched_house")]
         main.app.dependency_overrides[subject_source] = lambda: StaticSubjectSource(rows)
         try:

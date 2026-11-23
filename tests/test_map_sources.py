@@ -48,6 +48,7 @@ def map_row(identifier: str, layer: str, status: str, ambiguous: bool = False, h
 
 
 class MapSourceTests(unittest.TestCase):
+    """Exercise map-source grouping, coverage and retained preview routes."""
     def test_layers_join_presentation_groups(self):
         rows = [subject("h1", "Mensa", {}), map_row("a", "Mense", "matched_house"),
                 map_row("b", "Socialità volontariato e tempo libero", "matched_house")]
@@ -80,6 +81,7 @@ class MapSourceTests(unittest.TestCase):
         self.assertEqual(service["native_classifications"]["prestazioni"], [{"id": "topic:Salute", "nome": "Salute"}])
 
     def test_coverage_measures_helpinet_only(self):
+        """Keep coverage scoped to Helpinet while other preview sources remain readable."""
         rows = [subject("h1", "Mensa", {}), map_row("a", "Mense", "matched_house")]
         app.dependency_overrides[subject_source] = lambda: StaticSubjectSource(rows)
         try:
@@ -92,6 +94,7 @@ class MapSourceTests(unittest.TestCase):
 
 
     def test_debug_positions_include_hidden_candidates(self):
+        """Expose retained hidden placement candidates only through preview diagnostics."""
         rows = [subject("h1", "Mensa", {}), map_row("a", "Mense", "matched_house"),
                 map_row("cap", "Mense", "postcode_area"), map_row("amb", "Mense", "matched_street", ambiguous=True)]
         app.dependency_overrides[subject_source] = lambda: StaticSubjectSource(rows)
@@ -184,6 +187,7 @@ class GuideSourceTests(unittest.TestCase):
     """Reviewed document-guide entries (Sant'Egidio): directory, access text, scoped hours, aliases."""
 
     def test_telephone_services_go_to_the_directory_even_without_a_place(self):
+        """Retain telephone services in the directory without inventing a location."""
         card = services([guide_row("tel", status="no_address", delivery_mode="telephone")])[0]
         self.assertEqual(card["placement"]["section"], "directory")
         self.assertEqual(card["delivery_mode"], "telephone")

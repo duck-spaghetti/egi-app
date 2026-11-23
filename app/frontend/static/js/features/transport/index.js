@@ -214,7 +214,12 @@ function mount(attach){runtime.transport=attach(map=>TransportLayer.create(map,{
  modes:Object.fromEntries(['metro','rail','tram','bus'].map(mode=>[mode,document.getElementById('transport-'+mode)]))}));}
 function update(snapshot){state=snapshot;}
 function cancelOrigin(){runtime.originRequest?.abort();}
+function referenceChanged(){
+ cancelOrigin();
+ document.getElementById('origin-transit-body').textContent='Apri per caricare fermate e partenze dal punto scelto.';
+ if(document.getElementById('origin-transit').open)void loadOriginTransit();
+}
 function dispose(){cancelOrigin();runtime.transport?.dispose();runtime.transport=null;}
 
-return {mount,update,summaries:loadTransitSummaries,detail:loadTransitDetail,origin:loadOriginTransit,badge:transitBadge,shell:transitSectionShell,cancelOrigin,dispose};
+return {mount,update,summaries:loadTransitSummaries,detail:loadTransitDetail,origin:loadOriginTransit,badge:transitBadge,shell:transitSectionShell,referenceChanged,dispose};
 }

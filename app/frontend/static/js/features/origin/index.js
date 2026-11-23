@@ -33,9 +33,6 @@ function setUserLocation(lat,lng,label) {
   document.getElementById("reference-status").textContent=`Distanze in linea d’aria da ${display}`;
   locStatus.className="loc-status ok";
   locStatus.textContent=display;
-  document.getElementById("origin-transit-body").textContent="Apri per caricare fermate e partenze dal punto scelto.";
-  emit("cancelOrigin");
-  if (document.getElementById("origin-transit").open) emit("originTransit");
   emit("center",{lat,lng});
   emit("closeSheets");
 }

@@ -72,7 +72,7 @@ specific page actions instead of importing other feature state or DOM.
 | search | `select`, `matches`, `update`, `dispose`; matching/facets and controls only, no fetching or map/list rendering. |
 | map | `mount`, `update`, `attach`, `center`, `contains`, `invalidate`, `servicesVisible`, `dispose`; Leaflet and marker handles stay private. |
 | origin | `update`, `locate`, `search`, `choose`, `set`, `dispose`; explicit reference interaction, temporary address candidates and request cancellation. |
-| transport | Layer mount/update, summaries/detail/origin, badge/shell rendering and disposal; references/data come from the page. |
+| transport | Layer mount/update, summaries/detail/origin, badge/shell rendering and disposal; references/data come from the page. `referenceChanged` resets its own origin panel, cancels obsolete requests and reloads an open panel. |
 | cycleways | Optional overlay mount/dispose. |
 | preview | Existing debug panel and overlap-review behavior; selected only for preview. |
 
@@ -107,6 +107,7 @@ node --experimental-vm-modules tests/test_map_modules.cjs
 node --experimental-vm-modules tests/test_transport_layer.cjs
 node --experimental-vm-modules tests/test_transit_presentation.cjs
 node --experimental-vm-modules tests/test_entry_page.cjs
+node --experimental-vm-modules tests/test_review_corrections.cjs
 ```
 
 The Node fixture loads source unchanged using real ES Imports; it never strips

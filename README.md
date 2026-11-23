@@ -141,6 +141,9 @@ The database prerequisite is `008_contact_aliases`. Tests add
 `node --experimental-vm-modules tests/test_map_modules.cjs` (the module test needs
 the flag for `vm.SourceTextModule`). Error-path tests write diagnostics; set
 `EGI_ERROR_DIR` to a temporary directory so they do not land in `.local/errors`.
+`node --experimental-vm-modules tests/test_review_corrections.cjs` covers clipboard
+completion after page disposal and reference changes through the actual origin
+and transport modules, including cancellation of obsolete transport responses.
 
 Verified A3: 130 Python tests, six declared skips (five legacy live-preview HTTP
 cases and one sibling-checkout transport fixture); all three Node suites and

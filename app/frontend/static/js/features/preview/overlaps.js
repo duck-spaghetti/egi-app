@@ -155,7 +155,7 @@ function renderExport() {
 document.getElementById("copy").addEventListener("click", async () => {
   const text = document.getElementById("export").value;
   try { await navigator.clipboard.writeText(text); scope.check();document.getElementById("copied").textContent = "Copiato."; }
-  catch (_e) { document.getElementById("export").select(); document.getElementById("copied").textContent = "Seleziona e copia a mano."; }
+  catch (_e) { if(scope.signal.aborted)return;document.getElementById("export").select(); document.getElementById("copied").textContent = "Seleziona e copia a mano."; }
 },{signal:scope.signal});
 document.querySelectorAll(".filters input, .filters select").forEach(x => x.addEventListener("change", renderList,{signal:scope.signal}));
 document.getElementById("accept-high").addEventListener("click", () => {
