@@ -87,16 +87,29 @@ with TestClient(app) as client:
     assert client.get('/health').json()['mode']=='canonical-local'
     assert client.get('/map').status_code==200
     assert client.get('/map').headers['X-EGI-Data-Status']=='approved-canonical-local'
-    import app.backend.main as main
-    main.search_address=lambda query: []
+    import app.backend.search_routes as search
+    search.search_address=lambda query: []
     assert client.post('/api/preview/address-search',json={'query':'Roma'}).status_code==200
-    main.LOCAL_LAYERS=True
-    main.SUBJECT_SOURCE.latest=lambda: (_ for _ in ()).throw(AssertionError('preview must not be read'))
-    assert client.get('/api/preview/transit/places').status_code==200
+    assert client.get('/api/preview/transit/places').status_code==404
+    assert all(row['name_native'] for row in client.get('/api/public/languages').json())
 '''
         result = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True,
             env={**cls_env(self.environment), "EGI_DATA_MODE": "canonical", "EGI_DATABASE_URL": self.dsn})
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_configured_local_layers_never_read_preview(self):
+        """Actual canonical composition enables only selected local readers."""
+        code = """from fastapi.testclient import TestClient
+from app.backend.main import app
+from app.backend import runtime
+runtime.SUBJECT_SOURCE.latest=lambda: (_ for _ in ()).throw(AssertionError('preview must not be read'))
+with TestClient(app) as client:
+    assert client.get('/api/preview/transit/places').status_code==200
+    assert client.get('/api/preview/services').status_code==404
+"""
+        result=subprocess.run([sys.executable,'-c',code],cwd=ROOT,capture_output=True,text=True,
+            env={**cls_env(self.environment),'EGI_DATA_MODE':'canonical','EGI_DATABASE_URL':self.dsn,'EGI_LOCAL_LAYERS':'1'})
+        self.assertEqual(result.returncode,0,result.stderr)
 
     def test_unavailable_store_has_no_secret_in_error(self):
         """Connection failures surface explicitly without disclosing the configured DSN."""

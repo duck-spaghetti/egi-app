@@ -15,7 +15,7 @@ async function main() {
     setTimeout:()=>1, clearTimeout(){}, setInterval(){},
     fetch: async url => {
       requests.push(url);
-      return {ok:true,json:async()=>url.startsWith('/api/preview/transport?')
+      return {ok:true,json:async()=>url==='/api/preview/transport'
         ? {availability:'available',features:[feature]}
         : {availability:'available',departures:[],alerts:[]}};
     },

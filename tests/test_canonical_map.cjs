@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const path=require('node:path');
-let source=fs.readFileSync(path.join(__dirname,'../app/frontend/static/js/map.js'),'utf8');
+let source=require('./map_fixture.cjs').source();
 source=source.replace(/init\(\)\.catch\(\(error\) => \{[\s\S]*?\n\}\);/,'');
 const element=()=>({classList:{add(){},remove(){},toggle(){}},setAttribute(){},addEventListener(){},dataset:{}});
 const sandbox={document:{getElementById:element,querySelector:element,querySelectorAll:()=>[]},

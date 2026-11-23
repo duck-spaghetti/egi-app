@@ -1,0 +1,128 @@
+[
+  {
+    "file": "vendor/leaflet-1.9.4/LICENSE",
+    "source": "https://registry.npmjs.org/leaflet/-/leaflet-1.9.4.tgz",
+    "sha256": "53e8dc25862014e4324741ca18fbe3611e11d42ef69f59f86ea8c5389647d4cb",
+    "archive_sha512": "nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA=="
+  },
+  {
+    "file": "vendor/leaflet-1.9.4/leaflet.css",
+    "source": "https://registry.npmjs.org/leaflet/-/leaflet-1.9.4.tgz",
+    "sha256": "a7837102824184820dfa198d1ebcd109ff6d0ff9a2672a074b9a1b4d147d04c6",
+    "archive_sha512": "nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA=="
+  },
+  {
+    "file": "vendor/leaflet-1.9.4/leaflet.js",
+    "source": "https://registry.npmjs.org/leaflet/-/leaflet-1.9.4.tgz",
+    "sha256": "db49d009c841f5ca34a888c96511ae936fd9f5533e90d8b2c4d57596f4e5641a",
+    "archive_sha512": "nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA=="
+  },
+  {
+    "file": "vendor/leaflet-1.9.4/leaflet.js.map",
+    "source": "https://registry.npmjs.org/leaflet/-/leaflet-1.9.4.tgz",
+    "sha256": "600a10dc5cd110de0699510d322afcbe01c7ca90b4c5f48adc20314c70aac753",
+    "archive_sha512": "nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA=="
+  },
+  {
+    "file": "vendor/leaflet-1.9.4/images/layers-2x.png",
+    "source": "https://registry.npmjs.org/leaflet/-/leaflet-1.9.4.tgz",
+    "sha256": "066daca850d8ffbef007af00b06eac0015728dee279c51f3cb6c716df7c42edf",
+    "archive_sha512": "nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA=="
+  },
+  {
+    "file": "vendor/leaflet-1.9.4/images/layers.png",
+    "source": "https://registry.npmjs.org/leaflet/-/leaflet-1.9.4.tgz",
+    "sha256": "1dbbe9d028e292f36fcba8f8b3a28d5e8932754fc2215b9ac69e4cdecf5107c6",
+    "archive_sha512": "nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA=="
+  },
+  {
+    "file": "vendor/leaflet-1.9.4/images/marker-icon-2x.png",
+    "source": "https://registry.npmjs.org/leaflet/-/leaflet-1.9.4.tgz",
+    "sha256": "00179c4c1ee830d3a108412ae0d294f55776cfeb085c60129a39aa6fc4ae2528",
+    "archive_sha512": "nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA=="
+  },
+  {
+    "file": "vendor/leaflet-1.9.4/images/marker-icon.png",
+    "source": "https://registry.npmjs.org/leaflet/-/leaflet-1.9.4.tgz",
+    "sha256": "574c3a5cca85f4114085b6841596d62f00d7c892c7b03f28cbfa301deb1dc437",
+    "archive_sha512": "nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA=="
+  },
+  {
+    "file": "vendor/leaflet-1.9.4/images/marker-shadow.png",
+    "source": "https://registry.npmjs.org/leaflet/-/leaflet-1.9.4.tgz",
+    "sha256": "264f5c640339f042dd729062cfc04c17f8ea0f29882b538e3848ed8f10edb4da",
+    "archive_sha512": "nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA=="
+  },
+  {
+    "file": "vendor/leaflet.markercluster-1.5.3/MarkerCluster.css",
+    "source": "https://registry.npmjs.org/leaflet.markercluster/-/leaflet.markercluster-1.5.3.tgz",
+    "sha256": "614dea0a98ff3f4ead74f04918f6b1d1b9ba435c25b5fc23b21a394d1e3e4d87",
+    "archive_sha512": "vPTw/Bndq7eQHjLBVlWpnGeLa3t+3zGiuM7fJwCkiMFq+nmRuG3RI3f7f4N4TDX7T4NpbAXpR2+NTRSEGfCSeA=="
+  },
+  {
+    "file": "vendor/leaflet.markercluster-1.5.3/MarkerCluster.Default.css",
+    "source": "https://registry.npmjs.org/leaflet.markercluster/-/leaflet.markercluster-1.5.3.tgz",
+    "sha256": "61258232d98d64dc2a7b1e02130d67421bc5b9bda5994eef70228ff97570c170",
+    "archive_sha512": "vPTw/Bndq7eQHjLBVlWpnGeLa3t+3zGiuM7fJwCkiMFq+nmRuG3RI3f7f4N4TDX7T4NpbAXpR2+NTRSEGfCSeA=="
+  },
+  {
+    "file": "vendor/leaflet.markercluster-1.5.3/leaflet.markercluster.js",
+    "source": "https://registry.npmjs.org/leaflet.markercluster/-/leaflet.markercluster-1.5.3.tgz",
+    "sha256": "1e4e1d22972a3926f48598e0caf14e3fe7049835d428a344fed4f9e3665b3508",
+    "archive_sha512": "vPTw/Bndq7eQHjLBVlWpnGeLa3t+3zGiuM7fJwCkiMFq+nmRuG3RI3f7f4N4TDX7T4NpbAXpR2+NTRSEGfCSeA=="
+  },
+  {
+    "file": "vendor/leaflet.markercluster-1.5.3/leaflet.markercluster.js.map",
+    "source": "https://registry.npmjs.org/leaflet.markercluster/-/leaflet.markercluster-1.5.3.tgz",
+    "sha256": "a76b044ac5fedb2b1b2a11006083d91695609703168d03712e4b305c8bafd8af",
+    "archive_sha512": "vPTw/Bndq7eQHjLBVlWpnGeLa3t+3zGiuM7fJwCkiMFq+nmRuG3RI3f7f4N4TDX7T4NpbAXpR2+NTRSEGfCSeA=="
+  },
+  {
+    "file": "vendor/leaflet.markercluster-1.5.3/MIT-LICENCE.txt",
+    "source": "https://registry.npmjs.org/leaflet.markercluster/-/leaflet.markercluster-1.5.3.tgz",
+    "sha256": "3133dacd38250bd1f524d8166cc60a016a382522e062fce143691c65bf5e4b3d",
+    "archive_sha512": "vPTw/Bndq7eQHjLBVlWpnGeLa3t+3zGiuM7fJwCkiMFq+nmRuG3RI3f7f4N4TDX7T4NpbAXpR2+NTRSEGfCSeA=="
+  },
+  {
+    "file": "fonts/fraunces/Fraunces[SOFT,WONK,opsz,wght].ttf",
+    "source": "https://raw.githubusercontent.com/google/fonts/06bfe0d62a98375cb09c942fa18e68bd32cff057/ofl/fraunces/Fraunces%5BSOFT%2CWONK%2Copsz%2Cwght%5D.ttf",
+    "git_blob": "8210f9488d3c732359a9292dd09aca3f2bae830e",
+    "sha256": "177ff6c0f14e5550a3c624247cd1189611d4eb65d000b14944c63d967958abbb"
+  },
+  {
+    "file": "fonts/fraunces/OFL.txt",
+    "source": "https://raw.githubusercontent.com/google/fonts/06bfe0d62a98375cb09c942fa18e68bd32cff057/ofl/fraunces/OFL.txt",
+    "git_blob": "22fa7ce5733434d0c634f6e55116f410858e938c",
+    "sha256": "bdf4c22802eaf804f998195871c6b8938aac2ac14b2d78a8bd66a6f1eced833b"
+  },
+  {
+    "file": "fonts/ibmplexsans/IBMPlexSans[wdth,wght].ttf",
+    "source": "https://raw.githubusercontent.com/google/fonts/06bfe0d62a98375cb09c942fa18e68bd32cff057/ofl/ibmplexsans/IBMPlexSans%5Bwdth%2Cwght%5D.ttf",
+    "git_blob": "30f837e8b02e8ecddce6cbebc425b1f422392515",
+    "sha256": "3b031aa4216174205bd8471f88a49b91f093169e9e87bd5262242bc5967fe2e3"
+  },
+  {
+    "file": "fonts/ibmplexsans/OFL.txt",
+    "source": "https://raw.githubusercontent.com/google/fonts/06bfe0d62a98375cb09c942fa18e68bd32cff057/ofl/ibmplexsans/OFL.txt",
+    "git_blob": "c35c4c618fab33da8695177b3a6cefe0810b7b28",
+    "sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da"
+  },
+  {
+    "file": "fonts/ibmplexmono/IBMPlexMono-Regular.ttf",
+    "source": "https://raw.githubusercontent.com/google/fonts/06bfe0d62a98375cb09c942fa18e68bd32cff057/ofl/ibmplexmono/IBMPlexMono-Regular.ttf",
+    "git_blob": "0c9770d5183ba60dc4350d3e011b782a320761ae",
+    "sha256": "6a3412f058c7d8dfd9170c41e85ade48e5156ecb89356110ca57a0a27734af46"
+  },
+  {
+    "file": "fonts/ibmplexmono/IBMPlexMono-Medium.ttf",
+    "source": "https://raw.githubusercontent.com/google/fonts/06bfe0d62a98375cb09c942fa18e68bd32cff057/ofl/ibmplexmono/IBMPlexMono-Medium.ttf",
+    "git_blob": "33c546f68b6007a45a3f10e845523abb2db25399",
+    "sha256": "a9b4c49bb299e05b5f6c481e7fb5e78943d2793249a0c8874ab574a2d1ea6755"
+  },
+  {
+    "file": "fonts/ibmplexmono/OFL.txt",
+    "source": "https://raw.githubusercontent.com/google/fonts/06bfe0d62a98375cb09c942fa18e68bd32cff057/ofl/ibmplexmono/OFL.txt",
+    "git_blob": "c35c4c618fab33da8695177b3a6cefe0810b7b28",
+    "sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da"
+  }
+]

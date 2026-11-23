@@ -6,7 +6,8 @@ import unittest
 
 from fastapi.testclient import TestClient
 
-from app.backend.main import app, subject_source
+from app.backend.main import app
+from app.backend.preview_dependencies import subject_source
 from app.backend.preview import categories, services
 from app.backend.subjects import StaticSubjectSource
 from tests.test_service_presentation import subject
@@ -186,7 +187,7 @@ class GuideSourceTests(unittest.TestCase):
         card = services([guide_row("tel", status="no_address", delivery_mode="telephone")])[0]
         self.assertEqual(card["placement"]["section"], "directory")
         self.assertEqual(card["delivery_mode"], "telephone")
-        from app.backend.main import is_placed
+        from app.backend.preview_routes import is_placed
         self.assertTrue(is_placed(card))
         self.assertFalse(is_placed(services([guide_row("none", status="no_address")])[0]))
 

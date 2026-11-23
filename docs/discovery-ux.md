@@ -29,8 +29,8 @@ A closed Trasporti nelle vicinanze section summarizes stop count/nearest distanc
 Expanded stops sort by distance in metres, then name/IDs; each stop's lines/alerts
 are separately expandable. Distance remains straight-line, walking time estimated.
 
-`GET /api/preview/transit/origin?lat&lon` takes an explicit reference in the supported
-Rome bounds (41–42.7 N, 11.5–13.7 E), without reading the service DB. It returns
+`POST /api/preview/transit/origin` with JSON `{lat,lon}` takes an explicit reference
+inside the configured profile's search extent (Rome: 41–42.7 N, 11.5–13.7 E), without reading the service DB. It returns
 `lines`, distance-ordered `stops`, per-line `next` directions, `realtime`, `alerts`,
 `now`, `schedule_availability` and source/method metadata. Posizione loads it when
 Mezzi vicino al punto scelto is expanded. A named/manual/GPS origin stays labelled;
@@ -84,7 +84,9 @@ The adapter sends an identifying User-Agent, bounds the area with `viewbox` and
 `bounded=1`, requests Italian results in Italy, uses verified TLS and an 8 s timeout,
 and limits response bytes. A shared file lock spaces application requests at least
 one second apart across workers; a thread lock protects the process cache. Cache
-holds at most 128 normalized queries/results for one hour in memory, never on disk.
+holds at most 128 results for 300 seconds in memory, never on disk, keyed by an
+HMAC digest (random per-process key, provider and profile scope) rather than the
+raw query.
 No address enters the local endpoint URL/access log; do not enable body logging.
 Provider configuration is trusted operator configuration, not a user-supplied URL.
 

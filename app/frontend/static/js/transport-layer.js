@@ -178,7 +178,7 @@ const TransportLayer = (() => {
     if (data.availability === "outside_calendar") return "Il feed disponibile non contiene servizio programmato per oggi. In attesa di aggiornamento.";
     const osm = data.osm_rail?.availability === "available" ? " Ferrovie aggiuntive: © OpenStreetMap contributors (ODbL 1.0), senza orari; servizio odierno non verificato." : "";
     if (osm && !(data.sources || []).some(s => !s.untimed && s.availability === "available")) return osm.trim();
-    const format = value => value ? new Date(value).toLocaleString("it-IT", {timeZone:"Europe/Rome"}) : "non disponibile";
+    const format = value => value ? new Date(value).toLocaleString("it-IT", {timeZone:(typeof window!=="undefined" && window.EGI_MAP_CONTEXT?.profile?.timezone) || "Europe/Rome"}) : "non disponibile";
     const refresh = data.refresh || {};
     let warning = refresh.result === "failed" ? " Ultimo tentativo fallito: uso l’ultima versione valida." : "";
     if (data.refresh_stale) warning += " Nessun controllo automatico nelle ultime 24 ore: verificare il job di aggiornamento.";
@@ -187,12 +187,18 @@ const TransportLayer = (() => {
 
   /** Query for the viewport, or null while the map has no usable size or bounds. */
   function viewportQuery(size, bounds, zoom, modes) {
-    const west = bounds.getWest(), south = bounds.getSouth(), east = bounds.getEast(), north = bounds.getNorth();
+    let west=bounds.getWest(),south=bounds.getSouth(),east=bounds.getEast(),north=bounds.getNorth();
+    const extent=typeof window!=="undefined" && window.EGI_MAP_CONTEXT?.profile?.search_extent;
+    if(extent){west=Math.max(west,extent[0]);south=Math.max(south,extent[1]);east=Math.min(east,extent[2]);north=Math.min(north,extent[3]);}
     if (!(size.x > 0 && size.y > 0 && west < east && south < north)) return null;
     return new URLSearchParams({west, south, east, north, zoom, modes: [...modes].join(",")});
   }
 
   function create(map, elements) {
+    let disposed=false;
+    const listeners=new AbortController(),cleanup=[];
+    const ownMap=(event,callback)=>{map.on(event,callback);cleanup.push(()=>map.off?.(event,callback));};
+    const ownOnce=(event,callback)=>{map.once(event,callback);cleanup.push(()=>map.off?.(event,callback));};
     // Services (markerPane, z 600) stay above the network: lines z 350, stops z 450.
     if (!map.getPane("transportLines")) map.createPane("transportLines").style.zIndex = 350;
     if (!map.getPane("transportStops")) map.createPane("transportStops").style.zIndex = 450;
@@ -201,7 +207,7 @@ const TransportLayer = (() => {
       map.getContainer().classList.toggle("tl-detail", map.getZoom() >= DETAIL_ZOOM || Boolean(focused));
       map.getContainer().classList.toggle("tl-focused", Boolean(focused));
     };
-    map.on("zoomend", syncDetail);
+    ownMap("zoomend", syncDetail);
     const modes = new Set(elements.modes ? MODES.filter(mode=>elements.modes[mode]?.checked) : MODES);
     let visible = false;
     let features = [];
@@ -227,7 +233,7 @@ const TransportLayer = (() => {
       held = null;
       layer.clearLayers();
       syncDetail();
-      if (!visible) return;
+      if (disposed || !visible) return;
       const labelled = new Set();
       for (const feature of features) {
         const props = feature.properties;
@@ -269,7 +275,7 @@ const TransportLayer = (() => {
 
     async function load() {
       request?.abort();
-      if (!visible) return;
+      if (disposed || !visible) return;
       if (!modes.size && !focused) {
         features = [];
         render();
@@ -278,17 +284,17 @@ const TransportLayer = (() => {
       const query = viewportQuery(map.getSize(), map.getBounds(), map.getZoom(), modes.size ? modes : new Set(MODES));
       if (!query) {
         // The map container has no size yet (first paint, hidden view): retry on resize.
-        map.once("resize", schedule);
+        ownOnce("resize", schedule);
         return;
       }
       if (focused) query.set("routes", focused.routeIds.join(","));
       const current = new AbortController();
       request = current;
       try {
-        const response = await fetch(`/api/preview/transport?${query}`, {signal: current.signal});
+        const response = await fetch("/api/preview/transport", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...Object.fromEntries(query),west:Number(query.get("west")),south:Number(query.get("south")),east:Number(query.get("east")),north:Number(query.get("north")),zoom:Number(query.get("zoom"))}),signal:current.signal});
         if (!response.ok) throw Error(`HTTP ${response.status}`);
         const data = await response.json();
-        if (current.signal.aborted) return;
+        if (disposed || current.signal.aborted) return;
         setStatus(statusText(data));
         if (popupOpen) {
           held = data.features;
@@ -327,11 +333,13 @@ const TransportLayer = (() => {
     }
 
     function schedule() {
+      if(disposed) return;
       clearTimeout(timer);
       timer = setTimeout(load, 180);
     }
 
     function setVisible(value) {
+      if(disposed) return;
       visible = value;
       if (!visible && focused) clearFocus(false);
       if (elements.toggle) {
@@ -347,7 +355,7 @@ const TransportLayer = (() => {
     function focus({routeIds, label, stopIds = [], points = [], onClear = null}) {
       focused = {routeIds: [...new Set(routeIds)].slice(0, 80), label, stopIds: new Set(stopIds), center: points[0] || null, onClear};
       chip.innerHTML = `<span>${escapeHtml(label)}</span><button type="button" aria-label="Chiudi vista linee e mostra tutta la rete">✕</button>`;
-      chip.querySelector("button").addEventListener("click", () => clearFocus());
+      chip.querySelector("button").addEventListener("click", () => clearFocus(), {signal:listeners.signal});
       chip.hidden = false;
       features = [];
       if (points.length) map.fitBounds(L.latLngBounds(points).pad(0.25), {maxZoom: 16});
@@ -372,7 +380,7 @@ const TransportLayer = (() => {
         if(elements.modes?.[mode]) elements.modes[mode].checked=next;
       }
       setVisible(next);
-    });
+    }, {signal:listeners.signal});
     for (const mode of MODES) {
       elements.modes?.[mode]?.addEventListener("change", event => {
         if (event.target.checked) modes.add(mode); else modes.delete(mode);
@@ -380,12 +388,12 @@ const TransportLayer = (() => {
         render();
         if (focused) clearFocus(false);
         setVisible(modes.size > 0);
-      });
+      }, {signal:listeners.signal});
     }
-    map.on("moveend", schedule);
-    setInterval(load, 60000);
+    ownMap("moveend", schedule);
+    const interval=setInterval(load,60000);
     setVisible(false);
-    return {setVisible, isVisible: () => visible, reload: load, focus, clearFocus, focusedRoutes: () => focused?.routeIds || null};
+    return {setVisible, isVisible: () => visible, reload: load, focus, clearFocus, focusedRoutes: () => focused?.routeIds || null, dispose(){disposed=true;visible=false;listeners.abort();request?.abort();clearTimeout(timer);clearInterval(interval);for(const clean of cleanup)clean();layer.off?.();layer.remove?.();chip.remove?.();}};
   }
 
   return {DETAIL_ZOOM, TRAIN_GLYPH, UNTIMED_NOTE, routePopupHtml, directionTimes, realtimeText, alertsHtml, realtimeNote, create, statusText, viewportQuery, lineStyle, focusLineStyle, lineLabelPoint, colorForLine, stopIconHtml, popupHtml, lineColor, departuresHtml, timeText, wheelchairText};

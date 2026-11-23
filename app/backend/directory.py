@@ -7,14 +7,11 @@ provenance without combining the two sources' canonical records.
 
 from collections import defaultdict
 from typing import Any
-from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query
-
-from .directory_db import Db
+from .app_profile import resolved
 from .presentation import AUDIENCE, COST, DOCUMENTS, PROCEDURE
 
-LANGUAGES = [{"id": i, "code": code, "native_name": name, "english_name": name,
+LANGUAGES = [{"id": i, "code": code, "name_native": name, "name_english": name,
               "direction": "rtl" if code == "ar" else "ltr", "is_active": True}
              for i, (code, name) in enumerate([("it", "Italiano"), ("en", "English"),
                                               ("fr", "Français"), ("ar", "العربية")], 1)]
@@ -47,27 +44,35 @@ def vocabulary(snapshot: dict) -> dict:
 def area(snapshot: dict) -> dict:
     """Map the configured public Rome territory to the existing UI area envelope."""
     territory = snapshot["territory"]
-    return {"id": 1, "canonical_id": territory["territory_id"], "slug": territory["code"],
-            "name": territory["name"], "country_code": territory["country_code"],
-            "default_zoom": 11, "is_active": True, "timezone": territory["timezone_name"],
-            "default_center": {"type": "Point", "coordinates": [12.4964, 41.9028]},
-            "geometry_bbox": {"type": "Polygon", "coordinates": [
-                [[11.5, 41.0], [13.7, 41.0], [13.7, 42.7], [11.5, 42.7], [11.5, 41.0]]]}}
+    city = resolved(territory)
+    west,south,east,north = city['bounds']
+    return {"id":1,"canonical_id":territory['territory_id'],"slug":territory['code'],
+            "name":city['name'],"country_code":city['country_code'],"timezone":city['timezone'],
+            "default_zoom":city['zoom'],"is_active":True,
+            "default_center":{"type":"Point","coordinates":city['center']},
+            "geometry_bbox":{"type":"Polygon","coordinates":[[[west,south],[east,south],[east,north],[west,north],[west,south]]]}}
 
 
 def weekly_days(hours: list[dict]) -> list[dict]:
     """Combine service schedules without treating an uncertain day as closed."""
-    days = []
-    for weekday, (code, label) in enumerate(DAYS, 1):
-        weekly = [row for row in hours if row["iso_weekday"] == weekday
-                  and row["scope_code"] == "service"]
-        intervals = [{"opens_raw": row["opens_at"][:5], "closes_raw": row["closes_at"][:5],
-                      "label": f"{row['opens_at'][:5]}–{row['closes_at'][:5]}"
-                               + (" (+1 giorno)" if row["end_day_offset"] else ""),
-                      "review_note": None} for row in weekly if row.get("opens_at")]
-        state = "closed" if weekly and all(row["day_state"] == "closed" for row in weekly) else "unknown"
-        days.append({"day": code, "label": label, "intervals": intervals, "issues": [], "state": state})
-    return days
+    intervals = defaultdict(list)
+    states = defaultdict(list)
+    for row in hours:
+        if row['scope_code']!='service':
+            continue
+        day=row['iso_weekday']
+        states[day].append(row['day_state'])
+        if not row.get('opens_at'):
+            continue
+        opens,closes=row['opens_at'][:5],row['closes_at'][:5]
+        finish='00:00' if row['end_day_offset'] else closes
+        intervals[day].append({'opens_raw':opens,'closes_raw':finish,'label':f'{opens}–{finish}','review_note':None})
+        if row['end_day_offset'] and closes!='00:00':
+            intervals[day%7+1].append({'opens_raw':'00:00','closes_raw':closes,'label':f'00:00–{closes}',
+                                      'review_note':'Prosegue dal giorno precedente'})
+    return [{"day":code,"label":label,"intervals":sorted(intervals[weekday],key=lambda row:row['opens_raw']),
+             "issues":[],"state":"closed" if states[weekday] and all(x=='closed' for x in states[weekday]) else "unknown"}
+            for weekday,(code,label) in enumerate(DAYS,1)]
 
 
 def cards(snapshot: dict) -> list[dict]:
@@ -114,8 +119,9 @@ def cards(snapshot: dict) -> list[dict]:
             "conditions": conditions, "linked_sources": supplements[service["service_id"]],
             "cost_tag": service["cost"]["state"], "cost_note": text(service["cost"]["note"]),
             "delivery_mode": service["delivery_mode"], "operational_status": service["operational_status"],
+            "verification": service.get("verification", {}),
             "canonical_opening": service["opening"], "opening_evaluated_at": snapshot["evaluated_at"],
-            "hours_display": {"days": days, "canonical_opening": service["opening"], "evaluated_at": snapshot["evaluated_at"]},
+            "hours_display": {"days": days, "verification":service.get("verification",{}), "canonical_opening": service["opening"], "evaluated_at": snapshot["evaluated_at"]},
             "place_id": place.get("location_id"), "place": {"id": place.get("location_id"), "geometry": geometry,
                 "address": next((row["formatted"] for row in place.get("addresses", []) if row["kind"] == "physical"),
                                 text(place.get("area_description"))),
@@ -139,49 +145,3 @@ def _contact(row: dict, linked: dict | None = None) -> dict:
                            "sources": row.get("sources", [])} if linked else None}
 
 
-def router(db: Db) -> APIRouter:
-    """Provide public discovery endpoints over the configured facade, with bounded inputs."""
-    result = APIRouter(prefix="/api/public")
-
-    @result.get("/services")
-    def services(area_id: int = 1, language: str = Query(default="it", max_length=16),
-                 limit: int = Query(default=2000, ge=1, le=5000)):
-        """Return approved, discoverable cards including services without map points."""
-        if area_id != 1:
-            raise HTTPException(404, "Area non disponibile")
-        return cards(db.snapshot(language))[:limit]
-
-    @result.get("/services/{identifier}")
-    def detail(identifier: UUID, language: str = Query(default="it", max_length=16)):
-        """Return a card only if it belongs to this configured public directory."""
-        found = next((row for row in cards(db.snapshot(language)) if row["id"] == str(identifier)), None)
-        if found is None:
-            raise HTTPException(404, "Servizio non disponibile")
-        return found
-
-    @result.get("/categories")
-    def categories(language: str = Query(default="it", max_length=16)):
-        """Return categories from the adopted public vocabulary."""
-        return vocabulary(db.snapshot(language))["needs"]
-
-    @result.get("/taxonomy")
-    def taxonomy(language: str = Query(default="it", max_length=16)):
-        """Return public labels, excluding importer mapping rules."""
-        return vocabulary(db.snapshot(language))
-
-    @result.get("/areas")
-    def areas():
-        """Return the configured public territory."""
-        return [area(db.snapshot())]
-
-    @result.get("/languages")
-    def languages():
-        """Return the existing interface catalogs; language expansion belongs to B2."""
-        return LANGUAGES
-
-    @result.get("/category-translations")
-    def category_translations():
-        """Keep the existing frontend envelope; canonical labels carry their resolved text."""
-        return []
-
-    return result

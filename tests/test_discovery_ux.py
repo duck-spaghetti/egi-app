@@ -1,3 +1,4 @@
+from app.backend import local_routes, search_routes, runtime
 """Verify address-search isolation, local train visibility and origin/destination semantics."""
 
 from copy import deepcopy
@@ -54,11 +55,11 @@ class GeocodingTests(unittest.TestCase):
     def test_post_contract_and_failure_redaction(self):
         """Search uses POST, validates bounds and hides upstream exceptions/query text."""
         client = TestClient(main.app)
-        with patch.object(main,"search_address",return_value=[]) as search:
+        with patch.object(search_routes,"search_address",return_value=[]) as search:
             self.assertEqual(client.post("/api/preview/address-search",json={"query":"Roma"}).json()["results"], [])
             self.assertEqual(client.post("/api/preview/address-search",json={"query":"x"}).status_code, 422)
             self.assertEqual(search.call_count,1)
-        with patch.object(main,"search_address",side_effect=OSError("secret query and upstream details")):
+        with patch.object(search_routes,"search_address",side_effect=OSError("secret query and upstream details")):
             response=client.post("/api/preview/address-search",json={"query":"Roma"})
             self.assertEqual(response.status_code,503)
             self.assertNotIn("secret",response.text)
@@ -111,12 +112,12 @@ class LocalTransportTests(unittest.TestCase):
         client=TestClient(main.app)
         result={"availability":"available","places":{"origin":[]},"sources":[]}
         schedule={"availability":"available","departures":[],"realtime":{},"alerts":[],"now":"10:00"}
-        with patch.object(main,"nearby_transit",return_value=result), patch.object(main,"next_departures_all",return_value=schedule), patch.object(main.SUBJECT_SOURCE,"latest") as db:
-            data=client.get("/api/preview/transit/origin?lat=41.9&lon=12.5")
+        with patch.object(local_routes,"nearby_transit",return_value=result), patch.object(local_routes,"next_departures_all",return_value=schedule), patch.object(runtime.SUBJECT_SOURCE,"latest") as db:
+            data=client.post("/api/preview/transit/origin",json={"lat":41.9,"lon":12.5})
             self.assertEqual(data.status_code,200)
             self.assertEqual(data.json()["stops"],[])
             db.assert_not_called()
-        self.assertEqual(client.get("/api/preview/transit/origin?lat=45&lon=9").status_code,422)
+        self.assertEqual(client.post("/api/preview/transit/origin",json={"lat":45,"lon":9}).status_code,422)
 
 
 if __name__=="__main__":

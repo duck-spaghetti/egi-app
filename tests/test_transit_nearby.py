@@ -12,8 +12,9 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app.backend import main
-from app.backend.main import app, subject_source
+from app.backend import local_routes as main
+from app.backend.main import app
+from app.backend.preview_dependencies import subject_source
 from app.backend.subjects import StaticSubjectSource
 from app.backend.transit_nearby import (
     StopIndex,
@@ -148,7 +149,7 @@ class DirectionTrimTests(unittest.TestCase):
 
     def test_trim(self):
         """Empty directions drop out unless nothing is left."""
-        from app.backend.main import upcoming_directions
+        from app.backend.local_routes import upcoming_directions
 
         def d(name, minutes):
             """A direction with an optional next time."""

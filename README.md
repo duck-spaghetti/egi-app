@@ -36,7 +36,8 @@ EGI_DATABASE_URL='host=/ABS/WORKSPACE/.local/a3-db port=65436 dbname=egi_a3_demo
 The schema prerequisite is the approved database through `007_linked_supplements`;
 provisioning/loading is separately authorized in the workspace A3 design. Do not
 point this command at the primary preview or provision an arbitrary target.
-`EGI_DB_BACKEND` accepts only `postgres`; `EGI_TERRITORY_CODE` defaults to `roma`.
+`EGI_DB_BACKEND` accepts only `postgres`; since B1 the territory code comes from the
+`EGI_APP_CONFIG` profile (`EGI_TERRITORY_CODE` is no longer read).
 `EGI_QUERY_CATALOGUE` can select a trusted local YAML catalogue. Missing settings,
 unsupported backends, duplicate YAML keys and missing operations fail startup
 without echoing secret values. There is no SQLite backend or connection pool.
@@ -74,6 +75,63 @@ The independent native harness creates only `/private/tmp/egi-app-read-*` target
 It checks restricted-role reads, HTTP isolation, bound parameters, safe failures,
 publication/withdrawal cache invalidation and fresh secondary review eligibility.
 
+## B1 structure, configuration and request privacy
+
+B1 (workspace plan `.scratch/mvp/b1-plan.md`) keeps the A3 behavior and changes:
+
+- **City profile.** `EGI_APP_CONFIG` selects one validated YAML profile; default
+  `app/backend/app_profile.yaml` (Rome: territory code, fallback centre/bounds/zoom,
+  search extent, public origin, emergency numbers, external-service notice). Only
+  these resolved public values reach page bootstrap and `/areas`; DSN and local
+  paths never do. Geocoder bounds and frontend time zone use the same profile.
+- **Coordinate-free URLs.** `POST /api/preview/address-search` `{query}`,
+  `POST /api/preview/transit/origin` `{lat,lon}`, `POST /api/preview/transport`
+  `{west,south,east,north,zoom,modes,routes?}` and `POST /api/preview/cycleways`
+  `{west,south,east,north,zoom}` take typed bodies that reject unexpected fields,
+  unknown modes, nonfinite or oversized extents and more than 80 routes (schemas in
+  `request_schemas.py`). The old coordinate GET forms return 405. The visitor's
+  position, search text and selected address stay in page memory only (no URL,
+  storage or cookie); reload forgets them. Directions links carry only the public
+  destination.
+- **Errors and diagnostics.** Failures return an allowlisted message plus an opaque
+  diagnostic ID. `diagnostics.py` writes only UTC time, severity, event code and
+  code location under `EGI_ERROR_DIR` (default `.local/errors` in the working
+  directory), expired after 14 days at startup and periodically while running.
+  Launch with `--no-access-log`.
+- **Geocoder cache.** Process memory only, HMAC-keyed with a random per-process key
+  and provider/profile scope, 300 s TTL, at most 128 entries.
+- **Local assets.** Leaflet 1.9.4, Leaflet.markercluster 1.5.3 and the Fraunces/IBM
+  Plex typefaces are served from `/static/vendor/` and `/static/fonts/` with their
+  licences and `static/vendor/manifest.json` integrity hashes; no CDN or Google
+  Fonts request remains. Map tiles and an explicit address search still contact
+  OpenStreetMap/Nominatim.
+- **Modules.** `main.py` composes the app; routes live in `page_routes.py`,
+  `directory_routes.py`, `search_routes.py`, `local_routes.py` and
+  `preview_routes.py`, with shared state in `runtime.py`. The map page loads ES
+  modules `map-shell.js` (bootstrap/lifecycle), `map-state.js`, `map-data.js`,
+  `map-view.js`, `map-filters.js`, `map-details.js`, `map-hours.js`,
+  `map-origin.js`, `map-transit.js`, `map-network.js` and `map-utils.js`.
+- **Map behavior.** One marker per exact coordinate among filtered results; the
+  detail lists the other public services at that point, labelled `Fuori dai filtri
+  attivi` when outside the current filters. Unverified hours show `Aperto · da
+  verificare` / `Chiuso · da verificare`; overnight intervals render on both days.
+
+The B1 demo used the reader role on the B1 database:
+
+```sh
+EGI_DATA_MODE=canonical EGI_LOCAL_LAYERS=1 \
+EGI_DATABASE_URL='host=/ABS/WORKSPACE/.local/b1-db port=65438 dbname=egi_b1_demo user=egi_b1_reader_login' \
+EGI_ERROR_DIR=/ABS/WORKSPACE/.local/b1-app/errors \
+/ABS/WORKSPACE/.local/venvs/app-a3/bin/python -m uvicorn app.backend.main:app \
+  --host 127.0.0.1 --port 8004 --no-access-log
+```
+
+The database prerequisite is `008_contact_aliases`. Tests add
+`node tests/test_canonical_map.cjs` and
+`node --experimental-vm-modules tests/test_map_modules.cjs` (the module test needs
+the flag for `vm.SourceTextModule`). Error-path tests write diagnostics; set
+`EGI_ERROR_DIR` to a temporary directory so they do not land in `.local/errors`.
+
 Verified A3: 130 Python tests, six declared skips (five legacy live-preview HTTP
 cases and one sibling-checkout transport fixture); all three Node suites and
 changed-JavaScript syntax checks pass. Real browser checks covered 594 cards,
@@ -109,7 +167,7 @@ If that port belongs to another session, preserve its process. With the recorded
 preview database already running, a separate instance can use:
 
 ```sh
-.venv/bin/python -m uvicorn app.backend.main:app --host 127.0.0.1 --port 8001
+.venv/bin/python -m uvicorn app.backend.main:app --host 127.0.0.1 --port 8001 --no-access-log
 ```
 
 Use the actual instance's port for browsing and live tests; 8001 was used for R3.
@@ -236,8 +294,9 @@ Only `load_active` in `app/backend/transport.py` knows that layout; it follows
 `../egi-importer/docs/transport-format.md`. Tests use the vendored example in
 `tests/fixtures/transport-root` and, when the importer sits alongside, check that
 the copy still matches the producer's.
-Parameters: west/south/east/north (WGS84 bbox), zoom (0–19), modes (any of
-`metro`, `rail`, `tram`, `bus`, comma-separated). It returns GeoJSON plus active-version and refresh metadata.
+It is a `POST` with JSON body west/south/east/north (WGS84 bbox), zoom (0–19),
+modes (any of `metro`, `rail`, `tram`, `bus`, comma-separated) and optional
+`routes` (at most 80). It returns GeoJSON plus active-version and refresh metadata.
 Bounding boxes select intersecting route shapes. Below zoom 17 the response uses the
 importer's simplified levels (50 m from zoom 11, 12 m from 13, 3 m from 15); full
 source shapes from zoom 17. Responses over 1 KB are gzip-compressed (level 5).
@@ -396,7 +455,7 @@ render as before.
 
 ### Cycle lanes
 
-`GET /api/preview/cycleways?west&south&east&north&zoom` returns OpenStreetMap cycle
+`POST /api/preview/cycleways` with `{west,south,east,north,zoom}` returns OpenStreetMap cycle
 infrastructure in the viewport from zoom 12 (`app/backend/cycleways.py`, format
 `../egi-importer/docs/cycleways-format.md`), drawn by `cycle-layer.js` under its own
 "Piste ciclabili" toggle: separated paths solid dark green, tracks dashed, lanes

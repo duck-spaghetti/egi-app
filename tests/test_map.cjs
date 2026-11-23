@@ -4,11 +4,11 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const transportSource = fs.readFileSync(path.join(__dirname, '../app/frontend/static/js/transport-layer.js'), 'utf8');
-let source = fs.readFileSync(path.join(__dirname, '../app/frontend/static/js/map.js'), 'utf8');
+let source = require('./map_fixture.cjs').source();
 // Isolate pure adaptation/filter helpers; real browser bootstrap is checked separately.
 source = source.replace(/init\(\)\.catch\(\(error\) => \{[\s\S]*?\n\}\);/, '');
 const fakeElement = () => ({classList:{add(){},remove(){},toggle(){}}, setAttribute(){}, addEventListener(){}, append(){}, querySelector:()=>null, querySelectorAll:()=>[], innerHTML:'', textContent:'', scrollTop:0, dataset:{}});
-const sandbox = {document:{getElementById:()=>fakeElement(), querySelector:()=>fakeElement(), querySelectorAll:()=>[], createElement:()=>fakeElement()}, window:{EGI_MAP_CONTEXT:{languageCode:'it'},EGI_I18N:{t:(_key,_args,fallback)=>fallback||''}}, console, URLSearchParams, URL};
+const sandbox = {document:{getElementById:()=>fakeElement(), querySelector:()=>fakeElement(), querySelectorAll:()=>[], createElement:()=>fakeElement()}, window:{EGI_MAP_CONTEXT:{languageCode:'it',profile:{timezone:'Europe/Rome'}},EGI_I18N:{t:(_key,_args,fallback)=>fallback||''}}, console, URLSearchParams, URL};
 vm.createContext(sandbox);
 vm.runInContext(transportSource + '\nthis.TransportLayer = TransportLayer;',sandbox);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '../app/frontend/static/js/cycle-layer.js'), 'utf8') + '\nthis.CycleLayer = CycleLayer;',sandbox);

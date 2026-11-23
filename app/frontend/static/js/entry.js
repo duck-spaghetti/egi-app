@@ -6,7 +6,6 @@ const state = {
   cityId: null,
   languages: [],
   cities: [],
-  detectedPosition: null,
 };
 
 const LANG_CYCLE_ORDER = ["it", "en", "ar", "fr"];
@@ -47,9 +46,9 @@ async function bootstrap() {
     startCycler();
   } catch (error) {
     await applyLanguage(state.lang);
-    elements.langList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+    elements.langList.innerHTML = `<div class="empty-state">${escapeHtml("Catalogo temporaneamente non disponibile. Riprova.")}</div>`;
     elements.cityList.innerHTML = "";
-    elements.geoStatus.textContent = error.message;
+    elements.geoStatus.textContent = "Catalogo temporaneamente non disponibile. Riprova.";
     updateStep();
   }
 }
@@ -250,36 +249,7 @@ function enterApp() {
   const url = new URL("/map", window.location.origin);
   url.searchParams.set("city_id", String(city.id));
   url.searchParams.set("lang", state.lang);
-  if (isDetectedPositionUsableForCity(city)) {
-    url.searchParams.set("user_lat", formatCoordinate(state.detectedPosition.lat));
-    url.searchParams.set("user_lng", formatCoordinate(state.detectedPosition.lng));
-  }
   window.location.href = url.toString();
-}
-
-function isDetectedPositionUsableForCity(city) {
-  const position = state.detectedPosition;
-  if (!position || !Number.isFinite(position.lat) || !Number.isFinite(position.lng)) {
-    return false;
-  }
-  if (
-    Number.isFinite(city.bboxSouth) &&
-    Number.isFinite(city.bboxNorth) &&
-    Number.isFinite(city.bboxWest) &&
-    Number.isFinite(city.bboxEast)
-  ) {
-    return (
-      position.lat >= city.bboxSouth &&
-      position.lat <= city.bboxNorth &&
-      position.lng >= city.bboxWest &&
-      position.lng <= city.bboxEast
-    );
-  }
-  return true;
-}
-
-function formatCoordinate(value) {
-  return Number(value).toFixed(6);
 }
 
 function selectedCity() {
@@ -345,14 +315,7 @@ function browserLanguageCandidates() {
 
 async function readJson(response, label) {
   if (response.ok) return response.json();
-  let detail = response.statusText;
-  try {
-    const payload = await response.json();
-    detail = payload.detail?.message || payload.detail || detail;
-  } catch (_error) {
-    // Keep the HTTP status text when the body is not JSON.
-  }
-  throw new Error(`Errore caricando ${label}: ${detail}`);
+  throw new Error("Servizio temporaneamente non disponibile");
 }
 
 function normalizeArea(area) {

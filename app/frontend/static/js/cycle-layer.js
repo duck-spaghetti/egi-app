@@ -34,6 +34,10 @@ const CycleLayer = (() => {
   }
 
   function create(map, elements) {
+    let disposed=false;
+    const listeners=new AbortController(),cleanup=[];
+    const ownMap=(event,callback)=>{map.on(event,callback);cleanup.push(()=>map.off?.(event,callback));};
+    const ownOnce=(event,callback)=>{map.once(event,callback);cleanup.push(()=>map.off?.(event,callback));};
     const layer = L.layerGroup().addTo(map);
     let visible = false;
     let request = null;
@@ -42,19 +46,23 @@ const CycleLayer = (() => {
     async function load() {
       request?.abort();
       layer.clearLayers();
-      if (!visible) return;
+      if (disposed || !visible) return;
       const size = map.getSize();
       const b = map.getBounds();
-      if (!(size.x > 0 && size.y > 0 && b.getWest() < b.getEast())) return map.once("resize", schedule);
+      if (!(size.x > 0 && size.y > 0 && b.getWest() < b.getEast())) return ownOnce("resize", schedule);
       const current = new AbortController();
       request = current;
       const zoom = map.getZoom();
-      const query = new URLSearchParams({west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth(), zoom});
+      let west=b.getWest(),south=b.getSouth(),east=b.getEast(),north=b.getNorth();
+      const extent=typeof window!=="undefined" && window.EGI_MAP_CONTEXT?.profile?.search_extent;
+      if(extent){west=Math.max(west,extent[0]);south=Math.max(south,extent[1]);east=Math.min(east,extent[2]);north=Math.min(north,extent[3]);}
+      if(west>=east || south>=north) return;
+      const body={west,south,east,north,zoom};
       try {
-        const response = await fetch(`/api/preview/cycleways?${query}`, {signal: current.signal});
+        const response = await fetch("/api/preview/cycleways",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:current.signal});
         if (!response.ok) throw Error(`HTTP ${response.status}`);
         const data = await response.json();
-        if (current.signal.aborted) return;
+        if (disposed || current.signal.aborted) return;
         layer.clearLayers();
         for (const feature of data.features) {
           L.geoJSON(feature.geometry, {style: style(feature.properties.kind)}).bindPopup(popupHtml(feature.properties)).addTo(layer);
@@ -67,11 +75,13 @@ const CycleLayer = (() => {
     }
 
     function schedule() {
+      if(disposed) return;
       clearTimeout(timer);
       timer = setTimeout(load, 200);
     }
 
     function setVisible(value) {
+      if(disposed) return;
       visible = value;
       if (elements.toggle) {
         elements.toggle.classList.toggle("active", visible);
@@ -81,10 +91,10 @@ const CycleLayer = (() => {
       schedule();
     }
 
-    elements.toggle?.addEventListener("click", () => setVisible(!visible));
-    map.on("moveend", () => visible && schedule());
+    elements.toggle?.addEventListener("click", () => setVisible(!visible), {signal:listeners.signal});
+    ownMap("moveend", () => visible && schedule());
     setVisible(false);
-    return {setVisible, isVisible: () => visible, reload: load};
+    return {setVisible, isVisible: () => visible, reload: load, dispose(){disposed=true;visible=false;listeners.abort();request?.abort();clearTimeout(timer);for(const clean of cleanup)clean();layer.off?.();layer.remove?.();}};
   }
 
   return {create, style, popupHtml, statusText};

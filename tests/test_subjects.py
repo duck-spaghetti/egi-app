@@ -11,7 +11,8 @@ import unittest
 
 from fastapi.testclient import TestClient
 
-from app.backend.main import app, subject_source
+from app.backend.main import app
+from app.backend.preview_dependencies import subject_source
 from app.backend.subjects import (
     RUN_PROBE,
     SUBJECTS,

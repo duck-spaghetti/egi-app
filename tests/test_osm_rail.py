@@ -13,8 +13,9 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app.backend import main
-from app.backend.main import app, subject_source
+from app.backend import local_routes as main
+from app.backend.main import app
+from app.backend.preview_dependencies import subject_source
 from app.backend.osm_rail import nearby_places, rail_view
 from app.backend.subjects import StaticSubjectSource
 from tests.test_service_presentation import subject
@@ -87,7 +88,7 @@ class EndpointTests(unittest.TestCase):
 
     def test_map_and_detail_when_only_osm_available(self):
         """Untimed source availability never masquerades as a scheduled departure."""
-        data = self.client.get("/api/preview/transport?zoom=14&modes=rail").json()
+        data = self.client.post("/api/preview/transport",json={"west":12.2,"south":41.7,"east":12.8,"north":42.1,"zoom":14,"modes":"rail"}).json()
         self.assertEqual(data["availability"], "available")
         self.assertEqual(len(data["features"]), 4)
         self.assertTrue(data["osm_rail"]["untimed"])
@@ -109,7 +110,7 @@ class EndpointTests(unittest.TestCase):
             # Fix the service day for the dated GTFS fixture, leaving OSM independent.
             from app.backend.transport import transport_view_all
             with patch.object(main, "transport_view_all", side_effect=lambda *a, **kw: transport_view_all(*a, day="2026-01-05", **kw)):
-                data = self.client.get("/api/preview/transport?zoom=14").json()
+                data = self.client.post("/api/preview/transport",json={"west":12.2,"south":41.7,"east":12.8,"north":42.1,"zoom":14}).json()
         osm = [f for f in data["features"] if f["properties"].get("untimed")]
         timed = [f for f in data["features"] if not f["properties"].get("untimed")]
         self.assertEqual(len(osm), 4)

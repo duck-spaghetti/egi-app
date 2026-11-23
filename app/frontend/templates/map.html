@@ -3,9 +3,9 @@
 {% block title %}EGI — {{ city.name if city else "Mappa" }}{% endblock %}
 
 {% block head %}
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css" />
+  <link rel="stylesheet" href="/static/vendor/leaflet-1.9.4/leaflet.css" />
+  <link rel="stylesheet" href="/static/vendor/leaflet.markercluster-1.5.3/MarkerCluster.css" />
+  <link rel="stylesheet" href="/static/vendor/leaflet.markercluster-1.5.3/MarkerCluster.Default.css" />
   <link rel="stylesheet" href="/static/css/map.css" />
 {% endblock %}
 
@@ -32,7 +32,7 @@
       <img src="/static/assets/icons/egi-logo.svg" alt="EGI" class="brand-logo" />
     </div>
     <button type="button" class="nav-btn layers-trigger" data-sheet="layers" aria-label="Livelli della mappa"><span class="control-icon"><img src="/static/assets/icons/ui/layers.svg" alt="" aria-hidden="true" /></span><span class="control-label">Livelli</span></button>
-    <span class="map-city-tag" id="city-label">{{ city.name if city else "Roma" }}</span>
+    <span class="map-city-tag" id="city-label">{{ city.name if city else "Territorio" }}</span>
 
     <div class="floating-actions" aria-label="Controlli mappa">
       <button class="nav-btn" data-sheet="filters">
@@ -81,10 +81,9 @@
   <div class="sheet-body">
     <div class="sos-card sheet-sos-card">
       <div class="nums">
-        <a class="sos-num primary" href="tel:112"><span>Emergenza unica europea</span><span class="num">112</span></a>
-        <a class="sos-num" href="tel:800440022"><span>Sala Operativa Sociale Roma</span><span class="num">800 440 022</span></a>
-        <a class="sos-num" href="tel:1522"><span>Antiviolenza donne</span><span class="num">1522</span></a>
-        <a class="sos-num" href="tel:114"><span>Emergenza infanzia</span><span class="num">114</span></a>
+        {% for item in profile.emergencies %}
+        <a class="sos-num{% if loop.first %} primary{% endif %}" href="tel:{{ item.number|replace(' ', '') }}"><span>{{ item.label }}</span><span class="num">{{ item.number }}</span></a>
+        {% endfor %}
       </div>
     </div>
     <p><button class="btn" type="button" id="sos-directory">Linee di aiuto e servizi a distanza</button></p>
@@ -190,7 +189,8 @@
     <div class="loc-section service-search">
       <h3>Oppure scegli un riferimento</h3>
       <form id="address-search-form">
-        <label for="addr-input">Cerca indirizzo o luogo pubblico a Roma e dintorni</label>
+        <p class="source-note">{{ profile.external_notice }}</p>
+        <label for="addr-input">Cerca indirizzo o luogo pubblico a {{ city.name }}</label>
         <input id="addr-input" type="search" minlength="3" maxlength="200" autocomplete="off" required>
         <button class="btn" type="submit" id="address-submit">Cerca indirizzo</button>
       </form>
@@ -220,7 +220,7 @@
   <div class="sheet-body">
     <div id="settings-main">
       <div class="settings-section-title">Rubrica</div>
-      <div class="menu-directory"><button class="btn" id="open-emergency">Numeri di emergenza · 112 e altri contatti</button><button class="btn" id="open-directory">Servizi a distanza</button></div>
+      <div class="menu-directory"><button class="btn" id="open-emergency">Numeri di emergenza</button><button class="btn" id="open-directory">Servizi a distanza</button></div>
       <div class="settings-section-title" data-i18n="map.preferences">Preferenze</div>
       <div class="settings-list">
         <div class="row" data-sub="city">
@@ -231,7 +231,7 @@
               <div class="desc" data-i18n="map.change_active_map">Cambia la mappa attiva</div>
             </div>
           </div>
-          <div class="value" id="city-value">{{ city.name if city else "Roma" }}</div>
+          <div class="value" id="city-value">{{ city.name if city else "Territorio" }}</div>
         </div>
         <div class="row" data-sub="language">
           <div class="left">
@@ -274,7 +274,7 @@
         <div class="logo">
           <img src="/static/assets/icons/egi-logo.svg" alt="EGI" class="brand-logo" />
         </div>
-        <div class="v">v0.2 preview — {{ city.name if city else "Roma" }}</div>
+        <div class="v">v0.2 preview — {{ city.name if city else "Territorio" }}</div>
         <div style="margin-top:6px">Open source · AGPL-3.0</div>
       </div>
     </div>
@@ -309,6 +309,7 @@
     canonical: {{ 'true' if canonical else 'false' }},
     localLayers: {{ 'true' if local_layers else 'false' }},
     cityId: {{ city.id if city else 'null' }},
+    profile: {{ profile|tojson }},
     cityName: {{ city.name|tojson if city else '"Roma"' }},
     latitude: {{ city.center_lat if city else '41.9028' }},
     longitude: {{ city.center_lng if city else '12.4964' }},
@@ -320,10 +321,10 @@
     languageCode: {{ language.code|tojson if language else '"IT"' }}
   };
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<script src="/static/vendor/leaflet-1.9.4/leaflet.js"></script>
+<script src="/static/vendor/leaflet.markercluster-1.5.3/leaflet.markercluster.js"></script>
 <script src="/static/js/transport-layer.js" defer></script>
 <script src="/static/js/cycle-layer.js" defer></script>
 <script src="/static/js/debug-sources.js" defer></script>
-<script src="/static/js/map.js" defer></script>
+<script type="module" src="/static/js/map.js"></script>
 {% endblock %}
