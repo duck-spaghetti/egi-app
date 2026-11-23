@@ -259,7 +259,7 @@ and the scope are in [v0.1 plan](docs/v01-plan.md).
 ## Need-first presentation taxonomy (v0.3)
 
 The map's need tiles, offers ("Prestazione"), "Per chi", "Pasto", "Come si accede" and quick
-paths come from `app/backend/taxonomy_v0_3.json`, applied to every card by
+paths come from `app/backend/api/preview/taxonomy_v0_3.json`, applied to every card by
 `app/backend/api/preview/taxonomy.py` (`/api/preview/taxonomy` serves the labels and paths). v0.2 was
 approved on 2026-11-09; v0.3 on 2026-11-15 during the source-by-source review
 ([proposal](../.scratch/taxonomy/proposal.md) §13, [plan](../.scratch/taxonomy/v0.3-plan.md)).
