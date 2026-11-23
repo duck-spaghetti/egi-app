@@ -7,9 +7,9 @@ import unittest
 from fastapi.testclient import TestClient
 
 from app.backend.main import app
-from app.backend.preview_dependencies import subject_source
-from app.backend.preview import categories, services
-from app.backend.subjects import StaticSubjectSource
+from app.backend.api.preview.dependencies import subject_source
+from app.backend.api.preview.projection import categories, services
+from app.backend.api.preview.subjects import StaticSubjectSource
 from tests.test_service_presentation import subject
 
 
@@ -83,7 +83,7 @@ class MapSourceTests(unittest.TestCase):
         rows = [subject("h1", "Mensa", {}), map_row("a", "Mense", "matched_house")]
         app.dependency_overrides[subject_source] = lambda: StaticSubjectSource(rows)
         try:
-            client = TestClient(app)
+            client = self.enterContext(TestClient(app))
             self.assertEqual(client.get("/api/preview/coverage").json()["services"], 1)
             self.assertEqual(len(client.get("/api/preview/services").json()), 1, "the Helpinet fixture has no coordinates")
             self.assertEqual(len(client.get("/api/preview/services?include_unplaced=true").json()), 2)
@@ -96,7 +96,7 @@ class MapSourceTests(unittest.TestCase):
                 map_row("cap", "Mense", "postcode_area"), map_row("amb", "Mense", "matched_street", ambiguous=True)]
         app.dependency_overrides[subject_source] = lambda: StaticSubjectSource(rows)
         try:
-            client = TestClient(app)
+            client = self.enterContext(TestClient(app))
             data = client.get("/api/preview/debug/positions?source=programma-integra").json()
             self.assertEqual(data["total"], 3)
             by_id = {p["id"]: p for p in data["points"]}
@@ -187,7 +187,8 @@ class GuideSourceTests(unittest.TestCase):
         card = services([guide_row("tel", status="no_address", delivery_mode="telephone")])[0]
         self.assertEqual(card["placement"]["section"], "directory")
         self.assertEqual(card["delivery_mode"], "telephone")
-        from app.backend.preview_routes import is_placed
+        from app.backend.api.preview.service import Preview
+        is_placed = Preview().is_placed
         self.assertTrue(is_placed(card))
         self.assertFalse(is_placed(services([guide_row("none", status="no_address")])[0]))
 

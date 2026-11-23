@@ -1,6 +1,7 @@
 """Verify independent OSM rail reads, nearby distances and preview endpoint merging."""
 
 from __future__ import annotations
+from dataclasses import replace
 
 import copy
 import json
@@ -13,11 +14,11 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app.backend import local_routes as main
+import app.backend.api.transport.service as main
 from app.backend.main import app
-from app.backend.preview_dependencies import subject_source
-from app.backend.osm_rail import nearby_places, rail_view
-from app.backend.subjects import StaticSubjectSource
+from app.backend.api.preview.dependencies import subject_source
+from app.backend.api.transport.osm_rail import nearby_places, rail_view
+from app.backend.api.preview.subjects import StaticSubjectSource
 from tests.test_service_presentation import subject
 
 FIXTURE = Path(__file__).parent / "fixtures/osm-rail-root"
@@ -80,11 +81,11 @@ class EndpointTests(unittest.TestCase):
         located["payload"]["source_values"]["posizione"]["coordinate"] = {"lat": 41.9, "lng": 12.5}
         app.dependency_overrides[subject_source] = lambda: StaticSubjectSource([located])
         self.addCleanup(app.dependency_overrides.clear)
-        for name, value in [("OSM_RAIL_ROOT", FIXTURE), ("TRANSPORT_ROOTS", (Path(self.temp.name) / "missing",))]:
-            target = patch.object(main, name, value)
+        self.client = self.enterContext(TestClient(app))
+        for name, value in [("osm_root", FIXTURE), ("transport_roots", (Path(self.temp.name) / "missing",))]:
+            target = patch.object(app.state.resources, "configuration", replace(app.state.resources.configuration, **{name:value}))
             target.start()
             self.addCleanup(target.stop)
-        self.client = TestClient(app)
 
     def test_map_and_detail_when_only_osm_available(self):
         """Untimed source availability never masquerades as a scheduled departure."""
@@ -106,9 +107,9 @@ class EndpointTests(unittest.TestCase):
     def test_timed_and_untimed_sources_remain_distinct(self):
         """An active GTFS fixture and OSM routes coexist without replacing source ids."""
         roots = (Path(__file__).parent / "fixtures/transport-root",)
-        with patch.object(main, "TRANSPORT_ROOTS", roots):
+        with patch.object(app.state.resources, "configuration", replace(app.state.resources.configuration, transport_roots=roots)):
             # Fix the service day for the dated GTFS fixture, leaving OSM independent.
-            from app.backend.transport import transport_view_all
+            from app.backend.api.transport.network import transport_view_all
             with patch.object(main, "transport_view_all", side_effect=lambda *a, **kw: transport_view_all(*a, day="2026-01-05", **kw)):
                 data = self.client.post("/api/preview/transport",json={"west":12.2,"south":41.7,"east":12.8,"north":42.1,"zoom":14}).json()
         osm = [f for f in data["features"] if f["properties"].get("untimed")]

@@ -1,6 +1,7 @@
 """Check the "Vicino a" ranking and its endpoints without PostgreSQL or a server."""
 
 from __future__ import annotations
+from dataclasses import replace
 
 import copy
 import math
@@ -12,11 +13,11 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app.backend import local_routes as main
+import app.backend.api.transport.service as main
 from app.backend.main import app
-from app.backend.preview_dependencies import subject_source
-from app.backend.subjects import StaticSubjectSource
-from app.backend.transit_nearby import (
+from app.backend.api.preview.dependencies import subject_source
+from app.backend.api.preview.subjects import StaticSubjectSource
+from app.backend.api.transport.nearby import (
     StopIndex,
     group_by_stop,
     lines_near_places_all,
@@ -149,7 +150,8 @@ class DirectionTrimTests(unittest.TestCase):
 
     def test_trim(self):
         """Empty directions drop out unless nothing is left."""
-        from app.backend.local_routes import upcoming_directions
+        from app.backend.api.transport.service import Transport
+        upcoming_directions = Transport.upcoming_directions
 
         def d(name, minutes):
             """A direction with an optional next time."""
@@ -202,11 +204,11 @@ class EndpointTests(unittest.TestCase):
         rows = [located, subject("svc-2", "Ascolto", {})]
         app.dependency_overrides[subject_source] = lambda: StaticSubjectSource(rows)
         self.addCleanup(app.dependency_overrides.clear)
-        self.client = TestClient(app)
-        root_patch = patch.object(main, "TRANSPORT_ROOTS", (FIXTURE,))
+        self.client = self.enterContext(TestClient(app))
+        root_patch = patch.object(app.state.resources, "configuration", replace(app.state.resources.configuration, transport_roots=(FIXTURE,)))
         root_patch.start()
         self.addCleanup(root_patch.stop)
-        osm_patch = patch.object(main, "OSM_RAIL_ROOT", FIXTURE / "no-osm-runtime")
+        osm_patch = patch.object(app.state.resources, "configuration", replace(app.state.resources.configuration, osm_root=FIXTURE / "no-osm-runtime"))
         osm_patch.start()
         self.addCleanup(osm_patch.stop)
 

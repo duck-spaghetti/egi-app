@@ -1,34 +1,45 @@
-/* Exercise the real ES module graph and lifecycle with Node's built-in VM. */
-const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
+/** Regression tests for page ownership and cancellation through actual ES Interfaces. */
+const assert=require('node:assert/strict');const {environment}=require('./module_fixture.cjs');
+const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
 (async()=>{
- const root=path.resolve(__dirname,'../app/frontend/static/js');
- const timers=new Set();let next=0;
- const element=()=>({classList:{add(){},remove(){},toggle(){}},setAttribute(){},addEventListener(){},dataset:{}});
- const sandbox=vm.createContext({window:{EGI_MAP_CONTEXT:{canonical:true,languageCode:'it',profile:{timezone:'Europe/Rome'}}},
-  document:{getElementById:element,querySelector:element},AbortController,DOMException,URLSearchParams,URL,
-  setInterval:()=>{timers.add(++next);return next;},clearInterval:id=>timers.delete(id),console});
- const modules=new Map();
- for(const file of fs.readdirSync(root).filter(x=>x==='map.js'||x.startsWith('map-'))){
-  let code=fs.readFileSync(path.join(root,file),'utf8');
-  if(file==='map.js')code=code.slice(0,code.indexOf('window.addEventListener("pagehide"'));
-  modules.set(path.join(root,file),new vm.SourceTextModule(code,{context:sandbox,identifier:path.join(root,file)}));
+ const timers=new Set();let timerId=0;
+ const env=environment({setInterval:()=>{timers.add(++timerId);return timerId;},clearInterval:id=>timers.delete(id)});
+ const {Lifecycle,startPage}=await env.load('lifecycle.js');const {createHttp}=await env.load('http.js');
+ const {createMapPage}=await env.load('pages/map.js');const {createI18n}=await env.load('i18n.js');
+ const scope=new Lifecycle();scope.every(()=>{},10);assert.equal(timers.size,1);scope.dispose();scope.dispose();assert.equal(timers.size,0);
+ const pending=deferred(),requestScope=new Lifecycle();const http=createHttp(requestScope,async()=>({ok:true,status:200,json:()=>pending.promise}));
+ const response=await http.request('/catalogue');const reading=response.json();requestScope.dispose();pending.resolve({privateOldInstance:true});
+ await assert.rejects(reading,{name:'AbortError'});
+ const fetchPending=deferred(),fetchScope=new Lifecycle();const fetching=createHttp(fetchScope,()=>fetchPending.promise).request('/late');
+ fetchScope.dispose();fetchPending.resolve({ok:true,json:async()=>[]});await assert.rejects(fetching,{name:'AbortError'});
+ // Old language and old payload completions may not mount/update a replacement page.
+ function fixture(languageWait,dataWait=Promise.resolve({})){
+  const events=[];const map={mount:()=>events.push('mount'),update:()=>events.push('update'),dispose:()=>events.push('dispose'),attach:()=>{},center(){},contains:()=>true,invalidate(){}};
+  const services={load:()=>dataWait,update:()=>events.push('services'),show(){},choose(){},refreshHours(){},describe:()=>({}),dispose(){}};
+  const feature={update(){},mount(){},dispose(){},summaries(){},detail(){},origin(){},badge:()=>'',shell:()=>'',cancelOrigin(){},locate(){},search(){},choose(){},set(){}};
+  const shell={bind(){},layout(){},translate(){},close(){},toggle:()=>events.push('error'),update(){},languages(){},cities(){},toast(){}};
+  return {events,page:createMapPage({languageCode:'it',localLayers:false,cityName:'Test'},
+   {i18n:{setLanguage:()=>languageWait,t:()=>'',translatePage(){}},http:{request(){throw Error('unexpected');}},
+    factories:{map:()=>map,services:()=>services,search:()=>({select:()=>[],update(){}}),origin:()=>feature,transport:()=>feature,cycleways:()=>feature,shell:()=>shell}})};
  }
- const entry=modules.get(path.join(root,'map.js'));
- await entry.link((name,parent)=>modules.get(path.resolve(path.dirname(parent.identifier),name)));await entry.evaluate();
- const get=file=>modules.get(path.join(root,file+'.js')).namespace;
- const {Lifecycle,state}=get('map-state');const scope=new Lifecycle();
- scope.every(()=>{},10);assert.equal(timers.size,1);scope.dispose();scope.dispose();assert.equal(timers.size,0);assert(scope.signal.aborted);
- const data=get('map-data'),view=get('map-view'),filters=get('map-filters'),details=get('map-details'),hours=get('map-hours');
- state.categories=[{id:1,slug:'igiene'},{id:2,slug:'vestiti'}];
- const make=(id,category)=>data.normalizePublicService({id,name:id,data_status:'approved_canonical_local',category:{id:category==='igiene'?1:2,slug:category},needs:[category],place:{id:'place-'+id,address:'Via Umberto Cagni 48',geometry:{type:'Point',coordinates:[12.3,41.73]}}});
- state.pois=[make('docce','igiene'),make('coperte','vestiti'),make('altro','vestiti')];state.filters.cats=new Set(['igiene']);
- const matches=filters.filteredPois();assert.equal(matches.length,1);const groups=view.siteGroups(matches);assert.equal(groups.length,1);assert.equal(groups[0].length,1,'marker count follows active filters');
- assert.equal(view.sameSourceGroup(matches[0]).length,3);assert(details.renderOtherServices(matches[0]).includes('fuori dai filtri attivi'));assert(state.filters.cats.has('igiene'));
- const declared={canonical_opening:{status:'closed'},verification:{checks:[]}};
- assert.equal(hours.canonicalOpeningStatus(declared).label,'Chiuso · da verificare');
- declared.verification.checks=[{scope:'field',field:'contact',outcome:'confirmed',checked_at:'2026-11-23'}];
- assert.equal(hours.canonicalOpeningStatus(declared).label,'Chiuso · da verificare');
- declared.verification.checks.push({scope:'field',field:'hours',outcome:'confirmed',checked_at:'2026-11-23',warning:null});
- assert.equal(hours.canonicalOpeningStatus(declared).label,'Chiuso');
- console.log('PASS: actual ES imports, lifecycle teardown, exact co-location, filter-preserving siblings and scoped verification');
+ const oldLanguage=deferred(),newLanguage=deferred();const a=fixture(oldLanguage.promise),b=fixture(newLanguage.promise);
+ const oldStart=a.page.mount();a.page.dispose();const newStart=b.page.mount();oldLanguage.resolve();await oldStart;
+ assert.deepEqual(a.events,[]);assert.deepEqual(b.events,[],'replacement stays pending until its own language is ready');
+ newLanguage.resolve();await newStart;assert(b.events.includes('mount'));b.page.dispose();assert.equal(timers.size,0);
+ const lateData=deferred();const c=fixture(Promise.resolve(),lateData.promise);const start=c.page.mount();await Promise.resolve();await Promise.resolve();
+ c.page.dispose();const before=c.events.slice();lateData.resolve({pois:[]});await start;assert.deepEqual(c.events,before,'retired data/error cannot update the page');assert(!c.events.includes('error'));
+ // Language-generation ordering changes both messages and direction atomically.
+ const requests=new Map();const dictionaryHttp={request:async url=>({ok:true,json:()=>{if(url.endsWith('/it.json'))return Promise.resolve({title:'IT'});const wait=deferred();requests.set(url,wait);return wait.promise;}})};
+ const languageScope=new Lifecycle(),translator=createI18n(languageScope,dictionaryHttp);
+ const first=translator.setLanguage('fr');await new Promise(setImmediate);const second=translator.setLanguage('ar');await new Promise(setImmediate);
+ requests.get('/translations/ar.json').resolve({title:'AR'});await second;
+ requests.get('/translations/fr.json').resolve({title:'FR'});await first;
+ assert.equal(translator.t('title'),'AR');assert.equal(env.document.documentElement.dir,'rtl');languageScope.dispose();
+ const host=new EventTarget(),instances=[];
+ const mounted=startPage(()=>{const life=new Lifecycle();const instance={mounts:0,scope:life,mount(){this.mounts++;},dispose(){life.dispose();}};instances.push(instance);return instance;},host);
+ assert.equal(instances.length,1);host.dispatchEvent(new Event('pagehide'));assert(instances[0].scope.signal.aborted);
+ const restored=new Event('pageshow');Object.defineProperty(restored,'persisted',{value:true});host.dispatchEvent(restored);
+ assert.equal(instances.length,2);assert.equal(instances[1].mounts,1);assert(!instances[1].scope.signal.aborted);
+ mounted.dispose();host.dispatchEvent(restored);assert.equal(instances.length,2,'final disposal also removes browser lifecycle listeners');
+ console.log('PASS: real ES graph; page instances, timer cleanup, stale language/fetch/JSON/data/error isolation and latest language wins');
 })().catch(error=>{console.error(error);process.exitCode=1;});

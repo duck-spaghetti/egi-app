@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
+const {environment} = require('./module_fixture.cjs');
 
 async function main() {
   const requests = [], markers = [];
@@ -29,8 +29,7 @@ async function main() {
       },
     },
   };
-  vm.createContext(sandbox);
-  vm.runInContext(fs.readFileSync(path.join(__dirname,'../app/frontend/static/js/transport-layer.js'),'utf8')+'\nthis.TransportLayer=TransportLayer;',sandbox);
+  sandbox.TransportLayer=(await environment(sandbox).load('features/transport/layer.js')).TransportLayer;
   const layer = sandbox.TransportLayer.create(map,{});
   layer.setVisible(true);
   await layer.reload();

@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+
+{% block title %}EGI — {{ city.name if city else "Mappa" }}{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet" href="/static/vendor/leaflet-1.9.4/leaflet.css" />
+  <link rel="stylesheet" href="/static/vendor/leaflet.markercluster-1.5.3/MarkerCluster.css" />
+  <link rel="stylesheet" href="/static/vendor/leaflet.markercluster-1.5.3/MarkerCluster.Default.css" />
+  <link rel="stylesheet" href="/static/css/foundations/tokens.css" />
+<link rel="stylesheet" href="/static/css/pages/map.css" />
+{% endblock %}
+
+{% block body %}
+<div id="app">
+  <div class="stage" id="stage">
+    <div id="map"></div>
+    <div class="list-view" id="list-view">
+      <div class="list-header">
+        <h2 data-i18n="map.nearby_places">Luoghi vicini</h2>
+        <div class="sub"><span id="list-count">0</span> <span data-i18n="map.results_count_label">risultati</span></div>
+        <div class="list-toolbar" role="toolbar" aria-label="Filtri e ordinamento">
+          <button type="button" class="list-filter-btn" data-sheet-open="filters" aria-controls="sheet-filters"><img src="/static/assets/icons/ui/filters.svg" alt="" aria-hidden="true" /><span data-i18n="map.filters">Filtri</span><span class="list-filter-count" id="list-filter-count" hidden></span></button>
+          <label class="list-order"><span>Ordina</span><select id="sort-services"><option value="name">Nome</option><option value="distance">Distanza</option></select></label>
+          <button type="button" id="pick-reference" class="list-pick">Scegli punto</button>
+        </div>
+        <p class="source-note" id="reference-status">Scegli una posizione per ordinare per distanza</p>
+        <p id="active-filter-summary" class="active-filter-summary" role="status"></p>
+      </div>
+      <div class="list-content"><div id="poi-list"></div></div>
+    </div>
+
+    <div class="map-brand" aria-label="EGI">
+      <img src="/static/assets/icons/egi-logo.svg" alt="EGI" class="brand-logo" />
+    </div>
+    <button type="button" class="nav-btn layers-trigger" data-sheet="layers" aria-label="Livelli della mappa"><span class="control-icon"><img src="/static/assets/icons/ui/layers.svg" alt="" aria-hidden="true" /></span><span class="control-label">Livelli</span></button>
+    <span class="map-city-tag" id="city-label">{{ city.name if city else "Territorio" }}</span>
+
+    <div class="floating-actions" aria-label="Controlli mappa">
+      <button class="nav-btn" data-sheet="filters">
+        <span class="control-icon">
+          <img src="/static/assets/icons/ui/filters.svg" alt="" aria-hidden="true" />
+        </span>
+        <span class="control-label" data-i18n="map.filters">Filtri</span>
+      </button>
+      <button class="view-toggle" id="view-toggle" aria-label="Cambia vista" data-i18n-aria-label="map.change_view">
+        <span class="view-toggle-track" aria-hidden="true">
+          <span class="view-toggle-option view-toggle-option-map">
+            <img src="/static/assets/icons/ui/map-marker.svg" alt="" />
+            <span data-i18n="map.map_view">Mappa</span>
+          </span>
+          <span class="view-toggle-option view-toggle-option-list">
+            <img src="/static/assets/icons/ui/list.svg" alt="" />
+            <span data-i18n="map.list">Lista</span>
+          </span>
+        </span>
+        <span class="sr-only" id="view-toggle-label" data-i18n="map.list">Lista</span>
+      </button>
+      <button class="nav-btn" data-sheet="settings">
+        <span class="control-icon">
+          <img src="/static/assets/icons/ui/menu-dots.svg" alt="" aria-hidden="true" />
+        </span>
+        <span class="control-label" data-i18n="map.menu">Menu</span>
+      </button>
+      <button class="nav-btn nav-btn-location" data-sheet="location">
+        <span class="control-icon">
+          <img src="/static/assets/icons/default/setting.svg" alt="" aria-hidden="true" />
+        </span>
+        <span class="control-label" data-i18n="map.location">Posizione</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-backdrop" id="backdrop"></div>
+
+<div class="sheet" id="sheet-sos">
+  <div class="grabber"></div>
+  <div class="sheet-head">
+    <h2 data-i18n="map.emergency_numbers">Numeri di emergenza</h2>
+    <button class="sheet-close" data-close data-i18n="common.close">Chiudi</button>
+  </div>
+  <div class="sheet-body">
+    <div class="sos-card sheet-sos-card">
+      <div class="nums">
+        {% for item in profile.emergencies %}
+        <a class="sos-num{% if loop.first %} primary{% endif %}" href="tel:{{ item.number|replace(' ', '') }}"><span>{{ item.label }}</span><span class="num">{{ item.number }}</span></a>
+        {% endfor %}
+      </div>
+    </div>
+    <p><button class="btn" type="button" id="sos-directory">Linee di aiuto e servizi a distanza</button></p>
+  </div>
+</div>
+
+{% include 'components/filters_panel.html' %}
+
+<div class="sheet layer-panel" id="sheet-layers"><div class="sheet-head"><h2>Livelli della mappa</h2><button class="sheet-close" data-close>Chiudi</button></div><div class="sheet-body">    <div class="filter-group">
+      <h3>Trasporti</h3>
+      <button class="layer-toggle" id="transport-toggle" type="button" aria-pressed="false">
+        <span class="dot"></span>
+        <span>Tutti i trasporti</span>
+      </button>
+      <div id="transport-modes" class="transport-modes">
+        <label><input type="checkbox" id="transport-metro"> Metro</label>
+        <label><input type="checkbox" id="transport-rail"> Treni</label>
+        <label><input type="checkbox" id="transport-tram"> Tram</label>
+        <label><input type="checkbox" id="transport-bus"> Autobus</label>
+      </div>
+      <ul class="transport-legend" aria-label="Legenda trasporti">
+        <li><span class="tl-station"><span class="tl-roundel">M</span><span class="tl-chip" style="--line-color:#E27439">A</span><span class="tl-chip" style="--line-color:#0570B5">B</span><span class="tl-chip" style="--line-color:#008456">C</span></span> Stazione metro da zoom 14; sigle delle linee da zoom 16 o al passaggio del mouse</li>
+        <li><span class="tl-station tl-rail"><span class="tl-roundel tl-train">FS</span><span class="tl-chip" style="--line-color:#00704A">REG</span></span> Stazioni dei treni regionali e metropolitani da zoom 14</li>
+        <li><span class="tl-stop tl-tram">T</span> Fermata tram da zoom 15; linee da zoom 12</li>
+        <li><span class="tl-stop tl-bus"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M4 1.5h8a2 2 0 0 1 2 2V12a1 1 0 0 1-1 1v1.25a.75.75 0 0 1-1.5 0V13h-7v1.25a.75.75 0 0 1-1.5 0V13a1 1 0 0 1-1-1V3.5a2 2 0 0 1 2-2Zm0 2v4h8v-4Zm.75 6.25a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm6.5 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/></svg></span> Fermata autobus da zoom 16; percorsi solo selezionando una linea</li>
+      </ul>
+      <p id="transport-status" class="source-note" role="status">Verifica dati trasporti…</p>
+      <button class="layer-toggle" id="cycle-toggle" type="button" aria-pressed="false">
+        <span class="dot"></span>
+        <span>Piste ciclabili</span>
+      </button>
+      <ul class="transport-legend cycle-legend" aria-label="Legenda piste ciclabili">
+        <li><span class="cycle-swatch separated"></span> Pista separata</li>
+        <li><span class="cycle-swatch track"></span> Pista su carreggiata</li>
+        <li><span class="cycle-swatch lane"></span> Corsia ciclabile</li>
+        <li><span class="cycle-swatch path"></span> Percorso pedonale e ciclabile</li>
+      </ul>
+      <p id="cycle-status" class="source-note" role="status" hidden></p>
+      <p class="source-note">Piste ciclabili da OpenStreetMap (© OpenStreetMap contributors, ODbL), non verificate da EGI; visibili da zoom 12.</p>
+      <p class="source-note">Bus e tram: previsioni in tempo reale dove disponibili. Metro e treni Trenitalia: orari programmati. Ferrovie OSM: senza orari. Le corse soppresse non sono segnalate. Ingrandisci per vedere i percorsi bus e le fermate.
+        Fonte: <a href="https://romamobilita.it/sistemi-e-tecnologie/open-data/" target="_blank" rel="noopener">Roma Servizi per la Mobilità</a>; treni: Trenitalia NeTEx dal <a href="https://www.cciss.it/nap/mmtis/public/catalog/Dataset/1077621" target="_blank" rel="noopener">NAP nazionale</a> (orario programmato, sole stazioni, senza tratte approssimate). Metromare e Roma–Viterbo: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors, ODbL 1.0</a>, senza orari; servizio odierno non verificato. Roma–Giardinetti esclusa: nei dati OSM esaminati risulta dismessa.
+        Licenze da chiarire: per Roma le ricognizioni dei cataloghi hanno indicato CC BY-SA e CC BY 4.0; per NeTEx la scheda NAP non indica una licenza. Preview locale non revisionata.</p>
+    </div>
+</div></div>
+
+<div class="sheet" id="sheet-location">
+  <div class="grabber"></div>
+  <div class="sheet-head">
+    <h2 data-i18n="map.your_location">La tua posizione</h2>
+    <button class="sheet-close" data-close data-i18n="common.close">Chiudi</button>
+  </div>
+  <div class="sheet-body">
+    <div class="loc-section">
+      <h3 data-i18n="map.current_status">Stato attuale</h3>
+      <div class="loc-status" id="loc-status">
+        <span class="label" data-i18n="map.position">Posizione</span>
+        <span data-i18n="map.no_position_set">Nessuna posizione impostata</span>
+      </div>
+    </div>
+
+    <div class="loc-section">
+      <h3 data-i18n="map.use_geolocation">Usa la geolocalizzazione</h3>
+      <button class="btn primary" id="geo-btn" data-i18n="map.find_my_position">Trova la mia posizione</button>
+    </div>
+
+    <div class="loc-section service-search">
+      <h3>Oppure scegli un riferimento</h3>
+      <form id="address-search-form">
+        <p class="source-note">{{ profile.external_notice }}</p>
+        <label for="addr-input">Cerca indirizzo o luogo pubblico a {{ city.name }}</label>
+        <input id="addr-input" type="search" minlength="3" maxlength="200" autocomplete="off" required>
+        <button class="btn" type="submit" id="address-submit">Cerca indirizzo</button>
+      </form>
+      <p class="source-note">La ricerca invia il testo a Nominatim. Non inserire dati personali o riservati. Nessun invio automatico della posizione. Dati © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>.</p>
+      <p id="address-search-status" role="status"></p>
+      <div id="address-results"></div>
+      <button type="button" id="pick-reference-location">Scegli un punto sulla mappa</button>
+      <button type="button" id="clear-reference">Rimuovi riferimento</button>
+      <div class="suggestions" id="suggestions"></div>
+      <details id="origin-transit"><summary>Mezzi vicino al punto scelto</summary><div id="origin-transit-body">Scegli una posizione per vedere fermate e partenze vicine.</div></details>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="sheet-settings">
+  <div class="grabber"></div>
+  <div class="sheet-head">
+    <h2 id="settings-title" data-i18n="map.menu">Menu</h2>
+    <div class="sheet-head-actions">
+      <button class="sheet-back-head hidden" id="settings-back-head" type="button" data-i18n="common.back">
+        <span class="arrow" aria-hidden="true">←</span>
+        <span>Indietro</span>
+      </button>
+      <button class="sheet-close" data-close data-i18n="common.close">Chiudi</button>
+    </div>
+  </div>
+  <div class="sheet-body">
+    <div id="settings-main">
+      <div class="settings-section-title">Rubrica</div>
+      <div class="menu-directory"><button class="btn" id="open-emergency">Numeri di emergenza</button><button class="btn" id="open-directory">Servizi a distanza</button></div>
+      <div class="settings-section-title" data-i18n="map.preferences">Preferenze</div>
+      <div class="settings-list">
+        <div class="row" data-sub="city">
+          <div class="left">
+            <div class="icon"><img src="/static/assets/icons/default/building.svg" alt="" aria-hidden="true" /></div>
+            <div class="text">
+              <div class="name" data-i18n="map.city">Città</div>
+              <div class="desc" data-i18n="map.change_active_map">Cambia la mappa attiva</div>
+            </div>
+          </div>
+          <div class="value" id="city-value">{{ city.name if city else "Territorio" }}</div>
+        </div>
+        <div class="row" data-sub="language">
+          <div class="left">
+            <div class="icon"><img src="/static/assets/icons/ui/language-exchange.svg" alt="" aria-hidden="true" /></div>
+            <div class="text">
+              <div class="name" data-i18n="map.language">Lingua</div>
+              <div class="desc" data-i18n="map.app_and_content_language">Lingua dell'app e dei contenuti</div>
+            </div>
+          </div>
+          <div class="value" id="lang-value">{{ language.code if language else "IT" }}</div>
+        </div>
+      </div>
+
+      <div class="settings-section-title" data-i18n="map.contribute">Contribuire</div>
+      <div class="settings-list">
+        <a class="row" href="/contribuisci?city_id={{ city.id if city else '' }}&lang={{ language.code if language else 'it' }}">
+          <div class="left">
+            <div class="icon"><img src="/static/assets/icons/ui/square-plus.svg" alt="" aria-hidden="true" /></div>
+            <div class="text">
+              <div class="name" data-i18n="map.add_place">Aggiungere un luogo</div>
+              <div class="desc" data-i18n="map.report_missing_service">Segnala un servizio mancante</div>
+            </div>
+          </div>
+          <div class="value">→</div>
+        </a>
+        <a class="row" href="https://github.com" target="_blank" rel="noreferrer">
+          <div class="left">
+            <div class="icon"><img src="/static/assets/icons/brands/github.svg" alt="" aria-hidden="true" /></div>
+            <div class="text">
+              <div class="name" data-i18n="map.github">GitHub</div>
+              <div class="desc" data-i18n="map.source_and_contributions">Codice sorgente e contributi</div>
+            </div>
+          </div>
+          <div class="value">↗</div>
+        </a>
+      </div>
+
+      <p><a href="/benchmark">Copertura dei dati Helpinet</a></p>
+      <div class="app-meta-block">
+        <div class="logo">
+          <img src="/static/assets/icons/egi-logo.svg" alt="EGI" class="brand-logo" />
+        </div>
+        <div class="v">v0.2 preview — {{ city.name if city else "Territorio" }}</div>
+        <div style="margin-top:6px">Open source · AGPL-3.0</div>
+      </div>
+    </div>
+
+    <div class="sub-page" id="sub-language">
+      <p style="color:var(--ink-soft);font-size:13px;margin:0 0 14px" data-i18n="map.choose_language_for_content">Scegli la lingua dell'app e del dettaglio servizi.</p>
+      <div class="lang-toggle" id="lang-list"></div>
+    </div>
+
+    <div class="sub-page" id="sub-city">
+      <div class="settings-list" id="city-list"></div>
+    </div>
+  </div>
+</div>
+
+{% include 'components/service_panel.html' %}
+
+<div class="toast" id="toast"></div>
+
+<script>
+  window.EGI_MAP_CONTEXT = {
+    apiBase: {{ (api_base or '/api/preview')|tojson }},
+    canonical: {{ 'true' if canonical else 'false' }},
+    localLayers: {{ 'true' if local_layers else 'false' }},
+    cityId: {{ city.id if city else 'null' }},
+    profile: {{ profile|tojson }},
+    cityName: {{ city.name|tojson if city else '"Roma"' }},
+    latitude: {{ city.center_lat if city else '41.9028' }},
+    longitude: {{ city.center_lng if city else '12.4964' }},
+    zoom: {{ city.default_zoom if city else '12' }},
+    boundsNorth: {{ city.bbox_north if city else '41.991' }},
+    boundsSouth: {{ city.bbox_south if city else '41.800' }},
+    boundsEast: {{ city.bbox_east if city else '12.650' }},
+    boundsWest: {{ city.bbox_west if city else '12.350' }},
+    languageCode: {{ language.code|tojson if language else '"IT"' }}
+  };
+</script>
+<script src="/static/vendor/leaflet-1.9.4/leaflet.js"></script>
+<script src="/static/vendor/leaflet.markercluster-1.5.3/leaflet.markercluster.js"></script>
+
+
+
+<script type="module" src="/static/js/pages/map-start.js"></script>
+{% endblock %}

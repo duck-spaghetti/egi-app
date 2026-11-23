@@ -15,9 +15,9 @@ import unittest
 
 import psycopg
 
-from app.backend.directory import cards
-from app.backend.directory_db import Db, DirectoryUnavailable
-from app.backend.directory_settings import DirectorySettings
+from app.backend.api.directory.projection import cards
+from app.backend.db.database import Db, DirectoryUnavailable
+from app.backend.config import DirectorySettings
 
 REPOSITORY = os.environ.get("EGI_DATABASE_REPO")
 PG = Path(os.environ.get("EGI_PG_BIN", "/Library/PostgreSQL/18/bin"))
@@ -41,6 +41,9 @@ class NativeDirectoryTests(unittest.TestCase):
         subprocess.run([PG/"pg_ctl", "-D", cls.base/"data", "-l", cls.base/"server.log", "-w", "start"],
                        check=True, stdout=subprocess.DEVNULL)
         subprocess.run([PG/"createdb", "egi_app_contract"], env=cls.environment, check=True)
+        subprocess.run([PG/"psql", "-X", "-v", "ON_ERROR_STOP=1", "-c",
+                        "REVOKE TEMPORARY ON DATABASE egi_app_contract FROM PUBLIC"],
+                       env=cls.environment, check=True, stdout=subprocess.DEVNULL)
         subprocess.run([os.environ.get("EGI_SQITCH", "sqitch"), "deploy", "--db-client", PG/"psql", "db:pg:egi_app_contract"],
                        cwd=REPOSITORY, env=cls.environment, check=True, stdout=subprocess.DEVNULL)
         subprocess.run([PG/"psql", "-X", "-v", "ON_ERROR_STOP=1", "-f", Path(REPOSITORY)/"tests/contract/fixtures.sql",
@@ -87,8 +90,7 @@ with TestClient(app) as client:
     assert client.get('/health').json()['mode']=='canonical-local'
     assert client.get('/map').status_code==200
     assert client.get('/map').headers['X-EGI-Data-Status']=='approved-canonical-local'
-    import app.backend.search_routes as search
-    search.search_address=lambda query: []
+    app.state.resources.geocoder.search_address=lambda query: []
     assert client.post('/api/preview/address-search',json={'query':'Roma'}).status_code==200
     assert client.get('/api/preview/transit/places').status_code==404
     assert all(row['name_native'] for row in client.get('/api/public/languages').json())
@@ -101,9 +103,9 @@ with TestClient(app) as client:
         """Actual canonical composition enables only selected local readers."""
         code = """from fastapi.testclient import TestClient
 from app.backend.main import app
-from app.backend import runtime
-runtime.SUBJECT_SOURCE.latest=lambda: (_ for _ in ()).throw(AssertionError('preview must not be read'))
+
 with TestClient(app) as client:
+    assert app.state.resources.source is None
     assert client.get('/api/preview/transit/places').status_code==200
     assert client.get('/api/preview/services').status_code==404
 """

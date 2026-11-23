@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from app.backend.identity import address_relation, completeness, proposed_needs, propose
+from app.backend.api.preview.identity import address_relation, completeness, proposed_needs, propose
 
 
 def card(i, title, kind, address, need="ascolto", status="geocoded_matched_house", description="", contacts=(), facility=None):

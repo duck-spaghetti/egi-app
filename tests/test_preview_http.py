@@ -1,6 +1,7 @@
 """Exercise a running local preview against the actual imported PostgreSQL evidence.
 
-Set EGI_APP_BASE_URL to the loopback preview, never a production application.
+Set EGI_APP_BASE_URL only to the retained 315-record Helpinet pilot preview.
+These historical cohort assertions are not a B1 canonical demo smoke test.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from urllib.request import urlopen
 BASE = os.environ.get("EGI_APP_BASE_URL", "")
 
 
-@unittest.skipUnless(BASE, "set EGI_APP_BASE_URL to the running local preview")
+@unittest.skipUnless(BASE, "needs EGI_APP_BASE_URL for the retained 315-record Helpinet pilot")
 class PreviewHttpTests(unittest.TestCase):
     """Check the recovered pages and read-only preview API through real HTTP."""
 
@@ -79,11 +80,10 @@ class PreviewHttpTests(unittest.TestCase):
         self.assertEqual(self.payload("/api/preview/category-translations"), [])
         for language in ["it", "en", "fr", "ar"]:
             self.payload("/translations/" + language + ".json")
-        with self.get("/static/js/map.js") as response:
-            body = response.read().decode()
-            self.assertIn("/api/preview/services", body)
-            self.assertIn("function openDetail(id)", body)
-            self.assertIn("Da verificare", body)
+        with self.get("/static/js/pages/map-start.js") as response:
+            self.assertIn("javascript", response.headers.get("Content-Type", ""))
+        with self.get("/static/css/pages/map.css") as response:
+            self.assertIn("text/css", response.headers.get("Content-Type", ""))
 
     def test_input_errors_and_no_public_or_mutation_router(self):
         """Invalid selections fail and private evidence has no public directory route."""

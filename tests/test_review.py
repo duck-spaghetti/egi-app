@@ -5,9 +5,9 @@ import unittest
 from fastapi.testclient import TestClient
 
 from app.backend import main
-from app.backend.preview_dependencies import subject_source
-from app.backend.review import overlap_pairs, street_key
-from app.backend.subjects import StaticSubjectSource
+from app.backend.api.preview.dependencies import subject_source
+from app.backend.api.preview.review import overlap_pairs, street_key
+from app.backend.api.preview.subjects import StaticSubjectSource
 from tests.test_map_sources import map_row
 
 
@@ -75,7 +75,7 @@ class ReviewTests(unittest.TestCase):
         rows = [map_row("x", "Salute", "matched_house")]
         main.app.dependency_overrides[subject_source] = lambda: StaticSubjectSource(rows)
         try:
-            client = TestClient(main.app)
+            client = self.enterContext(TestClient(main.app))
             self.assertEqual(client.get("/api/preview/review/overlaps").json()["count"], 0)
             self.assertEqual(client.get("/revisione/doppioni").status_code, 200)
         finally:

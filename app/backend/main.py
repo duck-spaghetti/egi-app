@@ -1,91 +1,99 @@
-"""Compose selected routers, shared readers, privacy middleware and resource lifecycle."""
-from contextlib import asynccontextmanager
+"""Compose the selected endpoint families and own each application's resources."""
 import asyncio
+from contextlib import asynccontextmanager
 import logging
-
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
-
-from .runtime import ROOT, CANONICAL, LOCAL_LAYERS, DIRECTORY
-from .diagnostics import DIAGNOSTICS, safe_response
-from .directory_db import DirectoryUnavailable
-from .page_routes import router as pages
-from .search_routes import router as search
+from .config import Configuration, ROOT
+from .dependencies import Resources
+from .diagnostics import safe_response
+from .exceptions import ApplicationError
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Expire old diagnostics before opening and own the running cleanup task."""
-    logging.getLogger('uvicorn.access').disabled=True
-    DIAGNOSTICS.prune()
-    cleanup=asyncio.create_task(DIAGNOSTICS.cleanup())
-    try:
-        yield
-    finally:
-        cleanup.cancel()
+def create_app(configuration=None, overrides=None):
+    """Create an isolated app; validate and construct dependencies in its lifespan."""
+    @asynccontextmanager
+    async def lifespan(application):
+        """Own validation, selected readers and diagnostic/cache expiry for this run."""
+        cfg = configuration or Configuration.load()
+        resources = Resources.create(cfg, overrides)
+        application.state.resources = resources
+        logging.getLogger('uvicorn.access').disabled = True
+        resources.diagnostics.prune()
+        cleanup = asyncio.create_task(resources.diagnostics.cleanup(resources.geocoder.expire_cache))
+        mount_selected(application, cfg)
         try:
-            await cleanup
-        except asyncio.CancelledError:
-            pass
+            yield
+        finally:
+            cleanup.cancel()
+            try:
+                await cleanup
+            except asyncio.CancelledError:
+                pass
+            resources.close()
+
+    application = FastAPI(title='EGI local directory', version='0.2.0', lifespan=lifespan)
+    application.add_middleware(TrustedHostMiddleware, allowed_hosts=['127.0.0.1', 'localhost', '[::1]', 'testserver'])
+    application.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
+    application.mount('/static', StaticFiles(directory=ROOT / 'app/frontend/static'), name='static')
+    application.mount('/translations', StaticFiles(directory=ROOT / 'translations'), name='translations')
+
+    def respond(request, status, code, error=None):
+        """Use only the requesting application's safe diagnostic writer."""
+        return safe_response(status, code, error, request.app.state.resources.diagnostics)
+
+    @application.exception_handler(RequestValidationError)
+    async def invalid_request(request: Request, error: RequestValidationError):
+        """Discard all input-bearing validation diagnostics."""
+        return respond(request, 422, 'invalid_request')
+
+    @application.exception_handler(ApplicationError)
+    async def expected_failure(request: Request, error: ApplicationError):
+        """Translate feature failures without exposing source or request details."""
+        return respond(request, error.status, 'invalid_request' if error.status == 422 else error.code)
+
+    @application.exception_handler(HTTPException)
+    async def http_failure(request: Request, error: HTTPException):
+        """Retain status codes while withholding HTTP exception contents."""
+        return respond(request, error.status_code, 'invalid_request' if error.status_code == 422 else 'directory_unavailable')
+
+    @application.middleware('http')
+    async def private_responses(request: Request, call_next):
+        """Contain unexpected failures and identify the selected data mode."""
+        try:
+            response = await call_next(request)
+        except Exception as error:
+            response = respond(request, 500, 'internal_error', error)
+        response.headers['Cache-Control'] = 'no-store'
+        response.headers['X-EGI-Data-Status'] = ('approved-canonical-local' if request.app.state.resources.configuration.canonical else 'unreviewed-source-preview')
+        return response
+    return application
 
 
-app=FastAPI(title='EGI local directory',version='0.2.0',lifespan=lifespan)
-app.add_middleware(TrustedHostMiddleware,allowed_hosts=['127.0.0.1','localhost','[::1]','testserver'])
-app.add_middleware(GZipMiddleware,minimum_size=1000,compresslevel=5)
-app.mount('/static',StaticFiles(directory=ROOT/'app/frontend/static'),name='static')
-app.mount('/translations',StaticFiles(directory=ROOT/'translations'),name='translations')
-app.include_router(pages)
-app.include_router(search)
-if CANONICAL:
-    from .directory_routes import router as directory_router
-    app.include_router(directory_router(DIRECTORY))
-else:
-    from .preview_routes import router as preview
-    app.include_router(preview)
-if not CANONICAL or LOCAL_LAYERS:
-    from .local_routes import router as local
-    app.include_router(local)
-
-
-@app.exception_handler(RequestValidationError)
-async def invalid_request(request: Request, error: RequestValidationError):
-    """Discard input-bearing validation detail before it reaches a response or log."""
-    return safe_response(422,'invalid_request')
-
-
-@app.exception_handler(DirectoryUnavailable)
-async def unavailable_directory(request: Request, error: DirectoryUnavailable):
-    """Expose a safe store failure without its connection configuration."""
-    return safe_response(503,'directory_unavailable')
-
-
-@app.exception_handler(HTTPException)
-async def expected_error(request: Request, error: HTTPException):
-    """Map HTTP failures without echoing exception detail or user parameters.
-
-    Only the address search depends on an upstream provider; other 503s are the
-    preview store, and app-raised 422s are invalid requests.
-    """
-    if error.status_code == 422:
-        code = 'invalid_request'
-    elif request.url.path == '/api/preview/address-search':
-        code = 'upstream_unavailable'
+def mount_selected(application, configuration):
+    """Install only the real endpoint families selected for this app, once."""
+    if getattr(application.state, 'mounted', False):
+        return
+    from .api.pages.router import router as pages
+    from .api.address_search.router import router as search
+    application.include_router(pages)
+    application.include_router(search)
+    if configuration.canonical:
+        from .api.directory.router import router as directory
+        application.include_router(directory)
     else:
-        code = 'directory_unavailable'
-    return safe_response(error.status_code,code)
+        from .api.preview.router import router as preview
+        application.include_router(preview)
+    if not configuration.canonical or configuration.local_layers:
+        from .api.transport.router import router as transport
+        from .api.cycleways.router import router as cycleways
+        application.include_router(transport)
+        application.include_router(cycleways)
+    application.state.mounted = True
 
 
-@app.middleware('http')
-async def private_responses(request: Request, call_next):
-    """Contain unexpected errors and mark every dynamic response with its data boundary."""
-    try:
-        response=await call_next(request)
-    except Exception as error:
-        response=safe_response(500,'internal_error',error)
-    response.headers['Cache-Control']='no-store'
-    response.headers['X-EGI-Data-Status']='approved-canonical-local' if CANONICAL else 'unreviewed-source-preview'
-    return response
+app = create_app()

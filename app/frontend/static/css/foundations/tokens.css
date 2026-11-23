@@ -1,0 +1,31 @@
+:root {
+  --bg: #f4f1ea;
+  --ink: #1a1a1a;
+  --ink-soft: #4a4a4a;
+  --ink-faint: #8a8a8a;
+  --line: #d9d3c5;
+  --paper: #fbf9f3;
+  --accent: #c43c1e;
+  --cat-food: #d4691a;
+  --cat-shelter: #2d5f3f;
+  --cat-hygiene: #1e6091;
+  --cat-health: #b91c47;
+  --cat-legal: #4a3b8c;
+  --cat-psych: #7c5e1a;
+  --cat-other: #5a5a5a;
+  --control-surface: rgba(251,249,243,0.94);
+  --control-ink: #242424;
+  --radius-soft: 12px;
+  --radius-pill: 999px;
+  --map-edge-x: clamp(16px, 5vw, 44px);
+  --map-edge-bottom: clamp(18px, 4.5vh, 44px);
+  --map-logo-size: clamp(48px, 12vw, 64px);
+  --map-control-size: clamp(44px, 12vw, 56px);
+  --map-toggle-option-size: clamp(52px, 14vw, 66px);
+  --map-icon-size: clamp(20px, 5.5vw, 24px);
+  --map-overlay-gap: clamp(8px, 2.8vw, 16px);
+  --map-list-bottom-space: clamp(112px, 22vh, 180px);
+  --map-list-top-space: clamp(86px, 15vh, 132px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+}

@@ -6,8 +6,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from app.backend.directory_db import catalogue, transition_passed
-from app.backend.directory_settings import settings
+from app.backend.db.database import catalogue, transition_passed
+from app.backend.config import settings
 
 
 class ConfigurationTests(unittest.TestCase):
@@ -42,7 +42,7 @@ class WeeklyScheduleTests(unittest.TestCase):
 
     def test_unknown_schedule_prevents_closed_label_in_either_order(self):
         """A closed schedule cannot hide another schedule's unknown hours."""
-        from app.backend.directory import weekly_days
+        from app.backend.api.directory.projection import weekly_days
         closed = {"iso_weekday": 1, "scope_code": "service", "day_state": "closed"}
         unknown = {**closed, "day_state": "unknown"}
         for rows in ([closed, unknown], [unknown, closed]):

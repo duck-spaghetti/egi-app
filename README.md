@@ -1,5 +1,15 @@
 # EGI app v0.2 — local preview
 
+## B1 architectural completion
+
+The current task branch implements the recovered backend/frontend organization.
+See [Module responsibilities, Interfaces and verification](docs/b1-architecture.md).
+The completion record is workspace `.scratch/mvp/b1-refactoring-completion.md`.
+B1 completion verification and independent review are recorded in the workspace plan; a separate canonical
+SQL supplement privacy defect remains open. Historical checkpoints below do not
+represent acceptance of this candidate.
+
+
 Recovered frontend from the original egi-app draft at
 `c090950874a8c5ac39c83f9ba2aa1ae06356af84`, adapted to the current database's source
 evidence. The original checkout is untouched. Map/list, source-need filters, service
@@ -42,10 +52,10 @@ point this command at the primary preview or provision an arbitrary target.
 unsupported backends, duplicate YAML keys and missing operations fail startup
 without echoing secret values. There is no SQLite backend or connection pool.
 
-`directory_settings.py` validates configuration; `directory_db.py` owns bound
+`config.py` validates configuration; `db/database.py` owns bound
 queries, read-only repeatable-read transactions, connection/statement timeouts,
-error mapping and the cache; `public_queries.yaml` holds the named reads.
-`directory.py` adapts public payloads into map/list/detail cards. Canonical routes
+error mapping and the cache; `queries/public.yaml` holds the named reads.
+`api/directory/projection.py` adapts public payloads into map/list/detail cards. Canonical routes
 are `/api/public/services`, `/services/{uuid}` under that prefix, `/categories`,
 `/category-translations`, `/taxonomy`, `/areas` and `/languages`. `/health` reports
 `canonical-local`. Store failure returns a safe 503, never a successful empty map.
@@ -70,7 +80,7 @@ public-launch transport or authorize fresh acquisition/job changes.
 For native verification set `EGI_DATABASE_REPO` to the explicit database worktree,
 `EGI_SQITCH` to Sqitch and, if necessary, `PERL5LIB` to its local runtime library.
 Use the A3 Python environment for `python -m unittest discover -s tests -v` and run
-`node tests/test_canonical_map.cjs` in addition to the two existing Node suites.
+`node --experimental-vm-modules tests/test_canonical_map.cjs` in addition to the two existing Node suites.
 The independent native harness creates only `/private/tmp/egi-app-read-*` targets.
 It checks restricted-role reads, HTTP isolation, bound parameters, safe failures,
 publication/withdrawal cache invalidation and fresh secondary review eligibility.
@@ -105,12 +115,12 @@ B1 (workspace plan `.scratch/mvp/b1-plan.md`) keeps the A3 behavior and changes:
   licences and `static/vendor/manifest.json` integrity hashes; no CDN or Google
   Fonts request remains. Map tiles and an explicit address search still contact
   OpenStreetMap/Nominatim.
-- **Modules.** `main.py` composes the app; routes live in `page_routes.py`,
-  `directory_routes.py`, `search_routes.py`, `local_routes.py` and
-  `preview_routes.py`, with shared state in `runtime.py`. The map page loads ES
-  modules `map-shell.js` (bootstrap/lifecycle), `map-state.js`, `map-data.js`,
-  `map-view.js`, `map-filters.js`, `map-details.js`, `map-hours.js`,
-  `map-origin.js`, `map-transit.js`, `map-network.js` and `map-utils.js`.
+- **Modules.** `main.create_app` owns instance resources through `config.py` and
+  `dependencies.py`; actual endpoint families live under `backend/api/`, each with
+  router/service/schemas/dependencies/exceptions responsibilities. `db/` owns the
+  configured reader and `queries/` the named YAML reads. The map's `js/pages/map.js`
+  coordinates explicit `features/` Interfaces; no shared mutable runtime is exported.
+  See [the current architecture](docs/b1-architecture.md) for ownership and test Seams.
 - **Map behavior.** One marker per exact coordinate among filtered results; the
   detail lists the other public services at that point, labelled `Fuori dai filtri
   attivi` when outside the current filters. Unverified hours show `Aperto · da
@@ -127,7 +137,7 @@ EGI_ERROR_DIR=/ABS/WORKSPACE/.local/b1-app/errors \
 ```
 
 The database prerequisite is `008_contact_aliases`. Tests add
-`node tests/test_canonical_map.cjs` and
+`node --experimental-vm-modules tests/test_canonical_map.cjs` and
 `node --experimental-vm-modules tests/test_map_modules.cjs` (the module test needs
 the flag for `vm.SourceTextModule`). Error-path tests write diagnostics; set
 `EGI_ERROR_DIR` to a temporary directory so they do not land in `.local/errors`.
@@ -208,7 +218,7 @@ history. The loader commits its complete import unit or rolls back. Imported sou
 subjects remain separate from canonical publication.
 
 The app reads the latest succeeded normalization for the selected Helpinet dataset,
-and for every dataset of each importer source (the Sant'Egidio guide has one per chapter), through `app/backend/subjects.py` (see
+and for every dataset of each importer source (the Sant'Egidio guide has one per chapter), through `app/backend/api/preview/subjects.py` (see
 [Map sources](#map-sources-my-maps-2026-11-09)). The snapshot is cached in-process: for 60 seconds
 no query is made, then a cheap `run_id` probe decides whether to reload. An accepted
 new load is therefore visible within about a minute, without restarting the app or
@@ -222,8 +232,8 @@ cache behaviour, transport projection) run with:
 
 ```sh
 .venv/bin/python -m unittest discover -s tests -v
-node tests/test_map.cjs
-node tests/test_transport_layer.cjs
+node --experimental-vm-modules tests/test_map.cjs
+node --experimental-vm-modules tests/test_transport_layer.cjs
 ```
 
 With the app running, the live HTTP tests against the real preview database run too:
@@ -232,7 +242,8 @@ With the app running, the live HTTP tests against the real preview database run 
 EGI_APP_BASE_URL=http://127.0.0.1:8000 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-Use the serving port (for example 8001) in `EGI_APP_BASE_URL`. For changed JavaScript,
+Use `EGI_APP_BASE_URL` only for the retained 315-record Helpinet pilot required by
+`test_preview_http.py`; it is not the B1 canonical-demo URL. For changed JavaScript,
 run `node --check` on the affected files. Last recorded suite/browser results are
 in the post-handoff plan; commands here do not claim a currently running server or
 a fresh passing test result. TestClient's httpx deprecation is known; the user
@@ -246,7 +257,7 @@ and the scope are in [v0.1 plan](docs/v01-plan.md).
 
 The map's need tiles, offers ("Prestazione"), "Per chi", "Pasto", "Come si accede" and quick
 paths come from `app/backend/taxonomy_v0_3.json`, applied to every card by
-`app/backend/taxonomy.py` (`/api/preview/taxonomy` serves the labels and paths). v0.2 was
+`app/backend/api/preview/taxonomy.py` (`/api/preview/taxonomy` serves the labels and paths). v0.2 was
 approved on 2026-11-09; v0.3 on 2026-11-15 during the source-by-source review
 ([proposal](../.scratch/taxonomy/proposal.md) §13, [plan](../.scratch/taxonomy/v0.3-plan.md)).
 
@@ -290,7 +301,7 @@ its actual topology. See [discovery UX](docs/discovery-ux.md) for the current co
 
 `/api/preview/transport` reads the sibling workspace `.local/transport` files;
 `EGI_TRANSPORT_ROOT` can explicitly select another runtime directory at startup.
-Only `load_active` in `app/backend/transport.py` knows that layout; it follows
+Only `load_active` in `app/backend/api/transport/network.py` knows that layout; it follows
 `../egi-importer/docs/transport-format.md`. Tests use the vendored example in
 `tests/fixtures/transport-root` and, when the importer sits alongside, check that
 the copy still matches the producer's.
@@ -319,7 +330,7 @@ Walking time is an estimate:
 straight-line distance × 1.3 at 4 km/h, rounded up, and the card says so. The
 service card shows four stop groups followed by "Altre N fermate". No badge for itinerant services,
 remote/directory services or services without coordinates. Logic and constants are
-in `app/backend/transit_nearby.py` and `app/backend/osm_rail.py`; unavailable or
+in `app/backend/api/transport/nearby.py` and `app/backend/api/transport/osm_rail.py`; unavailable or
 out-of-calendar timed sources contribute no timed rows, while an independent OSM
 runtime may still supply untimed rows. Service data remains usable.
 
@@ -334,7 +345,7 @@ map selection and geolocation share that origin. See the
 
 ### Scheduled departures
 
-`app/backend/departures.py` reads the active version's `departures.sqlite`
+`app/backend/api/transport/departures.py` reads the active version's `departures.sqlite`
 (read-only) and returns the next scheduled times per stop, line and direction
 from the current Rome time, including after-midnight trips of yesterday's service
 day; a direction with no further trip says so. `GET /api/preview/transit/departures
@@ -393,7 +404,7 @@ The discovery panel also offers **Aperti ora**, combining with existing filters 
 ### Service sheet layout r3 (2026-11-15)
 
 Approved in [card-layout plan](../.scratch/card-layout/plan.md) (proposals r1–r3). The detail
-sheet (`openDetail` in `map.js`) has:
+sheet (`openDetail` in `features/search/index.js`) has:
 
 - a **fixed header** instead of "Scheda servizio": category, title (the card's main offer
   cluster, else the source's service name), facility · address, coloured hours status with
@@ -456,8 +467,8 @@ render as before.
 ### Cycle lanes
 
 `POST /api/preview/cycleways` with `{west,south,east,north,zoom}` returns OpenStreetMap cycle
-infrastructure in the viewport from zoom 12 (`app/backend/cycleways.py`, format
-`../egi-importer/docs/cycleways-format.md`), drawn by `cycle-layer.js` under its own
+infrastructure in the viewport from zoom 12 (`app/backend/api/cycleways/network.py`, format
+`../egi-importer/docs/cycleways-format.md`), drawn by `features/cycleways/layer.js` under its own
 "Piste ciclabili" toggle: separated paths solid dark green, tracks dashed, lanes
 light dashed, shared paths dotted, with a legend and ODbL attribution. No official
 Rome dataset was found; the data is not verified by EGI.
@@ -516,7 +527,7 @@ appear next to Helpinet. `subjects.py` reads the latest succeeded `normalize` ru
 each `map_export` source and joins each service to its `location_candidate` from the
 latest succeeded child `geocode` run; the cache probe covers all those run IDs.
 
-- **Grouping:** `MAP_LAYER_GROUPS` in `app/backend/preview.py` places each layer in a
+- **Grouping:** `MAP_LAYER_GROUPS` in `app/backend/api/preview/projection.py` places each layer in a
   need group (GrIS → Curarmi; Scuolemigranti → Istruzione; Programma Integra by layer,
   adding the groups Istituzioni and Socialità). This is presentation only; the original
   layer is the service type and help topics are the listed themes.
@@ -574,7 +585,7 @@ exclusion) and a Mapillary test were built and then removed at the user's reques
 The Filtri sheet shows the number of services available ("1398 servizi disponibili", or
 "N servizi su T con i filtri attivi"). Need tiles, service types, prestations, access
 claims and sources show faceted counts: each value is counted under all the *other*
-active filters (`facetCounts` / `passesFilters` in `map.js`), so a count is the number of
+active filters (`facetCounts` / `passesFilters` in `features/search/index.js`), so a count is the number of
 results that choosing that value would give. Values with no results are hidden from the
 selects, and need tiles with no results are dimmed.
 
@@ -637,7 +648,7 @@ Also fixed: "Scegli punto" threw `poi is not defined` (a stray line from `7978a0
 ### Duplicate review page (2026-11-09)
 
 `/revisione/doppioni` lists cross-source candidate pairs among all visible services,
-placed or not (`app/backend/review.py`, `GET /api/preview/review/overlaps`). Candidates
+placed or not (`app/backend/api/preview/review.py`, `GET /api/preview/review/overlaps`). Candidates
 come from the same normalized address, a shared phone or email, or a 40 m grid. Each pair
 gets a score from independent signals, shown as evidence:
 

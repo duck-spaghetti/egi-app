@@ -69,21 +69,18 @@ class Diagnostics:
                     continue
         return max(0.01,next_expiry-now)
 
-    async def cleanup(self):
+    async def cleanup(self, expire=lambda: None):
         """Run application-owned expiry without changing any installed scheduler."""
-        from .geocoding import expire_cache
         while True:
-            expire_cache()
+            expire()
             await asyncio.sleep(self.prune())
 
 
-DIAGNOSTICS = Diagnostics(Path(os.environ.get('EGI_ERROR_DIR',Path.cwd()/'.local/errors')))
 
-
-def safe_response(status: int, code: str, error: Exception | None = None) -> JSONResponse:
+def safe_response(status: int, code: str, error: Exception | None = None, diagnostics: Diagnostics | None = None) -> JSONResponse:
     """Return only a fixed message and a fresh opaque reference to safe diagnostics."""
     messages={422:'Richiesta non valida',503:'Servizio temporaneamente non disponibile',500:'Errore temporaneo'}
     if status not in messages:
         return JSONResponse({'detail':'Risorsa non disponibile'},status_code=status)
-    identifier=DIAGNOSTICS.record(code,error)
+    identifier=diagnostics.record(code,error)
     return JSONResponse({'detail':messages[status],'diagnostic_id':identifier},status_code=status)

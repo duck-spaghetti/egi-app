@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from app.backend.cycleways import FORMAT, cycleways_view, read_network
+from app.backend.api.cycleways.network import FORMAT, cycleways_view, read_network
 
 
 def root_with(features: list) -> Path:

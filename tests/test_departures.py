@@ -16,9 +16,9 @@ from zoneinfo import ZoneInfo
 
 from fastapi.testclient import TestClient
 
-from app.backend.departures import clock, next_departures
+from app.backend.api.transport.departures import clock, next_departures
 from app.backend.main import app
-from app.backend.transport import read_network
+from app.backend.api.transport.network import read_network
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "transport-root"
 ROME = ZoneInfo("Europe/Rome")
@@ -90,7 +90,7 @@ class RealtimeTests(unittest.TestCase):
         """Fixture root plus a realtime snapshot: bus trip tb predicted at s1 08:04 (+4 min)."""
         import json
 
-        from app.backend import departures as module
+        import app.backend.api.transport.departures as module
 
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -126,7 +126,7 @@ class RealtimeTests(unittest.TestCase):
         """Predictions fetched over 3 minutes ago are not shown."""
         import json
 
-        from app.backend import departures as module
+        import app.backend.api.transport.departures as module
 
         self.snapshot["feeds"]["trip_updates"]["fetched_epoch"] = self.now.timestamp() - 600
         (self.root / "realtime" / "latest.json").write_text(json.dumps(self.snapshot))
@@ -141,7 +141,7 @@ class DepartureEndpointTests(unittest.TestCase):
 
     def test_stop_list_limits(self):
         """Empty or more than 40 stops is 422."""
-        client = TestClient(app)
+        client = self.enterContext(TestClient(app))
         self.assertEqual(client.get("/api/preview/transit/departures?stops=").status_code, 422)
         many = ",".join(f"s{i}" for i in range(41))
         self.assertEqual(client.get(f"/api/preview/transit/departures?stops={many}").status_code, 422)
