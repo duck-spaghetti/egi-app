@@ -1,0 +1,38 @@
+/** Preserve transport/cycle presentation and origin/destination behavior at actual Interfaces. */
+const assert=require('node:assert/strict');const {environment}=require('./module_fixture.cjs');
+(async()=>{
+ const env=environment();const {TransportLayer:T}=await env.load('features/transport/layer.js'),{CycleLayer:C}=await env.load('features/cycleways/layer.js');
+ assert(T.popupHtml({kind:'stop',transport_type:'bus',name:'<b>x',routes:[]}).includes('&lt;b&gt;x'));
+ assert(T.stopIconHtml({kind:'stop',transport_type:'tram',routes:[]}).includes('tl-tram'));
+ assert(T.stopIconHtml({kind:'stop',transport_type:'bus',routes:[]}).includes('tl-bus'));
+ assert(T.stopIconHtml({kind:'stop',transport_type:'rail',routes:[{mode:'rail',display_code:'REG'}]}).includes('REG'));
+ assert(T.lineStyle('rail','#00704A').dashArray);assert.equal(T.lineColor('rail',null),'#00704A');
+ assert(T.focusLineStyle('bus',null,'49').weight>T.lineStyle('bus').weight);assert.equal(T.focusLineStyle('metro','#E27439','A').color,'#E27439');
+ assert.equal(T.lineLabelPoint({type:'LineString',coordinates:[[12.4,41.8],[12.5,41.9],[12.6,42]]}).join(','),'41.9,12.5');
+ assert.equal(T.lineLabelPoint({type:'LineString',coordinates:[[12.4,41.8],[12.5,41.9],[12.6,42]]},[42,12.6]).join(','),'42,12.6');
+ const live=T.directionTimes({realtime:[{time:'22:07',in_min:6,delay_min:4}],times:[{time:'22:03',in_min:2}]});
+ assert(live.live);assert(live.text.includes('+4′'));assert(live.scheduled.includes('22:03'));
+ assert(!T.directionTimes({realtime:[],times:[{time:'22:03',in_min:2}]}).live);
+ assert(T.alertsHtml([{header:'<Deviazione>',routes:['89']}]).includes('&lt;Deviazione&gt;'));
+ const collapsed=T.alertsHtml([{header:'a',routes:['89','64']},{header:'b',routes:['89']},{header:'c',routes:['89']}],new Set(['89']));assert(collapsed.includes('3 avvisi'));assert(!collapsed.includes('64'));
+ assert(T.realtimeNote({realtime:{status:'stale'}}).includes('non aggiornato'));
+ assert.equal(T.timeText({time:'21:57',in_min:0}),'21:57 (in partenza)');
+ const busy=T.departuresHtml({availability:'available',now:'22:20',alerts:[],departures:Array.from({length:12},(_,i)=>({code:'REG',mode:'rail',headsign:'D'+i,times:i<3?[{time:'22:30',in_min:10}]:[],realtime:[]}))});
+ assert.equal((busy.match(/<li>/g)||[]).length,3);assert(busy.includes('9 altre destinazioni'));
+ const untimed=T.popupHtml({kind:'stop',transport_type:'rail',name:'<Station>',routes:[],untimed:true});assert(untimed.includes('ODbL 1.0'));assert(!untimed.includes('Carico'));assert(!untimed.includes('Trenitalia'));assert(!untimed.includes('<Station>'));
+ assert(T.statusText({availability:'available',osm_rail:{availability:'available'},sources:[{availability:'unavailable'},{availability:'available',untimed:true}]}).includes('senza orari'));
+ assert(C.style('lane').dashArray);assert(!C.style('separated').dashArray);assert.equal(C.style('unknown'),C.style('path'));
+ assert(C.popupHtml({label:'Corsia',name:'<x>'}).includes('&lt;x&gt;'));assert(C.statusText({availability:'available',min_zoom:12,features:[]},11).includes('zoom 12'));
+ const {Lifecycle}=await env.load('lifecycle.js'),scope=new Lifecycle();const {createTransport}=await env.load('features/transport/index.js');
+ const line={route_id:'89',code:'89',mode:'bus',walk_min:2,distance_m:80,stop_name:'Piazza',stop_ids:['s1'],next:[{headsign:'Termini',times:[{time:'08:00',in_min:10}],realtime:[]}]};
+ const group={stop_name:'Piazza',modes:['bus'],walk_min:2,distance_m:80,wheelchair:'yes',stop_ids:['s1'],lines:[line]};
+ let response={availability:'available',lines:[line],stops:[group],alerts:[],now:'07:50'};
+ const http={request:async()=>({ok:true,json:async()=>response}),post:async()=>({ok:true,json:async()=>response})};
+ const module=createTransport({scope,http,sites:{key:()=>''},emit(){}});const poi={id:'p',place_id:'place',latitude:41.9,longitude:12.5,raw:{}};
+ module.update({transitByPlace:{},userLoc:null});env.get('[data-transit-place]').dataset.transitPlace='place';await module.detail(poi);
+ let html=env.get('[data-transit-place]').innerHTML;assert(html.includes('Piazza'));assert(html.includes('accessibile'));assert(!html.includes('08:00'),'destination has no origin countdown');
+ module.update({transitByPlace:{},userLoc:{lat:41.9,lng:12.5,label:'Test'}});await module.origin();html=env.get('origin-transit-body').innerHTML;
+ assert(html.includes('08:00 (tra 10 min)'));assert(html.includes('Test'));
+ response={availability:'available',lines:[{...line,untimed:true}],stops:[{...group,lines:[{...line,untimed:true}]}]};await module.detail(poi);assert(env.get('[data-transit-place]').innerHTML.includes('OpenStreetMap'));
+ module.dispose();scope.dispose();console.log('PASS: actual transport presentation, origins, timetables, RT, alerts, untimed rail and cycleways');
+})().catch(error=>{console.error(error);process.exitCode=1;});

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EGI · Revisione doppioni</title>
+<link rel="stylesheet" href="/static/vendor/leaflet-1.9.4/leaflet.css">
+<link rel="stylesheet" href="/static/css/pages/review_overlaps.css">
+</head>
+<body>
+<header>
+  <h1>Revisione doppioni</h1>
+  <span class="progress" id="progress">Caricamento…</span>
+  <a href="/map">← Mappa</a>
+</header>
+<div class="layout">
+  <aside>
+    <div class="filters">
+      <label title="punteggio 8 o più"><input type="checkbox" data-tier="A" checked> A molto probabile</label>
+      <label title="punteggio 6–7"><input type="checkbox" data-tier="B" checked> B probabile</label>
+      <label title="punteggio 4–5"><input type="checkbox" data-tier="C" checked> C da valutare</label>
+      <label title="stesso indirizzo o entro 25 m, pochi altri segnali"><input type="checkbox" data-tier="D"> D solo vicini</label>
+      <label><input type="checkbox" id="open-only"> solo da decidere</label>
+      <label><input type="checkbox" id="multi-only"> gruppi con 3+ fonti</label>
+      <select id="source-filter" aria-label="Fonte"><option value="">Tutte le fonti</option></select>
+      <select id="proposal-filter" aria-label="Proposta">
+        <option value="">Tutte le proposte</option><option value="same_service">Proposta: stesso servizio</option>
+        <option value="same_place">Proposta: stesso luogo</option><option value="different">Proposta: diversi</option>
+        <option value="unsure">Proposta: non so</option></select>
+      <label><input type="checkbox" id="high-only"> solo confidenza alta</label>
+      <button type="button" id="accept-high" title="Registra come tue le proposte ad alta confidenza delle coppie mostrate ancora da decidere">Accetta le proposte alte mostrate</button>
+      <span class="hint" id="group-filter"></span>
+    </div>
+    <div id="list"></div>
+  </aside>
+  <main>
+    <div id="map"></div>
+    <div id="detail"><p class="hint">Scegli una coppia a sinistra.</p></div>
+    <h2 style="font-size:15px;margin-top:22px">Le tue decisioni</h2>
+    <p class="hint">Restano in questo browser. Quando vuoi, copia il testo e incollalo in chat: le registro come evidenza di revisione (curation/matches.csv), senza unire nulla in automatico.</p>
+    <textarea id="export" readonly></textarea>
+    <p><button type="button" id="copy">Copia decisioni</button> <span class="hint" id="copied"></span></p>
+    <p class="hint">Tasti: 1 stesso servizio · 2 stesso luogo, servizi diversi · 3 diversi · 0 non so · A accetta la proposta · J/K coppia successiva/precedente.</p>
+  </main>
+</div>
+<script src="/static/vendor/leaflet-1.9.4/leaflet.js"></script>
+<script type="module" src="/static/js/pages/review_overlaps.js"></script>
+</body>
+</html>

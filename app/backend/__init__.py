@@ -1,1 +1,1 @@
-"""Read-only preview API and rendering; no editorial mutation or publication."""
+"""Compose read-only canonical/public and isolated preview journeys; editorial writes live elsewhere."""

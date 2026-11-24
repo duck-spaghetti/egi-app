@@ -11,8 +11,9 @@ import unittest
 
 from fastapi.testclient import TestClient
 
-from app.backend.main import app, subject_source
-from app.backend.subjects import (
+from app.backend.main import app
+from app.backend.api.preview.dependencies import subject_source
+from app.backend.api.preview.subjects import (
     RUN_PROBE,
     SUBJECTS,
     PostgresSubjectSource,
@@ -119,7 +120,7 @@ class InProcessRouteTests(unittest.TestCase):
             subject("svc-2", "Ascolto", {}),
         ]
         app.dependency_overrides[subject_source] = lambda: StaticSubjectSource(rows)
-        self.client = TestClient(app)
+        self.client = self.enterContext(TestClient(app))
 
     def tearDown(self):
         """Restore the production source."""

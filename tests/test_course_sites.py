@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from app.backend.preview import services
+from app.backend.api.preview.projection import services
 from tests.test_map_sources import map_row
 
 

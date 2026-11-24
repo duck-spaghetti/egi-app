@@ -1,5 +1,15 @@
 # EGI app v0.2 — local preview
 
+## B1 architectural completion
+
+The current task branch implements the recovered backend/frontend organization.
+See [Module responsibilities, Interfaces and verification](docs/b1-architecture.md).
+The completion record is workspace `.scratch/mvp/b1-refactoring-completion.md`.
+B1 completion verification and independent review are recorded in the workspace plan; a separate canonical
+SQL supplement privacy defect remains open. Historical checkpoints below do not
+represent acceptance of this candidate.
+
+
 Recovered frontend from the original egi-app draft at
 `c090950874a8c5ac39c83f9ba2aa1ae06356af84`, adapted to the current database's source
 evidence. The original checkout is untouched. Map/list, source-need filters, service
@@ -15,6 +25,141 @@ Current task/approval and dated verification evidence are indexed in the workspa
 [tracker guide](../docs/agents/issue-tracker.md) and
 [post-handoff plan](../.scratch/post-handoff/plan.md). The original draft is reference
 history; production/editorial integration is a separate scope.
+
+## A3 canonical local mode
+
+The A3 branch adds a deliberately selected canonical mode alongside the retained
+preview. `EGI_DATA_MODE=canonical` serves only approved PostgreSQL public reads for
+Helpinet and Scuolemigranti. It never falls back to preview evidence on failure.
+Other sources are absent until migrated. Local canonical publication is not an
+Internet launch or confirmation that a service is currently available.
+
+From this checkout, using the approved workspace environment:
+
+```sh
+EGI_DATA_MODE=canonical \
+EGI_DATABASE_URL='host=/ABS/WORKSPACE/.local/a3-db port=65436 dbname=egi_a3_demo user=egi_a3_reader_login' \
+/ABS/WORKSPACE/.local/venvs/app-a3/bin/python -m uvicorn app.backend.main:app \
+  --host 127.0.0.1 --port 8003 --no-access-log
+```
+
+The schema prerequisite is the approved database through `007_linked_supplements`;
+provisioning/loading is separately authorized in the workspace A3 design. Do not
+point this command at the primary preview or provision an arbitrary target.
+`EGI_DB_BACKEND` accepts only `postgres`; since B1 the territory code comes from the
+`EGI_APP_CONFIG` profile (`EGI_TERRITORY_CODE` is no longer read).
+`EGI_QUERY_CATALOGUE` can select a trusted local YAML catalogue. Missing settings,
+unsupported backends, duplicate YAML keys and missing operations fail startup
+without echoing secret values. There is no SQLite backend or connection pool.
+
+`config.py` validates configuration; `db/database.py` owns bound
+queries, read-only repeatable-read transactions, connection/statement timeouts,
+error mapping and the cache; `queries/public.yaml` holds the named reads.
+`api/directory/projection.py` adapts public payloads into map/list/detail cards. Canonical routes
+are `/api/public/services`, `/services/{uuid}` under that prefix, `/categories`,
+`/category-translations`, `/taxonomy`, `/areas` and `/languages`. `/health` reports
+`canonical-local`. Store failure returns a safe 503, never a successful empty map.
+
+The cache holds at most eight language snapshots for 60 seconds, invalidated by
+public sequence changes and opening transitions. Linked supplements are reread on
+every request because their review/link decisions can change independently.
+They contain only explicitly approved secondary contacts/conditions with provenance;
+raw assertions, drafts and private contacts are unavailable. Missing points stay
+in the list; unknown days stay unknown across overlapping schedules. Open-now uses
+canonical opening status and refreshes while the map is open. Source attribution,
+original text and translation metadata are retained; UI translation completion is B2.
+
+Canonical mode returns 404 for raw preview/debug/review and benchmark surfaces.
+The existing address-search operation remains available independently of local
+transport. `EGI_LOCAL_LAYERS=1` optionally enables the existing local transport,
+rail and cycle runtime paths (`EGI_TRANSPORT_ROOT`, `EGI_RAIL_ROOT`,
+`EGI_OSM_RAIL_ROOT`, `EGI_CYCLEWAYS_ROOT`). Transit place UUIDs/points come from
+canonical reads; the preview store is not consulted. These layers do not select
+public-launch transport or authorize fresh acquisition/job changes.
+
+For native verification set `EGI_DATABASE_REPO` to the explicit database worktree,
+`EGI_SQITCH` to Sqitch and, if necessary, `PERL5LIB` to its local runtime library.
+Use the A3 Python environment for `python -m unittest discover -s tests -v` and run
+`node --experimental-vm-modules tests/test_canonical_map.cjs` in addition to the two existing Node suites.
+The independent native harness creates only `/private/tmp/egi-app-read-*` targets.
+It checks restricted-role reads, HTTP isolation, bound parameters, safe failures,
+publication/withdrawal cache invalidation and fresh secondary review eligibility.
+
+## B1 structure, configuration and request privacy
+
+B1 (workspace plan `.scratch/mvp/b1-plan.md`) keeps the A3 behavior and changes:
+
+- **City profile.** `EGI_APP_CONFIG` selects one validated YAML profile; default
+  `app/backend/app_profile.yaml` (Rome: territory code, fallback centre/bounds/zoom,
+  search extent, public origin, emergency numbers, external-service notice). Only
+  these resolved public values reach page bootstrap and `/areas`; DSN and local
+  paths never do. Geocoder bounds and frontend time zone use the same profile.
+- **Coordinate-free URLs.** `POST /api/preview/address-search` `{query}`,
+  `POST /api/preview/transit/origin` `{lat,lon}`, `POST /api/preview/transport`
+  `{west,south,east,north,zoom,modes,routes?}` and `POST /api/preview/cycleways`
+  `{west,south,east,north,zoom}` take typed bodies that reject unexpected fields,
+  unknown modes, nonfinite or oversized extents and more than 80 routes (schemas in
+  `request_schemas.py`). The old coordinate GET forms return 405. The visitor's
+  position, search text and selected address stay in page memory only (no URL,
+  storage or cookie); reload forgets them. Directions links carry only the public
+  destination.
+- **Errors and diagnostics.** Failures return an allowlisted message plus an opaque
+  diagnostic ID. `diagnostics.py` writes only UTC time, severity, event code and
+  code location under `EGI_ERROR_DIR` (default `.local/errors` in the working
+  directory), expired after 14 days at startup and periodically while running.
+  Launch with `--no-access-log`.
+- **Geocoder cache.** Process memory only, HMAC-keyed with a random per-process key
+  and provider/profile scope, 300 s TTL, at most 128 entries.
+- **Local assets.** Leaflet 1.9.4, Leaflet.markercluster 1.5.3 and the Fraunces/IBM
+  Plex typefaces are served from `/static/vendor/` and `/static/fonts/` with their
+  licences and `static/vendor/manifest.json` integrity hashes; no CDN or Google
+  Fonts request remains. Map tiles and an explicit address search still contact
+  OpenStreetMap/Nominatim.
+- **Modules.** `main.create_app` owns instance resources through `config.py` and
+  `dependencies.py`; actual endpoint families live under `backend/api/`, each with
+  router/service/schemas/dependencies/exceptions responsibilities. `db/` owns the
+  configured reader and `queries/` the named YAML reads. The map's `js/pages/map.js`
+  coordinates explicit `features/` Interfaces; no shared mutable runtime is exported.
+  See [the current architecture](docs/b1-architecture.md) for ownership and test Seams.
+- **Map behavior.** One marker per exact coordinate among filtered results; the
+  detail lists the other public services at that point, labelled `Fuori dai filtri
+  attivi` when outside the current filters. Unverified hours show `Aperto · da
+  verificare` / `Chiuso · da verificare`; overnight intervals render on both days.
+
+The B1 demo used the reader role on the B1 database:
+
+```sh
+EGI_DATA_MODE=canonical EGI_LOCAL_LAYERS=1 \
+EGI_DATABASE_URL='host=/ABS/WORKSPACE/.local/b1-db port=65438 dbname=egi_b1_demo user=egi_b1_reader_login' \
+EGI_ERROR_DIR=/ABS/WORKSPACE/.local/b1-app/errors \
+/ABS/WORKSPACE/.local/venvs/app-a3/bin/python -m uvicorn app.backend.main:app \
+  --host 127.0.0.1 --port 8004 --no-access-log
+```
+
+The current B1 demo has `009_contact_protection_register` (applied2026-11-24
+under a separate grant after backup). It retains 594 public cards and zero orphan
+addresses, with the same read-only login; public shapes are unchanged. The app
+still reads only public projections, while 009 also guards persistent contact
+restrictions and linked-contact labels. No historical inventory/backfill or
+privacy-role membership was added. Entry, map and public detail were smoke-tested
+in the browser after application; the existing process needed no restart.
+The prior 008 baseline is superseded for this demo. Tests add
+`node --experimental-vm-modules tests/test_canonical_map.cjs` and
+`node --experimental-vm-modules tests/test_map_modules.cjs` (the module test needs
+the flag for `vm.SourceTextModule`). Error-path tests write diagnostics; set
+`EGI_ERROR_DIR` to a temporary directory so they do not land in `.local/errors`.
+`node --experimental-vm-modules tests/test_review_corrections.cjs` covers clipboard
+completion after page disposal and reference changes through the actual origin
+and transport modules, including cancellation of obsolete transport responses.
+
+Verified A3: 130 Python tests, six declared skips (five legacy live-preview HTTP
+cases and one sibling-checkout transport fixture); all three Node suites and
+changed-JavaScript syntax checks pass. Real browser checks covered 594 cards,
+188 education results, a Scuolemigranti detail, unknown days, retained local transit,
+Arabic RTL/fallback and return to Italian. This is not mobile or staging acceptance.
+B1 still owns module extraction, city configuration, coordinate/query privacy,
+14-day redacted errors and local fonts/libraries. The local demo disables access
+logs but does not claim that broader privacy work is complete.
 
 ## Setup and start
 
@@ -42,7 +187,7 @@ If that port belongs to another session, preserve its process. With the recorded
 preview database already running, a separate instance can use:
 
 ```sh
-.venv/bin/python -m uvicorn app.backend.main:app --host 127.0.0.1 --port 8001
+.venv/bin/python -m uvicorn app.backend.main:app --host 127.0.0.1 --port 8001 --no-access-log
 ```
 
 Use the actual instance's port for browsing and live tests; 8001 was used for R3.
@@ -83,7 +228,7 @@ history. The loader commits its complete import unit or rolls back. Imported sou
 subjects remain separate from canonical publication.
 
 The app reads the latest succeeded normalization for the selected Helpinet dataset,
-and for every dataset of each importer source (the Sant'Egidio guide has one per chapter), through `app/backend/subjects.py` (see
+and for every dataset of each importer source (the Sant'Egidio guide has one per chapter), through `app/backend/api/preview/subjects.py` (see
 [Map sources](#map-sources-my-maps-2026-11-09)). The snapshot is cached in-process: for 60 seconds
 no query is made, then a cheap `run_id` probe decides whether to reload. An accepted
 new load is therefore visible within about a minute, without restarting the app or
@@ -97,8 +242,8 @@ cache behaviour, transport projection) run with:
 
 ```sh
 .venv/bin/python -m unittest discover -s tests -v
-node tests/test_map.cjs
-node tests/test_transport_layer.cjs
+node --experimental-vm-modules tests/test_map.cjs
+node --experimental-vm-modules tests/test_transport_layer.cjs
 ```
 
 With the app running, the live HTTP tests against the real preview database run too:
@@ -107,7 +252,8 @@ With the app running, the live HTTP tests against the real preview database run 
 EGI_APP_BASE_URL=http://127.0.0.1:8000 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-Use the serving port (for example 8001) in `EGI_APP_BASE_URL`. For changed JavaScript,
+Use `EGI_APP_BASE_URL` only for the retained 315-record Helpinet pilot required by
+`test_preview_http.py`; it is not the B1 canonical-demo URL. For changed JavaScript,
 run `node --check` on the affected files. Last recorded suite/browser results are
 in the post-handoff plan; commands here do not claim a currently running server or
 a fresh passing test result. TestClient's httpx deprecation is known; the user
@@ -120,8 +266,8 @@ and the scope are in [v0.1 plan](docs/v01-plan.md).
 ## Need-first presentation taxonomy (v0.3)
 
 The map's need tiles, offers ("Prestazione"), "Per chi", "Pasto", "Come si accede" and quick
-paths come from `app/backend/taxonomy_v0_3.json`, applied to every card by
-`app/backend/taxonomy.py` (`/api/preview/taxonomy` serves the labels and paths). v0.2 was
+paths come from `app/backend/api/preview/taxonomy_v0_3.json`, applied to every card by
+`app/backend/api/preview/taxonomy.py` (`/api/preview/taxonomy` serves the labels and paths). v0.2 was
 approved on 2026-11-09; v0.3 on 2026-11-15 during the source-by-source review
 ([proposal](../.scratch/taxonomy/proposal.md) §13, [plan](../.scratch/taxonomy/v0.3-plan.md)).
 
@@ -165,12 +311,13 @@ its actual topology. See [discovery UX](docs/discovery-ux.md) for the current co
 
 `/api/preview/transport` reads the sibling workspace `.local/transport` files;
 `EGI_TRANSPORT_ROOT` can explicitly select another runtime directory at startup.
-Only `load_active` in `app/backend/transport.py` knows that layout; it follows
+Only `load_active` in `app/backend/api/transport/network.py` knows that layout; it follows
 `../egi-importer/docs/transport-format.md`. Tests use the vendored example in
 `tests/fixtures/transport-root` and, when the importer sits alongside, check that
 the copy still matches the producer's.
-Parameters: west/south/east/north (WGS84 bbox), zoom (0–19), modes (any of
-`metro`, `rail`, `tram`, `bus`, comma-separated). It returns GeoJSON plus active-version and refresh metadata.
+It is a `POST` with JSON body west/south/east/north (WGS84 bbox), zoom (0–19),
+modes (any of `metro`, `rail`, `tram`, `bus`, comma-separated) and optional
+`routes` (at most 80). It returns GeoJSON plus active-version and refresh metadata.
 Bounding boxes select intersecting route shapes. Below zoom 17 the response uses the
 importer's simplified levels (50 m from zoom 11, 12 m from 13, 3 m from 15); full
 source shapes from zoom 17. Responses over 1 KB are gzip-compressed (level 5).
@@ -193,7 +340,7 @@ Walking time is an estimate:
 straight-line distance × 1.3 at 4 km/h, rounded up, and the card says so. The
 service card shows four stop groups followed by "Altre N fermate". No badge for itinerant services,
 remote/directory services or services without coordinates. Logic and constants are
-in `app/backend/transit_nearby.py` and `app/backend/osm_rail.py`; unavailable or
+in `app/backend/api/transport/nearby.py` and `app/backend/api/transport/osm_rail.py`; unavailable or
 out-of-calendar timed sources contribute no timed rows, while an independent OSM
 runtime may still supply untimed rows. Service data remains usable.
 
@@ -208,7 +355,7 @@ map selection and geolocation share that origin. See the
 
 ### Scheduled departures
 
-`app/backend/departures.py` reads the active version's `departures.sqlite`
+`app/backend/api/transport/departures.py` reads the active version's `departures.sqlite`
 (read-only) and returns the next scheduled times per stop, line and direction
 from the current Rome time, including after-midnight trips of yesterday's service
 day; a direction with no further trip says so. `GET /api/preview/transit/departures
@@ -267,7 +414,7 @@ The discovery panel also offers **Aperti ora**, combining with existing filters 
 ### Service sheet layout r3 (2026-11-15)
 
 Approved in [card-layout plan](../.scratch/card-layout/plan.md) (proposals r1–r3). The detail
-sheet (`openDetail` in `map.js`) has:
+sheet (`openDetail` in `features/search/index.js`) has:
 
 - a **fixed header** instead of "Scheda servizio": category, title (the card's main offer
   cluster, else the source's service name), facility · address, coloured hours status with
@@ -329,9 +476,9 @@ render as before.
 
 ### Cycle lanes
 
-`GET /api/preview/cycleways?west&south&east&north&zoom` returns OpenStreetMap cycle
-infrastructure in the viewport from zoom 12 (`app/backend/cycleways.py`, format
-`../egi-importer/docs/cycleways-format.md`), drawn by `cycle-layer.js` under its own
+`POST /api/preview/cycleways` with `{west,south,east,north,zoom}` returns OpenStreetMap cycle
+infrastructure in the viewport from zoom 12 (`app/backend/api/cycleways/network.py`, format
+`../egi-importer/docs/cycleways-format.md`), drawn by `features/cycleways/layer.js` under its own
 "Piste ciclabili" toggle: separated paths solid dark green, tracks dashed, lanes
 light dashed, shared paths dotted, with a legend and ODbL attribution. No official
 Rome dataset was found; the data is not verified by EGI.
@@ -390,7 +537,7 @@ appear next to Helpinet. `subjects.py` reads the latest succeeded `normalize` ru
 each `map_export` source and joins each service to its `location_candidate` from the
 latest succeeded child `geocode` run; the cache probe covers all those run IDs.
 
-- **Grouping:** `MAP_LAYER_GROUPS` in `app/backend/preview.py` places each layer in a
+- **Grouping:** `MAP_LAYER_GROUPS` in `app/backend/api/preview/projection.py` places each layer in a
   need group (GrIS → Curarmi; Scuolemigranti → Istruzione; Programma Integra by layer,
   adding the groups Istituzioni and Socialità). This is presentation only; the original
   layer is the service type and help topics are the listed themes.
@@ -448,7 +595,7 @@ exclusion) and a Mapillary test were built and then removed at the user's reques
 The Filtri sheet shows the number of services available ("1398 servizi disponibili", or
 "N servizi su T con i filtri attivi"). Need tiles, service types, prestations, access
 claims and sources show faceted counts: each value is counted under all the *other*
-active filters (`facetCounts` / `passesFilters` in `map.js`), so a count is the number of
+active filters (`facetCounts` / `passesFilters` in `features/search/index.js`), so a count is the number of
 results that choosing that value would give. Values with no results are hidden from the
 selects, and need tiles with no results are dimmed.
 
@@ -511,7 +658,7 @@ Also fixed: "Scegli punto" threw `poi is not defined` (a stray line from `7978a0
 ### Duplicate review page (2026-11-09)
 
 `/revisione/doppioni` lists cross-source candidate pairs among all visible services,
-placed or not (`app/backend/review.py`, `GET /api/preview/review/overlaps`). Candidates
+placed or not (`app/backend/api/preview/review.py`, `GET /api/preview/review/overlaps`). Candidates
 come from the same normalized address, a shared phone or email, or a 40 m grid. Each pair
 gets a score from independent signals, shown as evidence:
 

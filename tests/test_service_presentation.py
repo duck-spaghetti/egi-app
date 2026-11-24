@@ -5,8 +5,8 @@ from __future__ import annotations
 import copy
 import unittest
 
-from app.backend.presentation import access_sections, weekly_hours, placement, coverage
-from app.backend.preview import services
+from app.backend.api.preview.presentation import access_sections, weekly_hours, placement, coverage
+from app.backend.api.preview.projection import services
 
 
 def subject(identifier: str, name: str, hours: dict) -> dict:

@@ -1,0 +1,16 @@
+territory_code: roma
+fallback:
+  name: Roma e dintorni
+  country_code: IT
+  timezone: Europe/Rome
+  center: [12.4964, 41.9028]
+  bounds: [11.5, 41.0, 13.7, 42.7]
+  zoom: 11
+search_extent: [11.5, 41.0, 13.7, 42.7]
+public_origin: https://egi.cat
+emergencies:
+  - {number: '112', label: Emergenza unica europea}
+  - {number: '800 440 022', label: Sala Operativa Sociale Roma}
+  - {number: '1522', label: Antiviolenza donne}
+  - {number: '114', label: Emergenza infanzia}
+external_notice: 'Le mappe contattano OpenStreetMap; una ricerca indirizzo invia il testo a Nominatim. La posizione scelta resta nella memoria di questa pagina. Aprire indicazioni contatta Google Maps con la destinazione pubblica.'

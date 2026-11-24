@@ -4,4 +4,4 @@ set -eu
 EGI_APP_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$EGI_APP_ROOT"
 .venv/bin/python scripts/manage_preview_db.py start
-exec .venv/bin/python -m uvicorn app.backend.main:app --host 127.0.0.1 --port 8000
+exec .venv/bin/python -m uvicorn app.backend.main:app --no-access-log --host 127.0.0.1 --port 8000

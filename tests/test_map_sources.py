@@ -6,9 +6,10 @@ import unittest
 
 from fastapi.testclient import TestClient
 
-from app.backend.main import app, subject_source
-from app.backend.preview import categories, services
-from app.backend.subjects import StaticSubjectSource
+from app.backend.main import app
+from app.backend.api.preview.dependencies import subject_source
+from app.backend.api.preview.projection import categories, services
+from app.backend.api.preview.subjects import StaticSubjectSource
 from tests.test_service_presentation import subject
 
 
@@ -47,6 +48,7 @@ def map_row(identifier: str, layer: str, status: str, ambiguous: bool = False, h
 
 
 class MapSourceTests(unittest.TestCase):
+    """Exercise map-source grouping, coverage and retained preview routes."""
     def test_layers_join_presentation_groups(self):
         rows = [subject("h1", "Mensa", {}), map_row("a", "Mense", "matched_house"),
                 map_row("b", "Socialità volontariato e tempo libero", "matched_house")]
@@ -79,10 +81,11 @@ class MapSourceTests(unittest.TestCase):
         self.assertEqual(service["native_classifications"]["prestazioni"], [{"id": "topic:Salute", "nome": "Salute"}])
 
     def test_coverage_measures_helpinet_only(self):
+        """Keep coverage scoped to Helpinet while other preview sources remain readable."""
         rows = [subject("h1", "Mensa", {}), map_row("a", "Mense", "matched_house")]
         app.dependency_overrides[subject_source] = lambda: StaticSubjectSource(rows)
         try:
-            client = TestClient(app)
+            client = self.enterContext(TestClient(app))
             self.assertEqual(client.get("/api/preview/coverage").json()["services"], 1)
             self.assertEqual(len(client.get("/api/preview/services").json()), 1, "the Helpinet fixture has no coordinates")
             self.assertEqual(len(client.get("/api/preview/services?include_unplaced=true").json()), 2)
@@ -91,11 +94,12 @@ class MapSourceTests(unittest.TestCase):
 
 
     def test_debug_positions_include_hidden_candidates(self):
+        """Expose retained hidden placement candidates only through preview diagnostics."""
         rows = [subject("h1", "Mensa", {}), map_row("a", "Mense", "matched_house"),
                 map_row("cap", "Mense", "postcode_area"), map_row("amb", "Mense", "matched_street", ambiguous=True)]
         app.dependency_overrides[subject_source] = lambda: StaticSubjectSource(rows)
         try:
-            client = TestClient(app)
+            client = self.enterContext(TestClient(app))
             data = client.get("/api/preview/debug/positions?source=programma-integra").json()
             self.assertEqual(data["total"], 3)
             by_id = {p["id"]: p for p in data["points"]}
@@ -183,10 +187,12 @@ class GuideSourceTests(unittest.TestCase):
     """Reviewed document-guide entries (Sant'Egidio): directory, access text, scoped hours, aliases."""
 
     def test_telephone_services_go_to_the_directory_even_without_a_place(self):
+        """Retain telephone services in the directory without inventing a location."""
         card = services([guide_row("tel", status="no_address", delivery_mode="telephone")])[0]
         self.assertEqual(card["placement"]["section"], "directory")
         self.assertEqual(card["delivery_mode"], "telephone")
-        from app.backend.main import is_placed
+        from app.backend.api.preview.service import Preview
+        is_placed = Preview().is_placed
         self.assertTrue(is_placed(card))
         self.assertFalse(is_placed(services([guide_row("none", status="no_address")])[0]))
 

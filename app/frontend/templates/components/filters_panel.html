@@ -1,0 +1,38 @@
+<div class="sheet" id="sheet-filters">
+  <div class="grabber"></div>
+  <div class="sheet-head">
+    <h2 data-i18n="map.filters">Filtri</h2>
+    <button class="sheet-close" data-close data-i18n="common.close">Chiudi</button>
+  </div>
+  <div class="sheet-body" id="filter-sheet-host"><div id="filter-controls">
+    <p class="filter-total" id="filter-total" role="status" aria-live="polite"></p>
+    <div class="filter-group service-search">
+      <label for="service-query">Cerca servizio, struttura, prestazione o indirizzo</label>
+      <input id="service-query" type="search" placeholder="Es. doccia, italiano, appuntamento…" autocomplete="off">
+      <label for="section-filter">Sezione</label>
+      <select id="section-filter"><option value="all">Tutti i servizi</option><option value="services">Servizi territoriali e da verificare</option><option value="directory">Rubrica · servizi a distanza</option><option value="needs_position" class="debug-only">Posizione da completare (revisione)</option></select>
+      <label for="source-filter">Fonte</label>
+      <select id="source-filter"><option value="">Tutte le fonti</option></select>
+      <div class="issue-filter-wrap" hidden><label for="issue-filter">Problema di posizione</label>
+      <select id="issue-filter"><option value="">Qualsiasi (anche posizioni presenti)</option></select></div>
+    </div>
+    <fieldset class="discovery-path">
+      <legend>Trova il servizio</legend>
+      <label class="open-now-filter" style="display:flex;align-items:center;gap:9px;margin:0 0 14px;font-weight:600;cursor:pointer"><input id="open-now-filter" type="checkbox" style="width:18px;height:18px;margin:0"> Aperti ora</label>
+      <p class="source-note">{% if canonical %}Secondo gli orari canonici pubblicati.{% else %}Secondo gli orari strutturati delle fonti (Helpinet e GrIS).{% endif %} Con il filtro attivo, gli orari sconosciuti, testuali o ambigui sono esclusi.</p>
+      <div class="discovery-step"><h3>Bisogno</h3><div class="cat-grid" id="cat-grid"></div></div>
+      <p class="source-note" id="need-hint">Nessun bisogno scelto: vedi tutti i servizi. Scegli un bisogno per vederne le prestazioni.</p>
+      <div class="offer-groups" id="offer-groups"></div>
+    </fieldset>
+    <div class="filter-group service-search">
+      <label for="audience-filter">Per chi</label><select id="audience-filter"></select>
+      <label for="access-filter">Come si accede</label><select id="access-filter"></select>
+      <p class="source-note">Prestazioni, destinatari e accesso sono ricavati dai dati delle fonti; quelli letti dal testo sono interpretazioni da verificare (vedi la scheda).</p>
+    </div>
+
+  </div></div>
+  <div class="filter-bar">
+    <button class="btn" id="reset-filters" type="button" hidden>Azzera filtri</button>
+    <button class="btn primary" id="filters-search" type="button">Cerca</button>
+  </div>
+</div>

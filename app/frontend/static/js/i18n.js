@@ -1,6 +1,9 @@
-(function () {
+import {normalizeLang} from "./format.js";
+/** Per-page dictionary runtime; catalogues remain separate JSON files. */
+export function createI18n(scope, http) {
   const cache = new Map();
   let currentLang = "it";
+  let languageGeneration = 0;
   let currentMessages = {};
   let fallbackMessages = {};
 
@@ -10,14 +13,15 @@
       return cache.get(code);
     }
 
-    const promise = fetch(`/translations/${code}.json`)
+    const promise = http.request(`/translations/${code}.json`)
       .then((response) => {
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
         return response.json();
       })
-      .catch(() => {
+      .catch((error) => {
+        scope.check();
         if (code === "it") return {};
         return loadMessages("it");
       });
@@ -27,9 +31,14 @@
   }
 
   async function setLanguage(lang) {
-    currentLang = normalizeLang(lang);
-    fallbackMessages = await loadMessages("it");
-    currentMessages = currentLang === "it" ? fallbackMessages : await loadMessages(currentLang);
+    const requested = normalizeLang(lang);
+    const generation = ++languageGeneration;
+    const fallback = await loadMessages("it");
+    const messages = requested === "it" ? fallback : await loadMessages(requested);
+    scope.check();
+    if (generation !== languageGeneration) return;
+    currentLang=requested;
+    fallbackMessages=fallback;currentMessages=messages;
     document.documentElement.lang = currentLang;
     document.documentElement.dir = currentLang === "ar" ? "rtl" : "ltr";
     return currentMessages;
@@ -75,14 +84,11 @@
     return template.replace(/\{(\w+)\}/g, (_, key) => String(params[key] ?? `{${key}}`));
   }
 
-  function normalizeLang(lang) {
-    return String(lang || "it").split("-")[0].toLowerCase();
-  }
 
-  window.EGI_I18N = {
+  return {
     setLanguage,
     t,
     translatePage,
     getCurrentLanguage: () => currentLang,
   };
-})();
+}

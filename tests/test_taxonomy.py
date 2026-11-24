@@ -7,7 +7,7 @@ import json
 import unittest
 from unittest import mock
 
-from app.backend import taxonomy
+import app.backend.api.preview.taxonomy as taxonomy
 
 
 def card(title, kind=None, need=None, description="", address="Via X 1", hours=None, access_raw=None, entity_needs=None):

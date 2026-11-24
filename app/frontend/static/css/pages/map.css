@@ -1,0 +1,10 @@
+/** Map page stylesheet composition; actual UI rules have named owners. */
+@import url("../foundations/base.css");
+@import url("../pages/map-layout.css");
+@import url("../components/controls.css");
+@import url("../components/panels.css");
+@import url("../components/services.css");
+@import url("../components/transport.css");
+@import url("../components/cycleways.css");
+@import url("../components/map-markers.css");
+@import url("../pages/preview-debug.css");
