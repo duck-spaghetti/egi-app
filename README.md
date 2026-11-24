@@ -136,7 +136,14 @@ EGI_ERROR_DIR=/ABS/WORKSPACE/.local/b1-app/errors \
   --host 127.0.0.1 --port 8004 --no-access-log
 ```
 
-The database prerequisite is `008_contact_aliases`. Tests add
+The current B1 demo has `009_contact_protection_register` (applied2026-11-24
+under a separate grant after backup). It retains 594 public cards and zero orphan
+addresses, with the same read-only login; public shapes are unchanged. The app
+still reads only public projections, while 009 also guards persistent contact
+restrictions and linked-contact labels. No historical inventory/backfill or
+privacy-role membership was added. Entry, map and public detail were smoke-tested
+in the browser after application; the existing process needed no restart.
+The prior 008 baseline is superseded for this demo. Tests add
 `node --experimental-vm-modules tests/test_canonical_map.cjs` and
 `node --experimental-vm-modules tests/test_map_modules.cjs` (the module test needs
 the flag for `vm.SourceTextModule`). Error-path tests write diagnostics; set
