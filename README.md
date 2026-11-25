@@ -20,7 +20,8 @@ Scuolemigranti, Programma Integra), not the approved public directory.
 Routes use `/api/preview`. No canonical entity, editorial approval or publication is
 created. Blank descriptions remain blank; source hours have a separately labelled preview status; coordinates are source claims. Missing coordinates stay in the list.
 
-Git uses `main`, origin [duck-spaghetti/egi-app](https://github.com/duck-spaghetti/egi-app) (public, 2026-11-19), under the approved consolidation workflow.
+Development happens on `dev` of origin [duck-spaghetti/egi-app](https://github.com/duck-spaghetti/egi-app)
+(public, 2026-11-19; `dev` since 2026-11-25); `main` receives only authorized promotions.
 Current task/approval and dated verification evidence are indexed in the workspace
 [tracker guide](../docs/agents/issue-tracker.md) and
 [post-handoff plan](../.scratch/post-handoff/plan.md). The original draft is reference
@@ -375,7 +376,7 @@ Bus/tram predictions are available where the realtime feed covers them; metro an
 NeTEx rail remain scheduled, and OSM rail has no times. All remain attributed
 source data, not approved public EGI information. No transport DB grant or schema
 change. See sibling [importer instructions](../egi-importer/README.md) and
-[execution evidence](../egi-importer/docs/tpl-execution.md).
+[execution evidence](../egi-importer/docs/archive/tpl-execution.md).
 
 - Category groups are Helpinet's native needs for browsing, not an adopted EGI taxonomy.
   Map layers join these groups through a presentation crosswalk (`MAP_LAYER_GROUPS`).
@@ -385,8 +386,7 @@ change. See sibling [importer instructions](../egi-importer/README.md) and
 - Leaflet/cluster libraries and fonts retain the original external providers; map tiles use the standard OpenStreetMap endpoint with visible attribution;
   network access is needed for the basemap. No offline map is claimed.
 - Contribution forms, original CRUD routers, editorial matching and public export are
-  not connected. Local Git history now exists; hosting and remote delivery remain
-  separately scoped.
+  not connected. Hosting and deployment remain separately scoped.
 
 ## Historical v0.1 verification — 2026-11-08
 
@@ -504,7 +504,7 @@ contributors (ODbL 1.0), distinct from Trenitalia. Roma–Giardinetti is exclude
 because no active route was available in the inspected OSM data.
 
 Refresh manually from `egi-importer` with `python3 scripts/osm_rail.py poll`; no new
-job is installed. See [the runtime contract](../egi-importer/docs/osm-rail-format.md).
+job is installed. See [the runtime contract](../egi-importer/docs/transport/osm-rail-format.md).
 The Verify section covers independent runtime fixtures, source merging and the
 popup lifecycle test that ensures untimed stops make no departures request.
 
@@ -513,7 +513,7 @@ popup lifecycle test that ensures untimed stops make no departures request.
 The transport panel distinguishes bus/tram realtime predictions, scheduled metro/
 Trenitalia and untimed OSM rail. It retains the Roma licence uncertainty and now
 explicitly identifies the unstated NAP NeTEx licence. See the dated
-[source evidence and unsent clarification drafts](../egi-importer/docs/source-licensing.md).
+[source evidence and unsent clarification drafts](../egi-importer/docs/transport/source-licensing.md).
 The approved operations bundle installed the daily rail job and pruned four old
 derived Roma transport versions, preserving original captures and active data.
 Actual verification and limits are in the shared
@@ -532,7 +532,7 @@ the existing 8001 server was left running after process-control approval was den
 ### Map sources (My Maps, 2026-11-09)
 
 The three Google My Maps sources loaded by `egi-importer` (`python3 -m
-egi_importer.mymaps`, see [its pipeline doc](../egi-importer/docs/mymaps-pipeline.md))
+egi_importer.mymaps`, see [its pipeline doc](../egi-importer/legacy/docs/mymaps-pipeline.md))
 appear next to Helpinet. `subjects.py` reads the latest succeeded `normalize` run of
 each `map_export` source and joins each service to its `location_candidate` from the
 latest succeeded child `geocode` run; the cache probe covers all those run IDs.
@@ -602,7 +602,7 @@ selects, and need tiles with no results are dimmed.
 ### Map sources after normalizer 0.3 (2026-11-09)
 
 Cards follow the importer's classification
-([pipeline](../egi-importer/docs/mymaps-pipeline.md#3b-classification-processor-030-egi_importerclassifypy)):
+([pipeline](../egi-importer/legacy/docs/mymaps-pipeline.md#3b-classification-processor-030-legacyclassifypy)):
 
 - Excluded records (state schools, courts) and secondary per-layer copies are hidden
   (`is_visible`). The preview now shows 1,199 services instead of 1,398.
