@@ -21,3 +21,8 @@ form.inline { display: inline; margin-right: .75rem; }
 .desk-error { background: #fbe9e5; border: 1px solid var(--accent); padding: .75rem; border-radius: .25rem; margin: 0; }
 .desk-table { width: 100%; border-collapse: collapse; }
 .desk-table th, .desk-table td { text-align: left; padding: .5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+.desk-form .check { display: flex; gap: .5rem; align-items: center; }
+.desk-form textarea { font: inherit; padding: .5rem; border: 1px solid var(--line); border-radius: .25rem; }
+.desk-form fieldset { border: 1px solid var(--line); border-radius: .25rem; display: grid; gap: .5rem; }
+/* Honeypot: off-screen for people, present for bots. */
+.trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }

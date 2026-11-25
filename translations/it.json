@@ -98,7 +98,8 @@
     "email_action": "Email",
     "social_action": "Social",
     "telegram_action": "Telegram",
-    "menu": "Menu"
+    "menu": "Menu",
+    "still_valid_action": "Ancora valido?"
   },
   "contribute": {
     "title": "Nuovo servizio",
@@ -202,6 +203,51 @@
       "geocoding_failed": "Geocoding fallito: {error}",
       "submission_created": "Submission creata con id {id}.",
       "submission_failed": "Invio fallito: {error}"
+    },
+    "intake": {
+      "title": "Contribuisci",
+      "unavailable": "I contributi non sono ancora disponibili qui.",
+      "unknown_service": "Questo servizio non è tra quelli pubblicati.",
+      "report_title": "Segnala un errore",
+      "still_valid_title": "Questo servizio è ancora valido?",
+      "still_valid_hint": "Se ci sei stato di recente e hai visto che funziona come descritto, faccelo sapere: aiuta chi controlla le schede.",
+      "still_valid_submit": "Sì, è ancora valido",
+      "new_title": "Proponi un servizio",
+      "new_hint": "Bastano poche informazioni: le controlliamo prima di pubblicarle.",
+      "category": "Che cosa non va?",
+      "categories": {
+        "hours": "Orari",
+        "contacts": "Telefono e contatti",
+        "address": "Indirizzo o posizione",
+        "closed": "Chiuso o non esiste più",
+        "other": "Altro"
+      },
+      "message": "Raccontaci cosa hai visto (facoltativo)",
+      "value": "Il dato corretto, se lo conosci (facoltativo)",
+      "name": "Nome del servizio",
+      "offer": "Che cosa offre",
+      "address": "Indirizzo",
+      "online": "Si svolge online o al telefono",
+      "link": "Sito o pagina (facoltativo)",
+      "note": "Altro da sapere (facoltativo)",
+      "contact_title": "Vuoi essere ricontattato? (facoltativo)",
+      "contact": "Email o telefono",
+      "consent": "Acconsento a essere ricontattato su questa segnalazione.",
+      "privacy": "Non registriamo il tuo indirizzo IP. Il contatto, se lo lasci, lo vedono solo i moderatori e viene cancellato alla chiusura della segnalazione o dopo 90 giorni; il testo viene cancellato 30 giorni dopo la chiusura. Nei backup queste informazioni possono restare fino a 30 giorni in più. Conserviamo solo l'esito.",
+      "submit": "Invia",
+      "received_title": "Grazie",
+      "received_report": "Abbiamo ricevuto la segnalazione. Un moderatore la controllerà prima di cambiare la scheda.",
+      "received_still_valid": "Abbiamo ricevuto la conferma.",
+      "received_new_service": "Abbiamo ricevuto la proposta. Un moderatore la controllerà prima di pubblicarla.",
+      "later": "In questo momento non possiamo ricevere contributi. Riprova più tardi.",
+      "back": "Torna alla mappa",
+      "errors": {
+        "too_long": "Uno dei campi è troppo lungo.",
+        "category_required": "Scegli che cosa non va.",
+        "name_and_offer_required": "Servono il nome e che cosa offre.",
+        "consent_required": "Per lasciare un contatto serve il consenso.",
+        "invalid": "Non siamo riusciti a ricevere il contributo. Controlla i campi e riprova."
+      }
     }
   },
   "moderation": {

@@ -43,7 +43,6 @@ class EditorialSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="EGI_EDITORIAL_", hide_input_in_errors=True)
     database_url: SecretStr
-    intake_database_url: SecretStr | None = None
     cookie_secret: SecretStr = Field(min_length=32)
     secure_cookie: bool = True
     google_client_id: str | None = None
@@ -166,6 +165,7 @@ class Configuration:
     psql: str = '/Library/PostgreSQL/18/bin/psql'
     preview_runtime: Path = ROOT.parent / '.local/preview-db/runtime.json'
     editorial: EditorialSettings | None = None
+    intake_url: str | None = None
 
     @classmethod
     def load(cls):
@@ -188,4 +188,4 @@ class Configuration:
             rate_file=Path(os.environ.get('EGI_GEOCODER_RATE_FILE', ROOT.parent / '.local/geocoding/request.lock')),
             preview_dsn=os.environ.get('EGI_PREVIEW_DSN'),
             psql=os.environ.get('EGI_PSQL', '/Library/PostgreSQL/18/bin/psql'),
-            editorial=editorial_settings())
+            editorial=editorial_settings(), intake_url=os.environ.get('EGI_INTAKE_DATABASE_URL') or None)

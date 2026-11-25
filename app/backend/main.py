@@ -97,7 +97,9 @@ def mount_selected(application, configuration):
         return
     from .api.pages.router import router as pages
     from .api.address_search.router import router as search
+    from .api.contribute.router import router as contribute
     application.include_router(pages)
+    application.include_router(contribute)
     application.include_router(search)
     if configuration.canonical:
         from .api.directory.router import router as directory

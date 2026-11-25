@@ -195,6 +195,16 @@ Further accounts are invited from `/moderazione/account`. Tests:
 `tests/test_moderation_access.py` (needs `EGI_DATABASE_REPO`) and
 `tests/test_moderation_oidc.py` (ID token verification against a mock provider).
 
+### Visitor contributions (EGI-22)
+
+`/contribuisci` receives reports from a card's "Segnala un errore", still-valid
+signals from "Ancora valido?" and new-service proposals from the menu. It is active
+only in canonical mode with `EGI_INTAKE_DATABASE_URL` set to a login created
+`LOGIN IN ROLE egi_intake`, which may only call `editorial.submit_contribution`
+(global limits, honeypot, admin switch; no IP). Otherwise the page explains that
+contributions are not available. The form states retention and confirms receipt only.
+Tests: `tests/test_contribute.py` (needs `EGI_DATABASE_REPO`).
+
 ## Setup and start
 
 Use the selected existing FastAPI/Jinja2/Uvicorn stack in a dedicated `.venv`.

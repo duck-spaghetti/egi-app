@@ -533,6 +533,7 @@
 .service-report img { width:14px;height:14px;filter:invert(27%) sepia(64%) saturate(1500%) hue-rotate(345deg) brightness(88%); }
 
 .service-report:hover, .service-report:focus-visible { background:#f5ddd8; }
+.service-still-valid { margin-left:.5rem;font-size:.8rem;color:var(--ink-soft,#4a4a4a);text-decoration:underline; }
 
 .service-top.compact .service-extra,.service-top.compact .service-today,.service-top.compact .flag-hours,.service-top.compact .category-badge span { display:none; }
 

@@ -15,6 +15,7 @@ from .api.transport.service import Transport
 from .api.transport import network, osm_rail
 from .api.cycleways.service import Cycleways
 from .presentation.catalog import Catalog
+from .api.contribute.intake import Intake
 
 def moderation_for(settings, templates, overrides):
     """Build the moderation resources only when the editorial database is configured."""
@@ -42,6 +43,7 @@ class Resources:
     geocoder: object
     cycleways: object
     moderation: object = None
+    intake: object = None
 
     @classmethod
     def create(cls, configuration, overrides=None):
@@ -61,7 +63,8 @@ class Resources:
         return cls(cfg, templates,
             overrides.get('diagnostics') or Diagnostics(cfg.error_dir), reader, source, directory, preview,
             AddressSearch(geocoder), geocoder, Cycleways(cfg.policy, cfg.cycle_root),
-            moderation_for(cfg.editorial, templates, overrides))
+            moderation_for(cfg.editorial, templates, overrides),
+            overrides.get('intake') or (Intake(cfg.intake_url) if cfg.intake_url and cfg.canonical else None))
 
     def close(self):
         """Release only resources owned by this application's lifecycle."""
