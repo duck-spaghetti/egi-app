@@ -203,5 +203,88 @@
       "submission_created": "Submission creata con id {id}.",
       "submission_failed": "Invio fallito: {error}"
     }
+  },
+  "moderation": {
+    "title": "Moderazione",
+    "back_home": "Torna alla moderazione",
+    "nav": {
+      "accounts": "Account",
+      "sign_out": "Esci"
+    },
+    "sign_in": {
+      "title": "Accedi",
+      "google": "Accedi con Google",
+      "or": "oppure",
+      "login": "Nome utente",
+      "password": "Password",
+      "code": "Codice dell'app di autenticazione",
+      "code_hint": "Serve solo se hai attivato il codice; l'admin lo usa sempre.",
+      "submit": "Accedi",
+      "continue": "Continua"
+    },
+    "home": {
+      "greeting": "Ciao, {name}",
+      "intro": "Da qui gestisci contributi e schede dei servizi."
+    },
+    "invitation": {
+      "title": "Benvenuto, {name}",
+      "login": "Il tuo nome utente è {login}.",
+      "google": "Continua con Google",
+      "password": "Scegli una password (almeno 12 caratteri)",
+      "password_again": "Ripeti la password",
+      "totp_title": "Codice dell'app di autenticazione",
+      "totp_required": "Per l'admin è obbligatorio: aggiungi la chiave all'app e inserisci il codice che mostra.",
+      "totp_optional": "Facoltativo: se lo attivi, ti verrà chiesto a ogni accesso.",
+      "totp_key": "Chiave:",
+      "totp_link": "Apri nell'app di autenticazione",
+      "submit": "Attiva l'account"
+    },
+    "accounts": {
+      "title": "Account",
+      "name": "Persona",
+      "role": "Ruolo",
+      "state": "Stato",
+      "sessions": "Sessioni aperte",
+      "revoke": "Chiudi",
+      "reissue": "Nuovo invito",
+      "deactivate": "Disattiva",
+      "new": "Nuovo account",
+      "display_name": "Nome e cognome",
+      "create": "Crea e genera l'invito",
+      "link_title": "Link d'invito",
+      "link_hint": "Valido 48 ore e una sola volta. Copialo ora e consegnalo tu: non verrà mostrato di nuovo."
+    },
+    "roles": {
+      "admin": "Admin",
+      "moderator": "Moderatore"
+    },
+    "states": {
+      "pending": "In attesa di attivazione",
+      "active": "Attivo",
+      "deactivated": "Disattivato"
+    },
+    "methods": {
+      "password": "Password",
+      "oidc": "Google"
+    },
+    "errors": {
+      "wrong_credentials": "Nome utente, password o codice non corretti.",
+      "oidc_refused": "L'accesso con Google non è riuscito. Riprova.",
+      "unknown_identity": "Questo account Google non è collegato a nessun account EGI.",
+      "invitation_invalid": "Questo invito non è valido o è scaduto. Chiedine uno nuovo all'admin.",
+      "passwords_differ": "Le due password non coincidono.",
+      "password_too_short": "La password deve avere almeno 12 caratteri.",
+      "wrong_code": "Il codice non è corretto.",
+      "already_in_use": "Questo nome utente o account Google è già in uso.",
+      "last_admin": "Non puoi disattivare l'ultimo admin.",
+      "account_not_active": "L'account non è attivo.",
+      "account_not_reissuable": "Non si può invitare di nuovo un account disattivato.",
+      "display_name_required": "Serve il nome della persona.",
+      "second_factor_required": "Per l'admin serve il codice dell'app di autenticazione.",
+      "sign_in_refused": "Accesso non consentito.",
+      "session_invalid": "La sessione è scaduta. Accedi di nuovo.",
+      "admin_required": "Solo l'admin può farlo.",
+      "refused": "Operazione non riuscita."
+    }
   }
 }

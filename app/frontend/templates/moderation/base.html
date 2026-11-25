@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>{% block title %}{{ t('moderation.title') }}{% endblock %} · EGI</title>
+    {% block refresh %}{% endblock %}
+    <link rel="stylesheet" href="/static/css/foundations/fonts.css" />
+    <link rel="stylesheet" href="/static/css/foundations/tokens.css" />
+    <link rel="stylesheet" href="/static/css/moderation/moderation.css" />
+  </head>
+  <body class="desk">
+    <header class="desk-header">
+      <a class="desk-brand" href="/moderazione">{{ t('moderation.title') }}</a>
+      {% if person %}
+      <nav class="desk-nav">
+        {% block nav %}{% endblock %}
+        {% if person.role == 'admin' %}<a href="/moderazione/account">{{ t('moderation.nav.accounts') }}</a>{% endif %}
+        <span class="desk-person">{{ person.display_name }}</span>
+        <form method="post" action="/moderazione/esci">
+          <input type="hidden" name="form_token" value="{{ form_token }}" />
+          <button type="submit" class="link">{{ t('moderation.nav.sign_out') }}</button>
+        </form>
+      </nav>
+      {% endif %}
+    </header>
+    <main class="desk-main">
+      {% if error %}<p class="desk-error" role="alert">{{ t('moderation.errors.' ~ error) }}</p>{% endif %}
+      {% block body %}{% endblock %}
+    </main>
+  </body>
+</html>

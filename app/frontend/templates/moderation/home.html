@@ -1,0 +1,7 @@
+{% extends 'moderation/base.html' %}
+{% block body %}
+<section class="desk-card">
+  <h1>{{ t('moderation.home.greeting', name=person.display_name) }}</h1>
+  <p>{{ t('moderation.home.intro') }}</p>
+</section>
+{% endblock %}

@@ -1,0 +1,23 @@
+/* Moderation layout; shares only fonts and tokens with the public map (B3 Q5). */
+.desk { margin: 0; background: var(--bg); color: var(--ink); font-family: "IBM Plex Sans", system-ui, sans-serif; }
+.desk-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .75rem 1.25rem; border-bottom: 1px solid var(--line); background: var(--paper); }
+.desk-brand { font-family: Fraunces, serif; font-size: 1.25rem; color: var(--ink); text-decoration: none; }
+.desk-nav { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.desk-nav a { color: var(--ink); }
+.desk-person { color: var(--ink-soft); }
+.desk-main { max-width: 72rem; margin: 0 auto; padding: 1.25rem; display: grid; gap: 1.25rem; }
+.desk-card { background: var(--paper); border: 1px solid var(--line); border-radius: .5rem; padding: 1.25rem; }
+.desk-card.narrow { max-width: 28rem; }
+.desk-card.notice { border-color: var(--accent); }
+.desk-form { display: grid; gap: .75rem; }
+.desk-form label { display: grid; gap: .25rem; }
+.desk-form input, .desk-form select, .desk-link { font: inherit; padding: .5rem; border: 1px solid var(--line); border-radius: .25rem; background: #fff; }
+.desk-link { width: 100%; box-sizing: border-box; font-family: "IBM Plex Mono", monospace; }
+button, .button { font: inherit; padding: .5rem .9rem; border: 0; border-radius: .25rem; background: var(--ink); color: var(--paper); cursor: pointer; text-decoration: none; display: inline-block; }
+button.link { background: none; color: var(--ink); padding: 0; text-decoration: underline; }
+button.danger { color: var(--accent); }
+form.inline { display: inline; margin-right: .75rem; }
+.desk-or, .hint { color: var(--ink-soft); font-size: .9rem; margin: .25rem 0; }
+.desk-error { background: #fbe9e5; border: 1px solid var(--accent); padding: .75rem; border-radius: .25rem; margin: 0; }
+.desk-table { width: 100%; border-collapse: collapse; }
+.desk-table th, .desk-table td { text-align: left; padding: .5rem; border-bottom: 1px solid var(--line); vertical-align: top; }

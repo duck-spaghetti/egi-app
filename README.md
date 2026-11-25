@@ -78,8 +78,9 @@ rail and cycle runtime paths (`EGI_TRANSPORT_ROOT`, `EGI_RAIL_ROOT`,
 canonical reads; the preview store is not consulted. These layers do not select
 public-launch transport or authorize fresh acquisition/job changes.
 
-For native verification set `EGI_DATABASE_REPO` to the explicit database worktree,
-`EGI_SQITCH` to Sqitch and, if necessary, `PERL5LIB` to its local runtime library.
+For native verification set `EGI_DATABASE_REPO` to the explicit database worktree and,
+optionally, `EGI_SQITCH` to Sqitch (with `PERL5LIB` if needed); without it
+`tests/native.py` runs the plan's deploy scripts with psql in plan order.
 Use the A3 Python environment for `python -m unittest discover -s tests -v` and run
 `node --experimental-vm-modules tests/test_canonical_map.cjs` in addition to the two existing Node suites.
 The independent native harness creates only `/private/tmp/egi-app-read-*` targets.
@@ -162,6 +163,38 @@ B1 still owns module extraction, city configuration, coordinate/query privacy,
 14-day redacted errors and local fonts/libraries. The local demo disables access
 logs but does not claim that broader privacy work is complete.
 
+## Moderation (B3.1)
+
+`/moderazione` is the moderators' area (ADR 0009, 0011 of the workspace). It is not
+linked from public pages and is mounted only when `EGI_EDITORIAL_DATABASE_URL` is set.
+The database verifies each person's session; the app connects with one editorial login.
+
+| Variable | Meaning |
+| --- | --- |
+| `EGI_EDITORIAL_DATABASE_URL` | libpq string of a login created `LOGIN IN ROLE egi_editorial` |
+| `EGI_EDITORIAL_COOKIE_SECRET` | at least 32 random characters; signs form tokens and the Google sign-in cookie |
+| `EGI_EDITORIAL_SECURE_COOKIE` | `true` by default; `false` only for plain-HTTP local tests other than `localhost` |
+| `EGI_EDITORIAL_GOOGLE_CLIENT_ID`, `EGI_EDITORIAL_GOOGLE_CLIENT_SECRET` | enable "Accedi con Google"; the redirect URI to register is `<origin>/moderazione/google/ritorno` |
+| `EGI_EDITORIAL_GOOGLE_METADATA_URL` | another OpenID Connect provider's discovery document |
+
+Sign-in is by Google (bound by issuer and subject, never email) or by password
+(argon2, at least 12 characters); the admin also enters a TOTP code. Sessions last
+8 hours idle and 14 days at most. Every POST must come from this origin; signed-in
+POSTs also carry a per-session form token. New text is in `translations/it.json`
+under `moderation` (other languages fall back to Italian until B2).
+
+Create the first admin once, with the database owner's connection, and hand over the
+printed invitation link (valid 48 hours, once):
+
+```sh
+EGI_OWNER_DATABASE_URL='host=… dbname=… user=OWNER' \
+.venv/bin/python -m app.backend.api.moderation.bootstrap admin "Nome Cognome" --origin http://127.0.0.1:8000
+```
+
+Further accounts are invited from `/moderazione/account`. Tests:
+`tests/test_moderation_access.py` (needs `EGI_DATABASE_REPO`) and
+`tests/test_moderation_oidc.py` (ID token verification against a mock provider).
+
 ## Setup and start
 
 Use the selected existing FastAPI/Jinja2/Uvicorn stack in a dedicated `.venv`.
@@ -173,7 +206,7 @@ To reproduce the approved environment, from this directory:
 ```sh
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.lock.txt
-# test-only: httpx for FastAPI's in-process TestClient
+# dev lock: currently the runtime lock only (httpx is a runtime dependency since EGI-57)
 .venv/bin/python -m pip install -r requirements-dev.lock.txt
 ```
 

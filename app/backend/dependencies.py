@@ -14,6 +14,19 @@ from .api.preview.subjects import PostgresSubjectSource, run_psql
 from .api.transport.service import Transport
 from .api.transport import network, osm_rail
 from .api.cycleways.service import Cycleways
+from .presentation.catalog import Catalog
+
+def moderation_for(settings, templates, overrides):
+    """Build the moderation resources only when the editorial database is configured."""
+    if settings is None:
+        return None
+    from .api.moderation.service import Moderation
+    from .api.moderation.oidc import Oidc
+    oidc = overrides.get('oidc')
+    if oidc is None and settings.google_client_id and settings.google_client_secret:
+        oidc = Oidc(settings.google_metadata_url, settings.google_client_id, settings.google_client_secret.get_secret_value())
+    return Moderation(settings, templates, Catalog(ROOT / 'translations'), oidc, overrides.get('desk'))
+
 
 @dataclass
 class Resources:
@@ -28,6 +41,7 @@ class Resources:
     address_search: object
     geocoder: object
     cycleways: object
+    moderation: object = None
 
     @classmethod
     def create(cls, configuration, overrides=None):
@@ -43,9 +57,11 @@ class Resources:
             return resolved(reader.snapshot()['territory'] if cfg.canonical else None, cfg.policy)['country_code']
         geocoder = overrides.get('geocoder') or Geocoder(cfg.policy, country,
             cfg.geocoder_url, cfg.rate_file)
-        return cls(cfg, Jinja2Templates(directory=ROOT / 'app/frontend/templates'),
+        templates = Jinja2Templates(directory=ROOT / 'app/frontend/templates')
+        return cls(cfg, templates,
             overrides.get('diagnostics') or Diagnostics(cfg.error_dir), reader, source, directory, preview,
-            AddressSearch(geocoder), geocoder, Cycleways(cfg.policy, cfg.cycle_root))
+            AddressSearch(geocoder), geocoder, Cycleways(cfg.policy, cfg.cycle_root),
+            moderation_for(cfg.editorial, templates, overrides))
 
     def close(self):
         """Release only resources owned by this application's lifecycle."""
