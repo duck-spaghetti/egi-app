@@ -59,3 +59,34 @@ class Cluster:
         if (self.base/"data/postmaster.pid").exists():
             subprocess.run([PG/"pg_ctl", "-D", self.base/"data", "-m", "immediate", "-w", "stop"], stdout=subprocess.DEVNULL)
         shutil.rmtree(self.base)
+
+
+def people(cluster: Cluster, desk_login: str) -> dict:
+    """Create an admin and two moderators with open sessions; return cookie tokens and actors.
+
+    The owner bootstraps the admin; everything else runs as the editorial login, as the
+    app would. Session tokens are returned in clear for test cookies only.
+    """
+    import getpass
+    import hashlib
+    import psycopg
+
+    def digest(token):
+        """Hash a token as the app does."""
+        return hashlib.sha256(token.encode()).hexdigest()
+    with psycopg.connect(cluster.dsn(getpass.getuser()), autocommit=True) as owner:
+        admin = owner.execute("SELECT access.bootstrap_admin('admin1','Admin One',%s)", (digest('inv-admin'),)).fetchone()[0]
+    found = {}
+    with psycopg.connect(cluster.dsn(desk_login), autocommit=True) as desk:
+        desk.execute("SELECT access.accept_invitation(%s,'password','$argon2id$x',NULL,NULL,'JBSWY3DPEHPK3PXP')", (digest('inv-admin'),))
+        desk.execute("SELECT access.open_session(%s,%s,'password',true)", (admin, digest('admin')))
+        for login, name in (('mod1', 'Mod One'), ('mod2', 'Mod Two')):
+            with desk.transaction():
+                desk.execute('SELECT access.verify_session(%s)', (digest('admin'),))
+                account = desk.execute("SELECT access.create_account(%s,%s,'moderator',%s)", (login, name, digest('inv-' + login))).fetchone()[0]
+            desk.execute("SELECT access.accept_invitation(%s,'oidc',NULL,'https://accounts.google.com',%s,NULL)", (digest('inv-' + login), 'sub-' + login))
+            desk.execute("SELECT access.open_session(%s,%s,'oidc',false)", (account, digest(login)))
+        for login in ('admin', 'mod1', 'mod2'):
+            with desk.transaction():
+                found[login] = desk.execute('SELECT access.verify_session(%s)', (digest(login),)).fetchone()[0]['actor_id']
+    return {login: {'token': login, 'actor': actor} for login, actor in found.items()}

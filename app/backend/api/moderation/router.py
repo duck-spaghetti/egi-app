@@ -239,3 +239,7 @@ async def revoke(request: Request, session: str, module: Moderation = Depends(mo
     person = admin(request, module)
     module.desk.as_person(module.session_hash(request), 'SELECT access.revoke_session(%s)', (session,))
     return accounts_page(request, module, person)
+
+
+from .queue import router as queue_router  # noqa: E402  (after this module's routes, same prefix)
+router.include_router(queue_router)

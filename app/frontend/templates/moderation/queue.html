@@ -1,0 +1,35 @@
+{% extends 'moderation/base.html' %}
+{% block body %}
+<section class="desk-card">
+  <h1>{{ t('moderation.queue.title') }}</h1>
+  <form method="get" action="/moderazione/coda" class="desk-filters">
+    <label>{{ t('moderation.queue.state') }}<select name="stato"><option value="">{{ t('moderation.queue.open') }}</option>
+      {% for code in states %}<option value="{{ code }}" {% if filters.stato == code %}selected{% endif %}>{{ t('moderation.contribution_states.' ~ code) }}</option>{% endfor %}</select></label>
+    <label>{{ t('moderation.queue.kind') }}<select name="tipo"><option value="">—</option>
+      {% for code in kinds %}<option value="{{ code }}" {% if filters.tipo == code %}selected{% endif %}>{{ t('moderation.kinds.' ~ code) }}</option>{% endfor %}</select></label>
+    <label>{{ t('moderation.queue.category') }}<select name="categoria"><option value="">—</option>
+      {% for code in categories %}<option value="{{ code }}" {% if filters.categoria == code %}selected{% endif %}>{{ t('contribute.intake.categories.' ~ code) }}</option>{% endfor %}</select></label>
+    <label>{{ t('moderation.queue.waiting') }}<select name="attesa"><option value="">—</option>
+      {% for code in reasons %}<option value="{{ code }}" {% if filters.attesa == code %}selected{% endif %}>{{ t('moderation.reasons.' ~ code) }}</option>{% endfor %}</select></label>
+    <label>{{ t('moderation.queue.claimant') }}<select name="in_carico"><option value="">—</option>
+      <option value="me" {% if filters.in_carico == 'me' %}selected{% endif %}>{{ t('moderation.queue.mine') }}</option>
+      <option value="none" {% if filters.in_carico == 'none' %}selected{% endif %}>{{ t('moderation.queue.unclaimed') }}</option></select></label>
+    <button type="submit">{{ t('moderation.queue.filter') }}</button>
+  </form>
+</section>
+{% if not services and not singles %}<section class="desk-card"><p>{{ t('moderation.queue.empty') }}</p></section>{% endif %}
+{% for service in services %}
+<section class="desk-card queue-service">
+  <h2>{{ service.name }}</h2>
+  <ul class="queue-list">
+    {% for row in service.contributions %}{% include 'moderation/queue_row.html' %}{% endfor %}
+  </ul>
+</section>
+{% endfor %}
+{% if singles %}
+<section class="desk-card">
+  <h2>{{ t('moderation.queue.new_services') }}</h2>
+  <ul class="queue-list">{% for row in singles %}{% include 'moderation/queue_row.html' %}{% endfor %}</ul>
+</section>
+{% endif %}
+{% endblock %}

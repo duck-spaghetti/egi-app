@@ -15,6 +15,7 @@
       <a class="desk-brand" href="/moderazione">{{ t('moderation.title') }}</a>
       {% if person %}
       <nav class="desk-nav">
+        <a href="/moderazione/coda">{{ t('moderation.nav.queue') }}</a>
         {% block nav %}{% endblock %}
         {% if person.role == 'admin' %}<a href="/moderazione/account">{{ t('moderation.nav.accounts') }}</a>{% endif %}
         <span class="desk-person">{{ person.display_name }}</span>

@@ -1,0 +1,6 @@
+<li>
+  <a href="/moderazione/contributo/{{ row.contribution_id }}">{{ t('moderation.kinds.' ~ row.kind) }}{% if row.category %} · {{ t('contribute.intake.categories.' ~ row.category) }}{% endif %}</a>
+  <span class="badge state-{{ row.state }}">{{ t('moderation.contribution_states.' ~ row.state) }}{% if row.waiting_reason %}: {{ t('moderation.reasons.' ~ row.waiting_reason) }}{% endif %}</span>
+  {% if row.claimed_by_name %}<span class="hint">{{ t('moderation.queue.claimed_by', name=row.claimed_by_name) }}</span>{% endif %}
+  <span class="hint">{{ row.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
+</li>

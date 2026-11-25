@@ -255,7 +255,8 @@
     "back_home": "Torna alla moderazione",
     "nav": {
       "accounts": "Account",
-      "sign_out": "Esci"
+      "sign_out": "Esci",
+      "queue": "Coda"
     },
     "sign_in": {
       "title": "Accedi",
@@ -270,7 +271,9 @@
     },
     "home": {
       "greeting": "Ciao, {name}",
-      "intro": "Da qui gestisci contributi e schede dei servizi."
+      "intro": "Da qui gestisci contributi e schede dei servizi.",
+      "open_queue": "Apri la coda",
+      "admin_cases": "Casi che aspettano l'admin"
     },
     "invitation": {
       "title": "Benvenuto, {name}",
@@ -330,7 +333,77 @@
       "sign_in_refused": "Accesso non consentito.",
       "session_invalid": "La sessione è scaduta. Accedi di nuovo.",
       "admin_required": "Solo l'admin può farlo.",
-      "refused": "Operazione non riuscita."
+      "refused": "Operazione non riuscita.",
+      "claimed_by_other": "È già in carico a un'altra persona: puoi subentrare.",
+      "nothing_to_take_over": "Non c'è nulla da prendere.",
+      "not_claimed_by_you": "Non è in carico a te.",
+      "assignee_not_active": "Questa persona non è attiva.",
+      "no_submitter_contact": "Il segnalante non ha lasciato un contatto.",
+      "not_waiting": "Il contributo non è in attesa.",
+      "contribution_closed": "Il contributo è già chiuso.",
+      "contribution_not_found": "Contributo non trovato."
+    },
+    "queue": {
+      "title": "Coda dei contributi",
+      "state": "Stato",
+      "open": "Aperti",
+      "kind": "Tipo",
+      "category": "Categoria",
+      "waiting": "In attesa per",
+      "claimant": "In carico",
+      "mine": "A me",
+      "unclaimed": "A nessuno",
+      "filter": "Filtra",
+      "empty": "Nessun contributo con questi filtri.",
+      "new_services": "Proposte di nuovi servizi",
+      "claimed_by": "in carico a {name}",
+      "back": "← Torna alla coda"
+    },
+    "contribution_states": {
+      "new": "Nuovo",
+      "claimed": "In carico",
+      "waiting": "In attesa",
+      "closed": "Chiuso"
+    },
+    "kinds": {
+      "report": "Segnalazione",
+      "still_valid": "Ancora valido",
+      "new_service": "Nuovo servizio"
+    },
+    "reasons": {
+      "evidence": "serve evidenza",
+      "submitter": "serve il segnalante",
+      "admin": "serve l'admin"
+    },
+    "decisions": {
+      "accepted": "accettata",
+      "amended": "modificata",
+      "rejected": "rifiutata"
+    },
+    "events": {
+      "submitted": "inviato",
+      "claimed": "preso in carico",
+      "released": "lasciato",
+      "reassigned": "riassegnato",
+      "taken_over": "subentro",
+      "waiting": "messo in attesa",
+      "resumed": "ripreso",
+      "proposal_decided": "proposta decisa",
+      "closed": "chiuso"
+    },
+    "contribution": {
+      "service": "Servizio:",
+      "contact": "Contatto del segnalante (solo per i moderatori):",
+      "proposals": "Proposte",
+      "work": "Lavorazione",
+      "claim": "Prendi in carico",
+      "release": "Lascia",
+      "take_over": "Subentra",
+      "reassign": "Assegna",
+      "resume": "Riprendi (nessuna attesa)",
+      "set_waiting": "Imposta l'attesa",
+      "history": "Storia",
+      "visitor": "visitatore"
     }
   }
 }

@@ -26,3 +26,16 @@ form.inline { display: inline; margin-right: .75rem; }
 .desk-form fieldset { border: 1px solid var(--line); border-radius: .25rem; display: grid; gap: .5rem; }
 /* Honeypot: off-screen for people, present for bots. */
 .trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.desk-filters { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; }
+.desk-filters label { display: grid; gap: .25rem; font-size: .9rem; }
+.desk-filters select { font: inherit; padding: .35rem; }
+.queue-list { list-style: none; padding: 0; margin: 0; display: grid; gap: .5rem; }
+.queue-list li { display: flex; flex-wrap: wrap; gap: .75rem; align-items: baseline; }
+.badge { font-size: .8rem; padding: .1rem .5rem; border-radius: 1rem; background: var(--line); }
+.badge.state-new { background: #fde8c8; }
+.badge.state-waiting { background: #e6e0f5; }
+.badge.state-closed { background: #dfeedd; }
+.desk-actions { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
+.desk-inline-form { display: flex; gap: .5rem; align-items: center; }
+.desk-quote { margin: .5rem 0; padding: .5rem .75rem; border-left: 3px solid var(--line); background: #fff; white-space: pre-wrap; }
+.desk-history { padding-left: 1.25rem; color: var(--ink-soft); }

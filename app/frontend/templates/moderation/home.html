@@ -3,5 +3,7 @@
 <section class="desk-card">
   <h1>{{ t('moderation.home.greeting', name=person.display_name) }}</h1>
   <p>{{ t('moderation.home.intro') }}</p>
+  <p><a class="button" href="/moderazione/coda">{{ t('moderation.home.open_queue') }}</a>
+  {% if person.role == 'admin' %}<a href="/moderazione/coda?stato=waiting&amp;attesa=admin">{{ t('moderation.home.admin_cases') }}</a>{% endif %}</p>
 </section>
 {% endblock %}

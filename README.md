@@ -191,8 +191,12 @@ EGI_OWNER_DATABASE_URL='host=… dbname=… user=OWNER' \
 .venv/bin/python -m app.backend.api.moderation.bootstrap admin "Nome Cognome" --origin http://127.0.0.1:8000
 ```
 
-Further accounts are invited from `/moderazione/account`. Tests:
-`tests/test_moderation_access.py` (needs `EGI_DATABASE_REPO`) and
+Further accounts are invited from `/moderazione/account`. `/moderazione/coda` lists
+contributions grouped by service, filtered by state, kind, category, waiting reason
+and claimant; a contribution page shows its text, the submitter's contact, proposals
+and history, and lets a person claim, take over, release, reassign or set a waiting
+reason ("serve l'admin" puts it in the admin's view). Tests:
+`tests/test_moderation_access.py`, `tests/test_moderation_queue.py` (need `EGI_DATABASE_REPO`) and
 `tests/test_moderation_oidc.py` (ID token verification against a mock provider).
 
 ### Visitor contributions (EGI-22)
