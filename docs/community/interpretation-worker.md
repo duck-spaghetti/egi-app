@@ -112,3 +112,9 @@ checks passed after hardening nullable cleanup so unknown null keys remain inval
 The prior full suite passed 181 tests (six prerequisite skips); the additional null
 case is covered by that final targeted run. The supervision template passes plutil
 syntax validation; the worker CLI help runs. No actual provider call was made.
+
+Fixture protection: synthetic configurations carry `fixture_only:true`. The adapter
+refuses them unless the injected transport is httpx.MockTransport, even if a real
+key exists locally. The ordinary network worker therefore cannot accidentally send
+demo material through a synthetic configuration. Seven controlled provider tests
+and the native integration tests passed with this guard enabled.

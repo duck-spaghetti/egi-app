@@ -4,7 +4,7 @@ from uuid import uuid4
 
 
 CONFIG = {'provider':'openai','api':'responses','model':'fixture-model','store':False,
-          'live_authorized':True,'language_version':'fixture-languages/1','taxonomy_version':'fixture-taxonomy/1'}
+          'live_authorized':True,'fixture_only':True,'language_version':'fixture-languages/1','taxonomy_version':'fixture-taxonomy/1'}
 
 
 def request(text='Sportello') -> dict:

@@ -122,6 +122,11 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(calls,[])
         self.assertEqual(adapter.response['usage']['input_tokens'],0)
 
+    def test_fixture_configuration_cannot_use_real_network_transport(self):
+        """A demo/test configuration remains unable to send to the actual provider."""
+        with self.assertRaises(ConfigurationError):
+            OpenAIAdapter(CONFIG,SecretStr('fake-key'),300000,2000)
+
     def test_configuration_requires_explicit_data_and_dispatch_settings(self):
         """A key alone is insufficient to authorize live provider dispatch."""
         for field,value in (('store',True),('live_authorized',False),('provider','other'),('model','bad model')):

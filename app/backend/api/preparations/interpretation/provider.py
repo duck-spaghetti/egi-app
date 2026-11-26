@@ -16,7 +16,7 @@ from .schema import clean_result, output_schema
 ENDPOINT = 'https://api.openai.com/v1/responses'
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 CONFIG_KEYS = {'provider', 'api', 'model', 'store', 'live_authorized', 'language_version',
-               'taxonomy_version', 'timeout_seconds', 'reasoning_effort'}
+               'taxonomy_version', 'timeout_seconds', 'reasoning_effort', 'fixture_only'}
 
 
 class ConfigurationError(ValueError):
@@ -35,6 +35,8 @@ def validate_config(config: dict) -> dict:
     for key in ('language_version','taxonomy_version'):
         if not isinstance(config[key], str) or not 1 <= len(config[key]) <= 100:
             raise ConfigurationError('invalid_provider_configuration')
+    if 'fixture_only' in config and type(config['fixture_only']) is not bool:
+        raise ConfigurationError('invalid_provider_configuration')
     timeout = config.get('timeout_seconds', 120)
     if type(timeout) not in (int,float) or not 5 <= timeout <= 300:
         raise ConfigurationError('invalid_provider_timeout')
@@ -49,6 +51,8 @@ class OpenAIAdapter:
     def __init__(self, config: dict, api_key: SecretStr, max_input: int, max_output: int, transport=None):
         """Validate frozen limits/settings; inject a transport only for controlled tests."""
         self.config = validate_config(config)
+        if self.config.get('fixture_only') and not isinstance(transport,httpx.MockTransport):
+            raise ConfigurationError('fixture_provider_requires_mock_transport')
         if not isinstance(api_key, SecretStr) or not api_key.get_secret_value() or type(max_input) is not int or type(max_output) is not int or min(max_input,max_output) <= 0:
             raise ConfigurationError('invalid_provider_configuration')
         self.api_key, self.max_input, self.max_output = api_key, max_input, max_output
