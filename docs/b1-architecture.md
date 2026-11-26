@@ -79,6 +79,9 @@ specific page actions instead of importing other feature state or DOM.
 `features/map/sites.js` owns exact-position grouping separately from Leaflet. A
 marker reflects filtered matches; the selector/detail can show all public siblings
 with out-of-filter labels. Each retains its own identity and attributes.
+`features/map/pins.js` owns the site pin markup, its accessible label and the
+selection payload (`siteMarkers`), with no map library: every map module wraps the
+same markup in its own marker type.
 
 `http.js` is the concrete request Adapter. It checks the page lifecycle after both
 fetch and JSON completion. `lifecycle.js` owns cancellation/listeners/timers/cleanup and the actual
