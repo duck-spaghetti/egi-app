@@ -2,9 +2,9 @@
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 function element(){
  const classes=new Set(),listeners={};
- return {dataset:{},style:{},hidden:false,value:'',innerHTML:'',textContent:'',children:[],isConnected:true,selectedOptions:[],
+ return {dataset:{},style:{},attributes:{},hidden:false,value:'',innerHTML:'',textContent:'',children:[],isConnected:true,selectedOptions:[],
  classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x),toggle(x,on){if(on??!classes.has(x))classes.add(x);else classes.delete(x);}},
- setAttribute(){},toggleAttribute(){},getClientRects:()=>[{}],addEventListener(name,fn){listeners[name]=fn;},
+ setAttribute(k,v){this.attributes[k]=v;},getAttribute(k){return this.attributes[k]??null;},toggleAttribute(){},getClientRects:()=>[{}],addEventListener(name,fn){listeners[name]=fn;},
  querySelector:()=>element(),querySelectorAll:()=>[],append(x){this.children.push(x);},appendChild(x){this.children.push(x);},replaceChildren(){this.children=[];},focus(){},scrollTo(){},contains:()=>true,
  click(){listeners.click?.({target:this});},dispatch(name,event){listeners[name]?.(event);}};
 }

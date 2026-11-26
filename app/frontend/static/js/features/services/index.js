@@ -159,7 +159,7 @@ async function load(language) {
  const categories=projection.applyCategoryLabels(projection.mergeServiceCategories(bundle.categories
   .filter(c=>c.area_id==null||Number(c.area_id)===Number(context.cityId)).map(projection.normalizeCategory),bundle.rows));
  return {categories,pois:bundle.rows.map(projection.normalizePublicService).filter(Boolean),languages:bundle.languages,
-  cityOptions:bundle.areas.map(projection.normalizeArea),categoryTranslations:bundle.categoryTranslations,taxonomy:bundle.taxonomy};
+  cityOptions:bundle.areas.map(projection.normalizeArea),categoryTranslations:bundle.categoryTranslations,taxonomy:{...bundle.taxonomy,needs:(bundle.taxonomy.needs||[]).map(projection.displayCategory)}};
 }
 function update(snapshot,list) {state=snapshot;if(list)renderList(list);}
 function dispose(){document.getElementById('detail-body').onscroll=null;}

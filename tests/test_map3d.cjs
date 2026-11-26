@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict');const {environment}=require('./module_fixture.cjs');
 function fakeMapLibre(zoom=16){
  const created={maps:[],markers:[],protocols:[]};
- class Map{constructor(options){this.options=options;this.handlers={};this.controls=[];this.zoom=zoom;this.removed=false;this.bearing=0;this.pitch=0;created.maps.push(this);}
+ class Map{constructor(options){this.options=options;this.handlers={};this.controls=[];this.zoom=zoom;this.removed=false;this.bearing=0;this.pitch=options.pitch;created.maps.push(this);}
   on(name,fn){(this.handlers[name]||=[]).push(fn);} once(name,fn){this.on(name,fn);} off(){}
   fire(name,event={}){(this.handlers[name]||[]).forEach(fn=>fn(event));}
   addControl(control,position){this.controls.push({control,position,element:control.onAdd?.(this)});}
@@ -29,7 +29,7 @@ const live=c=>c.markers.filter(m=>!m.removed&&m.options.element.children?.[0]);
  const key=p=>`${p.latitude}:${p.longitude}`;
  const sites={groups:list=>{const g=new Map();list.forEach(p=>{if(!g.has(key(p)))g.set(key(p),[]);g.get(key(p)).push(p);});return [...g.values()];},
   siblings:poi=>pois.filter(p=>key(p)===key(poi))};
- const describe=p=>({category:p.cat});
+ let status='open';const describe=p=>({category:p.cat,status:{kind:status,label:status}});
  // Same sites and counts as the current module for the same list.
  const leafletMarkers=[];const L={latLngBounds:()=>({contains:()=>true}),latLng:()=>({}),divIcon:o=>o,
   map:()=>({setView(){return this;},attributionControl:{setPrefix(){}},getBoundsZoom:()=>10,setMinZoom(){},on(){},setMaxBounds(){},panInsideBounds(){},hasLayer:()=>true,addLayer(){},remove(){}}),
@@ -38,7 +38,7 @@ const live=c=>c.markers.filter(m=>!m.removed&&m.options.element.children?.[0]);
  const flat=createMap({context,sites,describe,emit(){},leaflet:L});flat.mount();flat.update({},pois);
  const events=[];const {lib,created}=fakeMapLibre(16);
  const map=createMap3d({context,sites,describe,emit:(type,payload)=>events.push([type,payload]),maplibre:lib,pmtiles:{Protocol:class{tile(){}}},origin:'http://localhost',reduceMotion:true});
- map.mount();const gl=created.maps[0];
+ map.mount();const gl=created.maps[0];assert.equal(gl.pitch,45,"3D starts inclined");
  same(created.protocols,['pmtiles']);
  assert.equal(gl.options.style.sources.basemap.url,'pmtiles://http://localhost/map3d/20261126T120000Z/basemap.pmtiles');
  assert.equal(gl.options.pixelRatio<=2,true);assert.equal(gl.options.touchPitch,false);assert.equal(gl.options.renderWorldCopies,false);
@@ -57,6 +57,13 @@ const live=c=>c.markers.filter(m=>!m.removed&&m.options.element.children?.[0]);
  // Clustering below z15: nearby sites merge into one button.
  gl.zoom=12;gl.fire('moveend');const clusters=live(created).filter(m=>m.getElement().children[0].className==='map3d-cluster');
  assert.equal(clusters.length,1);assert.equal(clusters[0].getElement().children[0].textContent,'2');
+ map.update({selectedId:3},pois);assert.equal(live(created).filter(m=>m.getElement().children[0].className==='map3d-cluster').length,0,'selected site stays individually reachable');
+ map.update({selectedId:2},pois.filter(p=>p.id!==2));assert.equal(live(created).filter(m=>m.getElement().children[0].className==='map3d-cluster').length,0,'selected filtered-out sibling preserves its site');
+ gl.zoom=17;map.update({},pois);
+ const suppressed=live(created).find(m=>/^B:/.test(m.getElement().children[0].title)).getElement().children[0];
+ assert(!suppressed.innerHTML.includes('map3d-site-label'));
+ assert(suppressed.getAttribute('aria-label').includes('open'));
+ status='closed';map.update({},pois);assert(suppressed.getAttribute('aria-label').includes('closed'),'accessible hours refresh even without visible label');
  gl.zoom=16;gl.fire('moveend');
  // Reference pick emits the same event as the current map, only while choosing.
  gl.fire('click',{lngLat:{lat:41.9,lng:12.5}});assert.notEqual(events.at(-1)[0],'pickedReference');
@@ -65,7 +72,7 @@ const live=c=>c.markers.filter(m=>!m.removed&&m.options.element.children?.[0]);
  map.update({userLoc:{lat:41.9,lng:12.5}},pois);assert(created.markers.some(m=>!m.removed&&/user-dot/.test(m.getElement().innerHTML)));
  // Controls: rotation and tilt only by explicit buttons.
  const box=gl.controls[1].element;assert.equal(box.children.length,3);
- box.children[1].click();assert.equal(gl.bearing,30);box.children[2].click();assert.equal(gl.pitch,55);
+ box.children[1].click();assert.equal(gl.bearing,30);box.children[2].click();assert.equal(gl.pitch,0);box.children[2].click();assert.equal(gl.pitch,55);
  // Interface parity.
  assert.equal(map.contains(41.9,12.5),true);assert.equal(map.contains(45,9),false);
  map.center(41.9,12.5);same(gl.last.center,[12.5,41.9]);

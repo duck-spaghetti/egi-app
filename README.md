@@ -768,18 +768,30 @@ The vector-tile bare point-geometry import alone is rewritten to a relative impo
 
 ### Live buses in 3D
 
-The keyboard-operable **Live buses** control is off initially. It polls the local
+The keyboard-operable **Live buses** control is inside **Layers**, off initially. It polls the local
 vehicles endpoint every 20 seconds only while enabled, the page is visible and
 MapLibre zoom is at least 15. Area/line selections travel only in POST bodies.
-Comma-separated line codes restrict the viewed area. Vehicles are 12 × 2.6 × 3.2 m
-yellow boxes, oriented by supplied bearing or observed movement; labels start at
+Comma-separated line codes restrict the viewed area. Vehicles use deliberately enlarged 18 × 4 × 4.8 m
+yellow map symbols, oriented by supplied bearing or observed movement; labels start at
 zoom 16. Snapshots interpolate for one second without extrapolation. Reduced motion
 updates immediately. Positions older than 120 seconds (or with unknown age) fade;
 a feed older than 180 seconds is cleared and announced, including while waiting
 for a slow response. Turning off, hiding the page and disposal cancel requests and
-timers. Roma Mobilità / CC BY-SA is visible while enabled.
+timers. Unchanged geometry is not resubmitted, and fresh buses remain visible during
+a viewport refresh. Roma Mobilità / CC BY-SA remains in the map attribution.
 
 M2 remains a local candidate: the user deferred Catalan support and legal-notice
 updates; those five-language/notice criteria are explicitly unsatisfied. M1 phone
 acceptance remains pending. This feature does not install offline/PWA caching;
 walking works on locally available basemap tiles and never calls an external router.
+
+### Local M2 map review
+
+3D starts at 45° pitch. Layers and the view switch share a toolbar. Screen-space
+clusters merge neighbours across cells, with translucent teal symbols sized and
+shaded by site count. At z16 service pins gain ground stems and names; at z17 they
+add categories and existing opening-status text/dots. Additional labels avoid one
+another and flip away from the right edge. Unknown, course and unverified hours
+retain their existing meaning. Category icons share a stroke style (plain shield,
+compass, graduation cap and briefcase); Orientation has a short UI label. Stored
+source taxonomy and the 2D map behavior remain unchanged.

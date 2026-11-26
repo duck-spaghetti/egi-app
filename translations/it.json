@@ -112,7 +112,9 @@
       "tilt": "Inclina la vista",
       "cluster": "{count} luoghi in quest'area: avvicina",
       "look": "Guarda l'edificio",
-      "slow": "La vista 3D è lenta su questo dispositivo: puoi tornare alla mappa piana."
+      "slow": "La vista 3D è lenta su questo dispositivo: puoi tornare alla mappa piana.",
+      "site_open": "{open}/{total} servizi aperti",
+      "hours_unknown": "Orario da verificare"
     },
     "walk": {
       "action": "Vai a piedi",
@@ -132,7 +134,8 @@
       "stale": "Dati dei bus non aggiornati.",
       "unavailable": "Bus in tempo reale non disponibili.",
       "loading": "Carico le posizioni dei bus…"
-    }
+    },
+    "category_orientation": "Orientamento"
   },
   "contribute": {
     "title": "Nuovo servizio",

@@ -112,7 +112,9 @@
       "tilt": "Tilt the view",
       "cluster": "{count} places in this area: zoom in",
       "look": "Look at the building",
-      "slow": "The 3D view is slow on this device: you can go back to the flat map."
+      "slow": "The 3D view is slow on this device: you can go back to the flat map.",
+      "site_open": "{open}/{total} services open",
+      "hours_unknown": "Hours to verify"
     },
     "walk": {
       "action": "Walk there",
@@ -132,7 +134,8 @@
       "stale": "Bus feed is out of date.",
       "unavailable": "Live buses unavailable.",
       "loading": "Loading bus positions…"
-    }
+    },
+    "category_orientation": "Orientation"
   },
   "contribute": {
     "title": "New service",

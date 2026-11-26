@@ -1,4 +1,5 @@
 import {siteMarkers,USER_DOT_HTML,USER_DOT_LABEL} from "../map/pins.js";
+import {clusterSites,clusterAppearance,siteLabel,CLUSTER_DISTANCE,NAME_ZOOM,DETAIL_ZOOM} from "./sites.js";
 import {egiStyle,liftBridgeLabels} from "./style.js";
 /** createMap3d: the 3D mode's map module, on MapLibre GL JS, with the current map's interface.
  *
@@ -6,12 +7,12 @@ import {egiStyle,liftBridgeLabels} from "./style.js";
  * servicesVisible and dispose behave as in features/map/index.js. Services are upright,
  * keyboard-focusable HTML markers from the shared pin markup and site grouping; at
  * zoom < CLUSTER_MAX_ZOOM sites closer than CLUSTER_PX on screen form one cluster button.
- * Rotation by buttons, compass reset and keyboard; tilt only by its own control;
+ * Initial pitch 45°; rotation by buttons, compass reset and keyboard; explicit tilt control;
  * reduced motion respected. maplibre is the vendored module, pmtiles the reader
  * (both injected, so tests can pass fakes).
  */
 const PROTOCOLS = new WeakSet(); // MapLibre instances with the pmtiles protocol registered
-export const CLUSTER_PX = 48, CLUSTER_MAX_ZOOM = 15, TILT = 55, ROTATE_STEP = 30;
+export const CLUSTER_PX = CLUSTER_DISTANCE, CLUSTER_MAX_ZOOM = 16, TILT = 55, ROTATE_STEP = 30;
 // Budget (spec, Performance): at least 30 fps while moving, JS memory under 150 MB.
 export const MIN_FPS = 30, MAX_HEAP_MB = 150, BUDGET_SAMPLES = 3;
 
@@ -41,7 +42,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   const map=runtime.map=new maplibre.Map({
    container:"map",style:egiStyle(base),
    center:[Number(context.longitude),Number(context.latitude)],zoom:Math.max(Number(context.zoom)||12,11),
-   pitch:0,maxPitch:60,touchPitch:false,pitchWithRotate:false,
+   pitch:45,maxPitch:60,touchPitch:false,pitchWithRotate:false,
    // Attributions (CTRN Regione Lazio, OpenStreetMap, Protomaps) always shown in full.
    attributionControl:{compact:false},fadeDuration:reduceMotion?0:300,
    // Pixel ratio capped at 2 (3x screens would draw 2.25 times the pixels for no visible
@@ -95,24 +96,18 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
    const tilt=button("tilt","Inclina la vista","⛰",()=>{
     const flat=runtime.map.getPitch()<1;move({pitch:flat?TILT:0});tilt.setAttribute("aria-pressed",String(flat));
    });
-   tilt.setAttribute("aria-pressed","false");
+   tilt.setAttribute("aria-pressed",String(runtime.map.getPitch()>=1));
    runtime.map.on("pitchend",()=>tilt.setAttribute("aria-pressed",String(runtime.map.getPitch()>=1)));
    for(const b of [button("rotate_left","Ruota a sinistra","⟲",()=>rotate(-ROTATE_STEP)),button("rotate_right","Ruota a destra","⟳",()=>rotate(ROTATE_STEP)),tilt])box.append(b);
    return box;
   },onRemove(){box?.remove();}};
  }
 
- /** Clusters of sites closer than CLUSTER_PX on screen (none from CLUSTER_MAX_ZOOM). */
+ /** Keep a selected site reachable while grouping other nearby sites. */
  function cluster(entries) {
-  const map=runtime.map;
-  if(map.getZoom()>=CLUSTER_MAX_ZOOM)return entries.map(site=>({site,members:[site]}));
-  const cells=new Map();
-  for(const site of entries){
-   const p=map.project([site.lng,site.lat]);
-   const key=`${Math.floor(p.x/CLUSTER_PX)}:${Math.floor(p.y/CLUSTER_PX)}`;
-   if(!cells.has(key))cells.set(key,[]);cells.get(key).push(site);
-  }
-  return [...cells.values()].map(members=>({site:members[0],members}));
+  const selected=entries.filter(site=>site.serviceIds.includes(String(state.selectedId)));
+  const rest=entries.filter(site=>!selected.includes(site));
+  return [...selected.map(site=>({site,members:[site]})),...clusterSites(rest,p=>runtime.map.project(p),runtime.map.getZoom(),CLUSTER_MAX_ZOOM)];
  }
 
  function wrap(el){const box=document.createElement("div");box.className="map3d-marker";box.append(el);return box;}
@@ -120,7 +115,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
  function render() {
   const map=runtime.map;
   if(!map||disposed)return;
-  const next=new Map();
+  const next=new Map(),labels=[];
   if(visible){
    for(const {site,members} of cluster(siteMarkers(list,{sites,describe}))){
     const count=members.length;
@@ -132,6 +127,8 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
      const el=document.createElement("button");el.type="button";
      if(count>1){
       el.className="map3d-cluster";el.textContent=String(count);
+      const appearance=clusterAppearance(count);el.style.width=`${appearance.size}px`;el.style.height=`${appearance.size}px`;
+      el.style.background=appearance.background;el.style.color=appearance.ink;
       el.setAttribute("aria-label",translate("map.map3d.cluster",{count},`${count} luoghi in quest'area: avvicina`));
       el.addEventListener("click",()=>move({center:entry.data.lngLat,zoom:Math.min(map.getZoom()+2,CLUSTER_MAX_ZOOM)}));
      }else{
@@ -143,8 +140,25 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
       pitchAlignment:"viewport",rotationAlignment:"viewport"}).setLngLat(lngLat).addTo(map);
     }
     entry.data={site,lngLat};
-    if(count===1&&entry.el.dataset.html!==site.html+site.label){
-     entry.el.innerHTML=site.html;entry.el.setAttribute("aria-label",site.label);entry.el.title=site.label;entry.el.dataset.html=site.html+site.label;
+    if(count===1){
+     const selected=site.serviceIds.includes(String(state.selectedId));
+     const anchored=map.getZoom()>=NAME_ZOOM,detail=selected||map.getZoom()>=DETAIL_ZOOM;
+     const point=map.project(lngLat),width=detail?240:200,viewport=map.getContainer?.();
+     const screenWidth=viewport?.clientWidth||Infinity,screenHeight=viewport?.clientHeight||Infinity;
+     const leftSide=point.x+30+width>screenWidth-140;
+     const left=leftSide?point.x-30-width:point.x+30;
+     const box={left,right:left+width,top:point.y-80,bottom:point.y-(detail?0:42)};
+     const onScreen=box.right>0&&box.left<screenWidth&&box.bottom>0&&box.top<screenHeight;
+     entry.el.dataset.labelSide=leftSide?'left':'right';
+     const overlap=labels.some(b=>box.left<b.right&&box.right>b.left&&box.top<b.bottom&&box.bottom>b.top);
+     const labelled=(selected||anchored)&&onScreen&&(!overlap||selected);
+     if(labelled)labels.push(box);
+     const html=`<span class="map3d-pin-body">${site.html}${labelled?siteLabel(site,detail,translate):''}</span><span class="map3d-stem" aria-hidden="true"></span><span class="map3d-ground" aria-hidden="true"></span>`;
+     entry.el.dataset.anchored=String(anchored);entry.el.dataset.selected=String(selected);
+     const accessible=[site.label,...detail?(site.statuses||[]).map(s=>s?.label):[]].filter(Boolean).join(" · ");
+     if(entry.el.dataset.html!==html+accessible){
+      entry.el.innerHTML=html;entry.el.setAttribute("aria-label",accessible);entry.el.title=site.label;entry.el.dataset.html=html+accessible;
+     }
     }
     next.set(key,entry);
    }

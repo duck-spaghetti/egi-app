@@ -112,7 +112,9 @@
       "tilt": "Incliner la vue",
       "cluster": "{count} lieux dans cette zone : zoomer",
       "look": "Voir le bâtiment",
-      "slow": "La vue 3D est lente sur cet appareil : vous pouvez revenir à la carte plane."
+      "slow": "La vue 3D est lente sur cet appareil : vous pouvez revenir à la carte plane.",
+      "site_open": "{open}/{total} services ouverts",
+      "hours_unknown": "Horaires à vérifier"
     },
     "walk": {
       "action": "Y aller à pied",
@@ -132,7 +134,8 @@
       "stale": "Les données des bus sont périmées.",
       "unavailable": "Bus en temps réel indisponibles.",
       "loading": "Chargement des positions des bus…"
-    }
+    },
+    "category_orientation": "Orientation"
   },
   "contribute": {
     "title": "Nouveau service",

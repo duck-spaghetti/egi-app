@@ -41,6 +41,8 @@ export function siteMarkers(list,{sites,describe}) {
     const categories = [...new Map(items.map(p => {const c=describe(p).category; return [c?.slug,c];})).values()].filter(Boolean);
     const poi = {...items[0], group_count:items.length, site_categories:categories, site_weights:categories.map(c=>items.filter(item=>describe(item).category?.slug===c.slug).length)};
     const label = `${poi.raw?.facility_name || poi.title}: ${items.length} servizi · ${categories.map(c=>categoryCaption(c.label || c.slug)).join(", ")}`;
-    return {lat:poi.latitude,lng:poi.longitude,html:pinHtml(poi,describe),label,choose:()=>({items:sites.siblings(poi),matched})};
+    const siblings=sites.siblings(poi);
+    return {lat:poi.latitude,lng:poi.longitude,html:pinHtml(poi,describe),label,
+      name:describe(items[0]).title||poi.raw?.facility_name||poi.title,items,serviceIds:siblings.map(p=>String(p.id)),categories,statuses:items.map(p=>describe(p).status),choose:()=>({items:siblings,matched})};
   });
 }

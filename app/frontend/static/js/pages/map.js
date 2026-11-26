@@ -50,7 +50,7 @@ export function createMapPage(context, dependencies={}) {
  const origin=factories.origin({context,scope,http,contains:map.contains,translate:i18n.t,emit});
  const cycle=factories.cycleways();
  const walking=context.view?.mode==='3d'&&factories.walking?factories.walking({context,scope,translate:i18n.t}):null;
- const buses=context.view?.mode==='3d'&&context.localLayers!==false&&factories.buses?factories.buses({scope,http,translate:i18n.t}):null;
+ const buses=context.view?.mode==='3d'&&context.localLayers!==false&&factories.buses?factories.buses({scope,http,translate:i18n.t,container:document.getElementById("live-buses-controls")}):null;
  let mounted=false, loading=null, languageGeneration=0, refreshInFlight=false;
  const shell=factories.shell({state,scope,i18n,emit,actions:{refresh,
   renderFilters:renderFilters,renderSearchOptions:()=>search.update(snapshot()),resetFilters,
@@ -119,7 +119,7 @@ export function createMapPage(context, dependencies={}) {
  }
  function select(id){
   if(scope.signal.aborted)return;
-  state.selectedId=id;services.update(snapshot());void services.show(id);
+  state.selectedId=id;refresh();void services.show(id);
  }
  async function language(code){
   const generation=++languageGeneration;

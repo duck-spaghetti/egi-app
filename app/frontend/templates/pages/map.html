@@ -32,8 +32,10 @@
     <div class="map-brand" aria-label="EGI">
       <img src="/static/assets/icons/egi-logo.svg" alt="EGI" class="brand-logo" />
     </div>
+    <div class="map-mode-tools">
     <button type="button" class="nav-btn layers-trigger" data-sheet="layers" aria-label="Livelli della mappa"><span class="control-icon"><img src="/static/assets/icons/ui/layers.svg" alt="" aria-hidden="true" /></span><span class="control-label">Livelli</span></button>
     <button type="button" class="nav-btn view3d-trigger" id="view3d-toggle" aria-pressed="false"><span class="control-icon view3d-icon" aria-hidden="true"><span class="view3d-to-3d">3D</span><span class="view3d-to-2d">2D</span></span><span class="control-label view3d-to-3d" data-i18n="map.map3d.label_3d">vista 3D</span><span class="control-label view3d-to-2d" data-i18n="map.map3d.label_2d">mappa piana</span></button>
+    </div>
     <span class="map-city-tag" id="city-label">{{ city.name if city else "Territorio" }}</span>
 
     <div class="floating-actions" aria-label="Controlli mappa">
@@ -112,6 +114,7 @@
         <li><span class="tl-stop tl-tram">T</span> Fermata tram da zoom 15; linee da zoom 12</li>
         <li><span class="tl-stop tl-bus"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M4 1.5h8a2 2 0 0 1 2 2V12a1 1 0 0 1-1 1v1.25a.75.75 0 0 1-1.5 0V13h-7v1.25a.75.75 0 0 1-1.5 0V13a1 1 0 0 1-1-1V3.5a2 2 0 0 1 2-2Zm0 2v4h8v-4Zm.75 6.25a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm6.5 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/></svg></span> Fermata autobus da zoom 16; percorsi solo selezionando una linea</li>
       </ul>
+      <div id="live-buses-controls" hidden></div>
       <p id="transport-status" class="source-note" role="status">Verifica dati trasporti…</p>
       <button class="layer-toggle" id="cycle-toggle" type="button" aria-pressed="false">
         <span class="dot"></span>

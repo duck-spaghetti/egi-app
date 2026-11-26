@@ -11,13 +11,13 @@
 .map3d-marker { line-height:0; }
 .map3d-pin,.map3d-cluster { margin:0;padding:0;border:0;background:none;font:inherit;color:inherit;cursor:pointer; }
 .map3d-pin:focus-visible,.map3d-cluster:focus-visible { outline:3px solid #0570b5;outline-offset:3px;border-radius:50%; }
-.map3d-cluster { min-width:38px;height:38px;padding:0 8px;border-radius:19px;background:#d06a2c;color:#fff;
-  font:700 14px/38px system-ui;box-shadow:0 0 0 4px #fff,0 2px 8px #0005; }
+.map3d-cluster { box-sizing:border-box;padding:0;border:2px solid #fffe;border-radius:50%;display:grid;place-items:center;
+  font:700 14px/1 system-ui;box-shadow:0 2px 8px #0003; }
 .map3d-ctrl { font-size:18px;line-height:1; }
 .map3d-ctrl[aria-pressed="true"] { background:#e8eef6; }
 #map.maplibregl-map { font:inherit; }
 /* MapLibre controls sit under the layers and view controls, clear of the city tag. */
-#map .maplibregl-ctrl-top-right { top:calc(214px + var(--safe-top));right:calc(var(--map-edge-x) - 10px); }
+#map .maplibregl-ctrl-top-right { top:calc(278px + var(--safe-top));right:calc(var(--map-edge-x) + 19px); }
 .stage.list-mode #map .maplibregl-ctrl-top-right { display:none; }
 /* Below the performance budget: a warning badge; the control stays usable. */
 .view3d-trigger[data-warning="true"] .control-icon { position:relative; }
@@ -35,3 +35,33 @@
 
 /* Stack the bus panel above a visible route summary, clear of the Map/List switch. */
 .map3d-route-status:not([hidden]) ~ .map3d-buses { bottom:calc(174px + var(--safe-bottom,0px)); }
+
+/* One toolbar keeps view and layer buttons aligned in both writing directions. */
+.map-mode-tools { position:absolute;inset-inline-end:var(--map-edge-x);top:calc(82px + var(--safe-top));z-index:620;width:88px;display:flex;flex-direction:column;align-items:center;gap:16px; }
+.map-mode-tools .layers-trigger,.map-mode-tools .view3d-trigger { position:static; }
+.stage.list-mode .map-mode-tools { display:none; }
+html[dir="rtl"] #map .maplibregl-ctrl-top-right { right:auto;left:calc(var(--map-edge-x) + 19px); }
+.map3d-buses.in-layers { position:static;max-width:none;padding:12px 0;box-shadow:none;background:none; }
+.map3d-pin { display:flex;flex-direction:column;align-items:center; }
+.map3d-pin-body { position:relative;display:block; }
+.map3d-stem,.map3d-ground { display:none; }
+.map3d-pin[data-anchored="true"] .map3d-stem { display:block;width:2px;height:26px;background:#455a64b3; }
+.map3d-pin[data-anchored="true"] .map3d-ground { display:block;width:6px;height:6px;border-radius:50%;background:#455a64;box-shadow:0 0 0 2px #fff; }
+.map3d-site-label { position:absolute;inset-inline-start:54px;top:0;display:block;width:max-content;max-width:230px;padding:7px 10px;border-radius:10px;background:#fffef3f2;color:#243239;box-shadow:0 2px 8px #0002;text-align:start;font:12px/1.35 system-ui;pointer-events:none; }
+.map3d-site-label strong,.map3d-site-label small { display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.map3d-site-label strong { max-width:210px;font-size:13px; }
+.map3d-site-status i { display:inline-block;width:7px;height:7px;border-radius:50%;margin-inline-end:5px;background:#6b7280; }
+.map3d-site-status.open i { background:#237443; }.map3d-site-status.closed i { background:#b83938; }.map3d-site-status.closing i { background:#ae7900; }
+
+.map3d-pin[data-label-side="left"] .map3d-site-label { inset-inline-start:auto;left:auto;right:54px; }
+.map3d-pin[data-label-side="right"] .map3d-site-label { inset-inline-start:auto;right:auto;left:54px; }
+/* Keep rotation controls in one row, leaving the lower reference action clear. */
+#map .maplibregl-ctrl-top-right { width:90px;right:calc(var(--map-edge-x) - 1px);display:flex;flex-direction:column;align-items:center; }
+#map .maplibregl-ctrl-top-right .maplibregl-ctrl { margin:10px 0 0; }
+#map .map3d-controls { display:flex; }
+#map .map3d-controls button { border:0; }
+html[dir="rtl"] #map .maplibregl-ctrl-top-right { right:auto;left:calc(var(--map-edge-x) - 1px); }
+@media (max-height:700px) {
+ .map-mode-tools { top:calc(62px + var(--safe-top));gap:8px; }
+ #map .maplibregl-ctrl-top-right { top:calc(238px + var(--safe-top)); }
+}

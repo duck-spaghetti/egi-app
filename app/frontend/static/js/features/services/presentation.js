@@ -7,6 +7,15 @@ function t(key, params = {}, fallback = "") {
   return translate(key, params, fallback);
 }
 
+/** UI-only category choices; source taxonomy and stored labels remain unchanged. */
+function displayCategory(category) {
+ if(!category)return category;
+ const known=new Set(['mangiare','dormire','lavarsi','vestiti_coperte','multiservizi','salute','violenza','orientamento','documenti_diritti','istruzione','lavoro']);
+ return {...category,
+  label:category.slug==='orientamento'?t('map.category_orientation',{},'Orientamento'):category.label,
+  icon_path:known.has(category.slug)?`/static/assets/icons/categories/${category.slug}.svg`:category.icon_path};
+}
+
 function normalizeExternalHref(value) {
   const raw = String(value || "").trim();
   if (!raw) return null;
@@ -122,7 +131,7 @@ function applyCategoryLabels(categories) {
     ) || snapshot().categoryTranslations.find((item) => item.category_id === category.id);
     return {
       ...category,
-      label: translation?.label || category.label || category.slug,
+      ...displayCategory({...category,label:translation?.label || category.label || category.slug}),
     };
   });
 }
@@ -564,7 +573,7 @@ function serviceButton(poi, matches = true) {
 }
 
 function categoryBadge(category) {
-  const c=category || {};
+  const c=displayCategory(category) || {};
   const url=normalizeCategoryIconPath(c.icon_path);
   return `<span class="category-badge" style="background:${escapeHtml(c.color || "#555")}">${url?`<img src="${escapeHtml(url)}" alt="">`:""}<span>${escapeHtml(categoryCaption(c.label || c.slug))}</span></span>`;
 }
@@ -736,16 +745,17 @@ function canonicalOpeningStatus(display, now = new Date()) {
   const opening=display.canonical_opening || {};
   const check=hoursVerification(display);
   const hint=check ? "" : " · da verificare";
+  const verificationLabel=check ? "" : "da verificare";
   const note=check ? `Verifica registrata il ${String(check.checked_at).slice(0,10)}. Non è disponibilità in tempo reale.` : "Orari interpretati come verosimilmente completi, in attesa di verifica. Contatta il servizio per conferma.";
   const transition=opening.next_transition_at ? new Date(opening.next_transition_at) : null;
-  if (transition && transition.getTime()<=now.getTime()) return {kind:"unknown",label:"Aggiornamento degli orari in corso",note};
+  if (transition && transition.getTime()<=now.getTime()) return {verificationLabel,kind:"unknown",label:"Aggiornamento degli orari in corso",note};
   if (opening.status==="open") {
     const closes=opening.closes_at ? new Date(opening.closes_at) : null;
     const closing=closes && closes.getTime()>now.getTime() && closes.getTime()-now.getTime()<=3600000;
-    return {kind:closing?"closing":"open",label:closing ? `Aperto${hint} · chiude alle ${new Intl.DateTimeFormat("it-IT",{timeZone:opening.timezone || context.profile?.timezone || "UTC",hour:"2-digit",minute:"2-digit"}).format(closes)}` : `Aperto${hint}`,note};
+    return {verificationLabel,kind:closing?"closing":"open",label:closing ? `Aperto${hint} · chiude alle ${new Intl.DateTimeFormat("it-IT",{timeZone:opening.timezone || context.profile?.timezone || "UTC",hour:"2-digit",minute:"2-digit"}).format(closes)}` : `Aperto${hint}`,note};
   }
-  if (opening.status==="closed") return {kind:"closed",label:`Chiuso${hint}`,note};
-  return {kind:"unknown",label:"Orario da verificare",note};
+  if (opening.status==="closed") return {verificationLabel,kind:"closed",label:`Chiuso${hint}`,note};
+  return {verificationLabel,kind:"unknown",label:"Orario da verificare",note};
 }
 
 /** Show selected canonical conditions and preserve each supplementary field's source. */
@@ -761,7 +771,7 @@ function renderCanonicalHours(poi) {
 }
 
 function resolveCategory(poi) {
- return snapshot().categories.find(c=>c.id===poi.category_id)||normalizeEmbeddedCategory(poi.category)||null;
+ return displayCategory(snapshot().categories.find(c=>c.id===poi.category_id)||normalizeEmbeddedCategory(poi.category)||null);
 }
 function describe(poi, now=new Date()) {
  return {title:serviceTitle(poi),kind:serviceKind(poi),organiser:serviceOrganiser(poi),
@@ -770,5 +780,5 @@ function describe(poi, now=new Date()) {
   status:sourceOpeningStatus(poi.raw?.hours_display,now),today:todayHours(poi.raw?.hours_display,now)};
 }
 
-return {describe,normalizePublicService,normalizeArea,normalizeCategory,mergeServiceCategories,applyCategoryLabels,normalizeCategoryIconPath,resolveCategory,categoryBadge,serviceTitle,serviceKind,serviceOrganiser,sourceNames,formatDistance,sourceOpeningStatus,todayHours,renderServiceHeader,renderInfoSection,renderHoursSection,renderContactsSection,renderSourcesSection,renderServiceBar,serviceButton,SERVICE_SECTIONS,escapeHtml,t};
+return {displayCategory,describe,normalizePublicService,normalizeArea,normalizeCategory,mergeServiceCategories,applyCategoryLabels,normalizeCategoryIconPath,resolveCategory,categoryBadge,serviceTitle,serviceKind,serviceOrganiser,sourceNames,formatDistance,sourceOpeningStatus,todayHours,renderServiceHeader,renderInfoSection,renderHoursSection,renderContactsSection,renderSourcesSection,renderServiceBar,serviceButton,SERVICE_SECTIONS,escapeHtml,t};
 }
