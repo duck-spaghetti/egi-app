@@ -111,7 +111,8 @@
       "rotate_right": "Tourner à droite",
       "tilt": "Incliner la vue",
       "cluster": "{count} lieux dans cette zone : zoomer",
-      "look": "Voir le bâtiment"
+      "look": "Voir le bâtiment",
+      "slow": "La vue 3D est lente sur cet appareil : vous pouvez revenir à la carte plane."
     }
   },
   "contribute": {

@@ -114,5 +114,17 @@ const live=c=>c.markers.filter(m=>!m.removed&&m.options.element.children?.[0]);
  const with3d=await page({...base,lookAt:(lat,lng)=>{looked=[lat,lng];}});
  assert.equal(with3d.length,1);assert.equal(with3d[0].textContent,"Guarda l'edificio");with3d[0].click();same(looked,[41.9,12.5]);
  assert.equal((await page(base)).length,0,'no button on the current map');
+ // Budget: three slow moves at z>=14 report once; a fast device reports nothing.
+ const {overBudget}=await env.load('features/map3d/index.js');
+ assert.equal(overBudget([20,25,40],null).over,true);assert.equal(overBudget([45,50,60],120).over,false);assert.equal(overBudget([45,50,60],200).over,true);
+ function budget(fps){
+  const b=fakeMapLibre(15);const reported=[];let now=0,queued=null;
+  const m=createMap3d({context,sites,describe,emit:(t,p)=>t==='map3dBudget'&&reported.push(p),maplibre:b.lib,origin:'http://localhost',reduceMotion:true,
+   frame:fn=>{queued=fn;return 1;},cancelFrame(){},clock:()=>now,heap:()=>null});
+  m.mount();const g=b.created.maps[0];
+  for(let i=0;i<4;i++){g.fire('movestart');for(let f=0;f<fps;f++){now+=1000/fps;queued();}g.fire('moveend');}
+  m.dispose();return reported;
+ }
+ assert.equal(budget(20).length,1);assert.equal(budget(20)[0].fps,20);assert.equal(budget(60).length,0);
  console.log('PASS: 3D map module parity (sites, choose, reference, clusters, controls, dispose) and view switch/handoff');
 })().catch(error=>{console.error(error);process.exitCode=1;});

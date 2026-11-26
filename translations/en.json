@@ -111,7 +111,8 @@
       "rotate_right": "Rotate right",
       "tilt": "Tilt the view",
       "cluster": "{count} places in this area: zoom in",
-      "look": "Look at the building"
+      "look": "Look at the building",
+      "slow": "The 3D view is slow on this device: you can go back to the flat map."
     }
   },
   "contribute": {

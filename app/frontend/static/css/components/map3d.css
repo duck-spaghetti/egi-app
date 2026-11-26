@@ -19,3 +19,7 @@
 /* MapLibre controls sit under the layers and view controls, clear of the city tag. */
 #map .maplibregl-ctrl-top-right { top:calc(214px + var(--safe-top));right:calc(var(--map-edge-x) - 10px); }
 .stage.list-mode #map .maplibregl-ctrl-top-right { display:none; }
+/* Below the performance budget: a warning badge; the control stays usable. */
+.view3d-trigger[data-warning="true"] .control-icon { position:relative; }
+.view3d-trigger[data-warning="true"] .control-icon::after { content:"!";position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;
+  background:#c43c1e;color:#fff;font:800 11px/16px system-ui;text-align:center; }

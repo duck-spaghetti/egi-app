@@ -12,10 +12,21 @@ import {egiStyle,liftBridgeLabels} from "./style.js";
  */
 const PROTOCOLS = new WeakSet(); // MapLibre instances with the pmtiles protocol registered
 export const CLUSTER_PX = 48, CLUSTER_MAX_ZOOM = 15, TILT = 55, ROTATE_STEP = 30;
+// Budget (spec, Performance): at least 30 fps while moving, JS memory under 150 MB.
+export const MIN_FPS = 30, MAX_HEAP_MB = 150, BUDGET_SAMPLES = 3;
+
+/** Median of the fps samples and the heap (MB, where the browser reports it): over budget or not. */
+export function overBudget(samples, heapMb) {
+  const sorted = [...samples].sort((a, b) => a - b);
+  const median = sorted.length ? sorted[Math.floor(sorted.length / 2)] : Infinity;
+  return {fps: Math.round(median), heapMb, over: median < MIN_FPS || (heapMb !== null && heapMb > MAX_HEAP_MB)};
+}
 
 export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,translate=(key,params,fallback)=>fallback||key,
   reduceMotion=Boolean(globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches),
-  devicePixelRatio=globalThis.devicePixelRatio||1,origin=globalThis.location?.origin||""}) {
+  devicePixelRatio=globalThis.devicePixelRatio||1,origin=globalThis.location?.origin||"",
+  frame=globalThis.requestAnimationFrame?.bind(globalThis),cancelFrame=globalThis.cancelAnimationFrame?.bind(globalThis),
+  clock=()=>globalThis.performance?.now?.()??Date.now(),heap=()=>globalThis.performance?.memory?.usedJSHeapSize??null}) {
  let state={},list=[],visible=true,disposed=false;
  const runtime={map:null,markers:new Map(),user:null,bounds:null,cleanups:[]};
  const t=(key,fallback)=>translate(key,{},fallback);
@@ -45,9 +56,29 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
    emit("pickedReference",{lat:event.lngLat.lat,lng:event.lngLat.lng,label:"Punto scelto sulla mappa"});
   });
   map.on("moveend",render);
+  watchBudget(map);
   map.on("load",()=>{if(map.getStyle)runtime.cleanups.push(liftBridgeLabels(map));render();});
   // The drawing itself is decorative: services, controls and attributions are separate HTML.
   const canvas=map.getCanvas?.();canvas?.setAttribute("aria-hidden","true");canvas?.removeAttribute?.("role");
+ }
+
+ /** Measure fps while the map moves; after BUDGET_SAMPLES moves, report once if below budget. */
+ function watchBudget(map) {
+  if(!frame)return;
+  const samples=[];let frames=0,start=0,id=null,done=false;
+  const loop=()=>{frames++;id=frame(loop);};
+  map.on("movestart",()=>{if(done)return;frames=0;start=clock();cancelFrame?.(id);id=frame(loop);});
+  map.on("moveend",()=>{
+   if(done||id===null)return;
+   cancelFrame?.(id);id=null;
+   const seconds=(clock()-start)/1000;
+   if(seconds>=0.5&&map.getZoom()>=14)samples.push(frames/seconds);
+   if(samples.length<BUDGET_SAMPLES)return;
+   done=true;
+   const bytes=heap();const result=overBudget(samples,bytes===null?null:Math.round(bytes/1048576));
+   if(result.over)emit("map3dBudget",result);
+  });
+  runtime.cleanups.push(()=>{done=true;cancelFrame?.(id);});
  }
 
  /** Rotate left/right and tilt: explicit buttons, labelled, keyboard reachable. */

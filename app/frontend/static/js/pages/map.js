@@ -143,6 +143,11 @@ export function createMapPage(context, dependencies={}) {
    case 'toggleOffer':if(state.filters.offersOff.has(payload.code))state.filters.offersOff.delete(payload.code);else state.filters.offersOff.add(payload.code);refresh();break;
    case 'select':select(payload.id);break;
    case 'choose':services.choose(payload.items,payload.matched);break;
+   case 'map3dBudget':{
+    const button=document.getElementById('view3d-toggle');
+    const text=i18n.t('map.map3d.slow',{},'La vista 3D è lenta su questo dispositivo: puoi tornare alla mappa piana.');
+    if(button){button.dataset.warning='true';button.title=text;}
+    shell.toast(text);break;}
    case 'detailReady':lookButton(payload.poi);void transit.detail(payload.poi);break;
    case 'openSheet':shell.open(payload.id);break;
    case 'closeSheets':shell.close();break;
