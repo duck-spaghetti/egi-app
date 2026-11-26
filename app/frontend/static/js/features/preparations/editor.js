@@ -1,10 +1,12 @@
 /** Community workbench: server-backed drafts, two editable views and explicit access. */
+import {createAnalysis} from './analysis.js';
 import {PreparationDraft} from './draft.js';
 import {renderFields, node, button} from './fields.js';
 const $ = id => document.getElementById(id);
 const context = JSON.parse($('preparation-context').textContent), text = context.text;
 const API = '/moderazione/contribuisci/api', token = $('preparation-form-token').value;
 let workspace, draft, mode = 'card', timer, saving, remote, historyAfter = 0, lastOperation;
+let analysis;
 let pendingInput, creation, manualAttempt, inputBase = '', publicBase = false;
 const inputDirty = () => !!workspace && ($('source-text').value !== inputBase || $('public-material').checked !== publicBase);
 const canEdit = () => workspace?.state === 'active' && ['owner','edit'].includes(workspace?.permission);
@@ -83,6 +85,7 @@ async function loadWorkspace() {
   }
   const people = await api('/persone'); $('share-person').replaceChildren();
   for (const person of people.items) if (person.actor_id !== workspace.owner_actor_id) $('share-person').append(new Option(person.display_name,person.actor_id));
+  analysis?.load(workspace);
   $('grant-list').replaceChildren();
   for (const grant of workspace.grants || []) $('grant-list').append(node('li',(people.items.find(person => person.actor_id === grant.actor_id)?.display_name || text.person)+' · '+text[grant.permission]));
 }
@@ -99,7 +102,7 @@ async function openWorkspace(id) {
     if (!response.ok) throw Object.assign(new Error(),{status:response.status});
     $('source-text').value = await response.text();
   }
-  inputBase = $('source-text').value; publicBase = $('public-material').checked;
+  inputBase = $('source-text').value; publicBase = $('public-material').checked; analysis?.load(workspace);
   history.replaceState(null,'','/moderazione/contribuisci?id='+encodeURIComponent(id)); clearProblem();
 }
 function render() {
@@ -115,6 +118,7 @@ function render() {
   $('restore-card').hidden = draft.payload.outcome !== 'trashed'; $('restore-card').disabled = !canEdit();
   $('undo-card').disabled = !canEdit() || !lastOperation;
   renderEvidence();
+  analysis?.cardChanged();
 }
 function renderEvidence() {
   $('card-evidence').replaceChildren();
@@ -123,7 +127,7 @@ function renderEvidence() {
     $('card-evidence').append(node('p',caption(evidence.path), 'hint'),node('blockquote',evidence.quote || evidence.note || text.not_set));
   }
 }
-function caption(path) { return path.split('/').filter(Boolean).map(part => text.field_labels[part] || text[part] || (/^\d+$/.test(part) ? Number(part)+1 : part)).join(' · '); }
+function caption(path) { return path.split('/').filter(part=>part && part!=='body').map(part => text.field_labels[part] || text[part] || (/^\d+$/.test(part) ? Number(part)+1 : part)).join(' · '); }
 async function openCard(id) {
   if (draft?.dirty && !await save()) return;
   const result = await api('/preparazioni/'+workspace.id+'/schede/'+id);
@@ -153,16 +157,18 @@ $('create-preparation').addEventListener('submit',async event => {
     creation = null; form.reset(); await list(); await openWorkspace(result.id);
   } catch(error) { if (error.status && error.status < 500 && error.status !== 409) creation = null; problem(error); }
 });
-$('input-form').addEventListener('submit',async event => {
-  event.preventDefault();
-  try {
+async function persistInput() {
     if (draft?.dirty && !await save()) return;
     pendingInput ??= {text:$('source-text').value,public:$('public-material').checked,expected:workspace.metadata_revision,key:uuid()};
     const attempt = pendingInput;
     await api('/preparazioni/'+workspace.id+'/input',undefined,{method:'POST',body:attempt.text,headers:{'Content-Type':'text/plain; charset=utf-8','X-EGI-Expected-Revision':String(attempt.expected),'X-EGI-Public-Material':String(attempt.public),'X-EGI-Request-Key':attempt.key}});
     inputBase = attempt.text; publicBase = attempt.public; pendingInput = null; await loadWorkspace(); clearProblem();
-  } catch(error) { if (error.status && error.status < 500) pendingInput = null; problem(error); }
+}
+$('input-form').addEventListener('submit',async event => {
+  event.preventDefault();
+  try {await persistInput();analysis.sourceSaved();}catch(error){if(error.status && error.status<500)pendingInput=null;problem(error);}
 });
+
 $('manual-card').addEventListener('click',async () => {
   try { if (draft?.dirty && !await save()) return; manualAttempt ??= {input_id:workspace.current_input_id,job_id:null,selections:[{creation_key:uuid()}],request_key:uuid()}; const result = await api('/preparazioni/'+workspace.id+'/schede/crea',manualAttempt); manualAttempt=null; await loadWorkspace(); await openCard(result.items[0].item_id); } catch(error) {if(error.status && error.status<500) manualAttempt=null;problem(error);}
 });
@@ -200,6 +206,10 @@ $('apply-comparison').addEventListener('click',() => {
   if(draft.rebase(remote,choices).length) { $('preparation-error').textContent=text.choose_conflicts; $('preparation-error').hidden=false; return; }
   $('conflict-panel').hidden=true; $('compare-card').hidden=true; render(); changed(); clearProblem();
 });
+$('workspace-refresh').addEventListener('click',()=>loadWorkspace().then(()=>{if(draft)render();clearProblem();}).catch(problem));
 $('show-trash').addEventListener('change',() => list().catch(problem));
 window.addEventListener('beforeunload',event => {if(draft?.dirty || draft?.pending || inputDirty()) {event.preventDefault();event.returnValue='';}});
+analysis=createAnalysis({context,api,workspace:()=>workspace,draft:()=>draft,canEdit,inputDirty,persistInput,flush:save,reload:loadWorkspace,openCard,error:problem,caption});
+$('source-text').addEventListener('input',()=>analysis.sourceChanged());
+$('public-material').addEventListener('change',()=>analysis.sourceChanged());
 list().then(() => {const id=new URLSearchParams(location.search).get('id');if(id)return openWorkspace(id);$('create-panel').open=true;}).catch(problem);

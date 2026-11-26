@@ -883,6 +883,28 @@
     "invalid": "Controlla i valori inseriti: alcuni campi non sono validi.",
     "too_large": "Il contenuto supera il limite previsto.",
     "additional": "Altri campi",
-    "save_input_first": "Salva il testo modificato prima di cambiare preparazione."
+    "save_input_first": "Salva il testo modificato prima di cambiare preparazione.",
+    "analysis_title": "Proposte dal testo",
+    "analysis_intro": "Al primo inserimento di materiale pubblico vengono proposte le schede riconosciute. Le modifiche successive richiedono un aggiornamento esplicito.",
+    "analysis_update": "Aggiorna proposte",
+    "analysis_cancel": "Annulla elaborazione",
+    "analysis_create": "Crea schede selezionate",
+    "analysis_apply": "Aggiorna la scheda aperta",
+    "analysis_stale": "Il testo è cambiato. Aggiorna le proposte prima di usarle.",
+    "analysis_uncertain": "L’esito della richiesta è incerto. Un nuovo aggiornamento è un tentativo esplicito e potrebbe avere un costo aggiuntivo.",
+    "unnamed_candidate": "Servizio senza nome",
+    "manual_preserved": "Correzioni manuali conservate:",
+    "job_states": {
+      "queued": "In coda: in attesa del worker.",
+      "leased": "Preparazione dell’elaborazione.",
+      "running": "Elaborazione in corso.",
+      "succeeded": "Scegli quali schede preparare.",
+      "failed": "Elaborazione non completata. Puoi correggere manualmente o aggiornare le proposte.",
+      "uncertain": "Esito incerto: la richiesta non viene ripetuta automaticamente.",
+      "cancelled": "Elaborazione annullata."
+    },
+    "refresh_state": "Ricarica stato",
+    "analysis_unavailable": "Assistenza IA non disponibile. Puoi continuare a modificare le schede manualmente.",
+    "analysis_budget": "Il budget IA disponibile non basta per questa elaborazione. Puoi continuare manualmente."
   }
 }

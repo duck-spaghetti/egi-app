@@ -1,5 +1,6 @@
 """Durable worker/native HTTP contracts with controlled provider exchanges only."""
 import getpass
+from copy import deepcopy
 import json
 from pathlib import Path
 import tempfile
@@ -147,6 +148,63 @@ class WorkerNativeTests(unittest.TestCase):
             self.assertEqual(usage['input_tokens'],100)
             self.assertNotIn('PRIVATE PROVIDER TEXT',json.dumps(output))
             self.assertEqual(self.owner.execute('SELECT settled_microusd FROM preparation.budget_reservations WHERE job_id=%s',(job,)).fetchone()[0],120)
+
+    def test_selected_candidates_updates_preserve_manual_and_cleared_values(self):
+        """Only explicit selections create cards; fresh results preserve manual edits."""
+        workspace,input_id = self.prepare('Sportello Sportello bis')
+        job = self.enqueue(workspace,input_id)
+
+        def response(exchange):
+            """Recognize two source-backed services without assigning a physical place."""
+            envelope = self.response(exchange).json()
+            value = json.loads(envelope['output'][0]['content'][0]['text'])
+            first = value['candidates'][0]
+            first['service'].update(description='Sportello',delivery_mode='telephone')
+            description = deepcopy(first['evidence'][0])
+            description.update(id=str(uuid4()),path='/service/description')
+            first['evidence'].append(description)
+            second = deepcopy(first)
+            second.update(candidate_key='two')
+            second['service']['name'] = 'Sportello bis'
+            second['evidence'][0].update(id=str(uuid4()),quote='Sportello bis',span={'start':10,'end':10+len('Sportello bis')})
+            second['evidence'][1]['id'] = str(uuid4())
+            value['candidates'].append(second)
+            envelope['output'][0]['content'][0]['text'] = json.dumps(value)
+            return httpx.Response(200,json=envelope)
+        self.assertEqual(self.worker(response).run_once()['state'],'succeeded')
+        visible = self.client.get(BASE+'/preparazioni/'+workspace+'/lavori/'+job).json()
+        self.assertEqual(len(self.client.get(BASE+'/preparazioni/'+workspace).json()['items']),0)
+        selected = {'input_id':input_id,'job_id':job,'selections':[{'candidate_id':visible['candidate_ids']['one']}],'request_key':str(uuid4())}
+        created = self.post('/preparazioni/'+workspace+'/schede/crea',selected)
+        self.assertEqual(created.status_code,201,created.text)
+        item = created.json()['items'][0]
+        selected['request_key'] = str(uuid4())
+        self.assertEqual(self.post('/preparazioni/'+workspace+'/schede/crea',selected).json()['items'][0]['item_id'],item['item_id'])
+        self.assertEqual(len(self.client.get(BASE+'/preparazioni/'+workspace).json()['items']),1)
+        payload = self.client.get(BASE+'/preparazioni/'+workspace+'/schede/'+item['item_id']).json()['version']['payload']
+        self.assertEqual(payload['location'],{'kind':'none'})
+        payload['service']['name'] = 'Manuale'
+        payload['service'].pop('description')
+        payload['evidence'] = []
+        payload['field_origins']['/service/name'] = {'state':'manual'}
+        payload['field_origins']['/service/description'] = {'state':'cleared'}
+        saved = self.post('/preparazioni/'+workspace+'/schede',{'changes':[{'item_id':item['item_id'],'expected_version':item['version_id'],'payload':payload}],'request_key':str(uuid4())})
+        self.assertEqual(saved.status_code,200,saved.text)
+        expected = saved.json()['items'][0]['after']
+        uploaded = self.client.post(BASE+'/preparazioni/'+workspace+'/input',content=b'Sportello Sportello bis nuovo',headers={**self.headers,'Content-Type':'text/plain; charset=utf-8','X-EGI-Expected-Revision':'2','X-EGI-Public-Material':'true','X-EGI-Request-Key':str(uuid4())})
+        self.assertEqual(uploaded.status_code,201,uploaded.text)
+        self.assertEqual(self.post('/preparazioni/'+workspace+'/schede/crea',{**selected,'request_key':str(uuid4())}).status_code,409)
+        input_id = uploaded.json()['input_id']
+        job = self.enqueue(workspace,input_id)
+        self.assertEqual(self.worker(response).run_once()['state'],'succeeded')
+        visible = self.client.get(BASE+'/preparazioni/'+workspace+'/lavori/'+job).json()
+        applied = self.post('/preparazioni/'+workspace+'/schede/crea',{'input_id':input_id,'job_id':job,'selections':[{'candidate_id':visible['candidate_ids']['one'],'target_item_id':item['item_id'],'expected_version':expected}],'request_key':str(uuid4())})
+        self.assertEqual(applied.status_code,201,applied.text)
+        self.assertIn('/service/name',applied.json()['items'][0]['conflicts'])
+        current = self.client.get(BASE+'/preparazioni/'+workspace+'/schede/'+item['item_id']).json()['version']['payload']
+        self.assertEqual(current['service']['name'],'Manuale')
+        self.assertNotIn('description',current['service'])
+        self.assertEqual(len(self.client.get(BASE+'/preparazioni/'+workspace).json()['items']),1)
 
     def test_ambiguous_timeout_is_not_redispatched(self):
         """A timeout holds its reservation and a new worker does not call it again."""

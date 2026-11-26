@@ -839,3 +839,7 @@ The separate [Community interpretation worker](docs/community/interpretation-wor
 uses the hash-pinned Reviewer wheel and the existing httpx stack. Install its
 `requirements-community.lock.txt` before running the full Community test suite.
 No real model, price, worker login or live dispatch is enabled automatically.
+
+[Interpretation selection](docs/community/interpretation-editor.md) connects first
+public insertion and explicit updates to durable jobs, with selected card creation
+and preservation of manual/cleared fields. A configured worker/model is still required.

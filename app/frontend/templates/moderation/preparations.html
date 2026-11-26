@@ -24,11 +24,20 @@
   </details>
 </aside>
 <section id="preparation-workspace" hidden>
-  <div class="desk-card"><div class="desk-actions"><h2 id="workspace-title"></h2><span id="workspace-permission" class="badge"></span><button id="workspace-trash" type="button">{{ t('community.trash') }}</button><button id="workspace-restore" type="button">{{ t('community.restore') }}</button></div>
+  <div class="desk-card"><div class="desk-actions"><h2 id="workspace-title"></h2><span id="workspace-permission" class="badge"></span><button id="workspace-refresh" type="button">{{ t("community.refresh_state") }}</button><button id="workspace-trash" type="button">{{ t('community.trash') }}</button><button id="workspace-restore" type="button">{{ t('community.restore') }}</button></div>
     <details open><summary>{{ t('community.input') }} · <span id="workspace-source"></span></summary>
       <form id="input-form" class="desk-form"><label for="source-text">{{ t('community.input') }}</label><textarea id="source-text" rows="8" maxlength="50000"></textarea><label class="check"><input id="public-material" type="checkbox" />{{ t('community.public_material') }}</label><p class="hint">{{ t('community.input_hint') }}</p><div class="desk-actions"><button id="save-input" type="submit">{{ t('community.save_input') }}</button><a id="original-link" target="_blank" rel="noopener">{{ t('community.original') }}</a><button id="manual-card" type="button">{{ t('community.manual') }}</button></div></form>
     </details>
   </div>
+  <section class="desk-card" id="analysis-panel" hidden>
+    <h2>{{ t('community.analysis_title') }}</h2><p id="analysis-status" role="status"></p>
+    <p id="analysis-stale" class="desk-notice" hidden>{{ t('community.analysis_stale') }}</p>
+    <p id="analysis-uncertain" class="hint" hidden>{{ t('community.analysis_uncertain') }}</p>
+    <div class="desk-actions"><button id="analysis-update" type="button">{{ t('community.analysis_update') }}</button><button id="analysis-cancel" type="button" hidden>{{ t('community.analysis_cancel') }}</button></div>
+    <ul id="analysis-candidates" class="queue-list"></ul>
+    <div class="desk-actions"><button id="analysis-create" type="button" disabled>{{ t('community.analysis_create') }}</button><button id="analysis-apply" type="button" disabled>{{ t('community.analysis_apply') }}</button></div>
+    <p id="analysis-kept" class="hint" role="status"></p>
+  </section>
   <div class="desk-card"><ul id="card-list" class="queue-list preparation-cards"></ul><p id="no-cards">{{ t('community.no_cards') }}</p></div>
   <article id="card-editor" class="desk-card" hidden>
     <div class="desk-actions"><div class="preparation-view-switch" role="group" aria-label="{{ t('community.fields_view') }}"><button type="button" id="view-card" aria-pressed="true">{{ t('community.card') }}</button><button type="button" id="view-fields" aria-pressed="false">{{ t('community.fields_view') }}</button></div><button id="save-card" type="button">{{ t('community.save') }}</button><button id="retry-card" type="button" hidden>{{ t('community.retry') }}</button><button id="compare-card" type="button" hidden>{{ t('community.compare') }}</button></div>
