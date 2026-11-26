@@ -132,7 +132,8 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   return lat>=s&&lat<=n&&lng>=w&&lng<=e;
  }
  function update(snapshot,rows){state=snapshot;list=rows;render();}
- function attach(factory){return factory(runtime.map);}
+ /** Layer factories receive the MapLibre map and the engine (so they pick their MapLibre version). */
+ function attach(factory){return factory(runtime.map,{maplibre});}
  function center(lat,lng){if(runtime.map&&contains(lat,lng))move({center:[lng,lat],zoom:Math.max(runtime.map.getZoom(),15)});}
  /** Fly to a service's building: z17.5, tilted (a jump when motion is reduced). */
  function lookAt(lat,lng){if(runtime.map&&contains(lat,lng))move({center:[lng,lat],zoom:17.5,pitch:TILT,duration:reduceMotion?0:1600});}

@@ -172,7 +172,7 @@ export function createMapPage(context, dependencies={}) {
     scope.own(services.dispose);scope.own(origin.dispose);scope.own(transit.dispose);scope.own(cycle.dispose);
     shell.bind();shell.layout();shell.translate();bindView();
     if(context.localLayers!==false){transit.mount(map.attach);cycle.mount(map.attach);}
-    if(!context.canonical && debug){
+    if(!context.canonical && debug && context.view?.mode!=='3d'){
      const {DebugSources}=await import('../features/preview/debug.js');scope.check();
      const debugPanel=map.attach(leafletMap=>DebugSources.create(leafletMap,{scope,http,setServicesVisible:visible=>emit('previewVisibility',{visible}),openDetail:id=>select(id)}));
      scope.own(debugPanel.dispose);

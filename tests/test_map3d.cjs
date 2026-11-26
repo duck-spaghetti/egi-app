@@ -21,7 +21,6 @@ const live=c=>c.markers.filter(m=>!m.removed&&m.options.element.children?.[0]);
  const {createMap3d}=await env.load('features/map3d/index.js');
  const {createMap}=await env.load('features/map/index.js');
  const {viewMode,saveHandoff,takeHandoff,applyHandoff,switchUrl,hasWebGL2}=await env.load('features/map/view.js');
- const {isMapLibre,inertLayer}=await env.load('features/map/engine.js');
  const context={map3d:{base:'/map3d/20261126T120000Z',version:'20261126T120000Z'},latitude:41.9,longitude:12.5,zoom:12,
   boundsWest:12.2,boundsSouth:41.6,boundsEast:12.9,boundsNorth:42.2};
  const cat={slug:'mangiare',label:'Mangiare',color:'#f00'};
@@ -71,10 +70,9 @@ const live=c=>c.markers.filter(m=>!m.removed&&m.options.element.children?.[0]);
  assert.equal(map.contains(41.9,12.5),true);assert.equal(map.contains(45,9),false);
  map.center(41.9,12.5);same(gl.last.center,[12.5,41.9]);
  map.servicesVisible(false);assert.equal(live(created).filter(m=>m.getElement().children[0]?.className==='map3d-pin').length,0);
- map.servicesVisible(true);assert.equal(isMapLibre(gl),true);assert.equal(map.attach(m=>m),gl);
+ map.servicesVisible(true);assert.equal(map.attach(m=>m),gl);assert.equal(map.attach((m,e)=>e.maplibre),lib);
  map.invalidate();assert.equal(gl.resized,true);
  map.dispose();assert.equal(gl.removed,true);assert.equal(created.markers.filter(m=>!m.removed).length,0);
- assert.equal(isMapLibre({addSource(){},getPane(){}}),false);assert.equal(inertLayer().focusedRoutes(),null);
  // View choice: URL, device memory, WebGL2 and data availability.
  const store=new Map();const storage={getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)};
  same(viewMode({search:'?vista=3d',storage,context,webgl2:true}),{mode:'3d',available:true,reason:null});

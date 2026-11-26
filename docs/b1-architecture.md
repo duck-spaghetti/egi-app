@@ -75,6 +75,7 @@ specific page actions instead of importing other feature state or DOM.
 | origin | `update`, `locate`, `search`, `choose`, `set`, `dispose`; explicit reference interaction, temporary address candidates and request cancellation. |
 | transport | Layer mount/update, summaries/detail/origin, badge/shell rendering and disposal; references/data come from the page. `referenceChanged` resets its own origin panel, cancels obsolete requests and reloads an open panel. |
 | cycleways | Optional overlay mount/dispose. |
+| 3D layers | In 3D mode the map module's `attach` passes the factory `(map, {maplibre})`; transport and cycleways then build `TransportLayerGL`/`CycleLayerGL` (same endpoints, debounce, toggles, status, popups, focus), reusing the presentation helpers of their Leaflet layers. Requests use the Leaflet-equivalent zoom (MapLibre zoom + 1). |
 | preview | Existing debug panel and overlap-review behavior; selected only for preview. |
 
 `features/map/sites.js` owns exact-position grouping separately from Leaflet. A
@@ -83,8 +84,7 @@ with out-of-filter labels. Each retains its own identity and attributes.
 `features/map/view.js` chooses the mode at startup (`?vista=3d|2d`, else the device
 choice in localStorage; 3D needs WebGL2 and an active data set) and carries filters,
 search text and reference point across the reload in sessionStorage, read once; the URL
-holds only view, language, city and selected service (ADR 0007). Layer modules tell the
-engine apart with `features/map/engine.js`.
+holds only view, language, city and selected service (ADR 0007).
 `features/map/pins.js` owns the site pin markup, its accessible label and the
 selection payload (`siteMarkers`), with no map library: every map module wraps the
 same markup in its own marker type.
