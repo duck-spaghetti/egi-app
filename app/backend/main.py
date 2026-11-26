@@ -110,6 +110,8 @@ def mount_selected(application, configuration):
     if configuration.editorial:
         from .api.moderation.router import router as moderation
         application.include_router(moderation)
+        from .api.preparations.router import router as preparations
+        application.include_router(preparations)
     if not configuration.canonical or configuration.local_layers:
         from .api.transport.router import router as transport
         from .api.cycleways.router import router as cycleways

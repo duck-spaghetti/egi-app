@@ -825,3 +825,8 @@ The app also reads `web_pages` and `document` sources from the importer:
 
 Services without an address-based position stay hidden from the map and list, as for the
 other sources (`?debug=1` shows them).
+
+Private Community preparation JSON/raw-text endpoints are documented in
+[preparation HTTP](docs/community/preparation-http.md). They reuse editorial
+sessions and require database changes 014–020; they do not enable CSV or real AI
+calls by themselves.
