@@ -29,3 +29,22 @@ class TransportViewport(Viewport):
         if self.routes is not None and (not 0 < len({x for x in self.routes.split(',') if x}) <= 80):
             raise ValueError('Invalid routes')
         return self
+
+
+class VehicleViewport(BaseModel):
+    """Bound vehicle requests in a POST body; never place visitor selections in URLs."""
+    model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
+    west: float = Field(ge=-180, le=180)
+    south: float = Field(ge=-90, le=90)
+    east: float = Field(ge=-180, le=180)
+    north: float = Field(ge=-90, le=90)
+    lines: list[str] = Field(default_factory=list, max_length=80)
+
+    @model_validator(mode='after')
+    def bounded(self):
+        """Require an ordered viewport no wider/taller than 0.15 degrees and short codes."""
+        if not 0 < self.east-self.west <= .15 or not 0 < self.north-self.south <= .15:
+            raise ValueError('Invalid area')
+        if any(not line or len(line)>32 for line in self.lines):
+            raise ValueError('Invalid lines')
+        return self

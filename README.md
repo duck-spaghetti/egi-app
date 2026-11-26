@@ -733,3 +733,19 @@ The app also reads `web_pages` and `document` sources from the importer:
 
 Services without an address-based position stay hidden from the map and list, as for the
 other sources (`?debug=1` shows them).
+
+## Live vehicle positions (M2, local 3D mode)
+
+`POST /api/preview/transit/vehicles` reads `<EGI_TRANSPORT_ROOT>/realtime/vehicles.json`
+(`egi-vehicles/1`, provided by the importer). JSON body: `west`, `south`, `east`,
+`north`, optional `lines` (up to 80 line codes, each at most 32 characters).
+The viewport must lie within the configured search extent and be no wider or
+higher than 0.15 degrees. The response includes `availability`, `stale`,
+`feed_timestamp`, server `now`, compact `vehicles` with vehicle `age` in seconds
+(or null), `licence: CC BY-SA` and `attribution: Roma Mobilità`.
+Both acquisition and publisher timestamps must be within 180 seconds; a stale
+snapshot returns no vehicles. Missing/corrupt snapshots are unavailable. The
+endpoint reads files only, never calls a database or upstream feed, retains no
+request state and puts area/line selections only in the POST body, never the URL.
+Access logging remains disabled and responses use `Cache-Control: no-store`.
+The assumed vehicle licence/version must be re-verified before launch.
