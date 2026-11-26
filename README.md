@@ -78,6 +78,14 @@ rail and cycle runtime paths (`EGI_TRANSPORT_ROOT`, `EGI_RAIL_ROOT`,
 canonical reads; the preview store is not consulted. These layers do not select
 public-launch transport or authorize fresh acquisition/job changes.
 
+The optional 3D mode of the map reads the 3D data set built by
+`../egi-importer/scripts/map3d.py` (format in `../egi-importer/docs/map3d/`). `EGI_MAP3D_ROOT`
+(default `.local/map3d` in the workspace) is its runtime root: the app reads
+`active.json` and serves only the active version's listed files at
+`/map3d/<version>/<path>`, with HTTP Range (PMTiles) and a one-year immutable cache;
+`/map3d/active` reports availability. A missing or invalid active version disables the
+3D mode; the current map is unaffected.
+
 For native verification set `EGI_DATABASE_REPO` to the explicit database worktree,
 `EGI_SQITCH` to Sqitch and, if necessary, `PERL5LIB` to its local runtime library.
 Use the A3 Python environment for `python -m unittest discover -s tests -v` and run
@@ -111,7 +119,9 @@ B1 (workspace plan `.scratch/mvp/b1-plan.md`) keeps the A3 behavior and changes:
   Launch with `--no-access-log`.
 - **Geocoder cache.** Process memory only, HMAC-keyed with a random per-process key
   and provider/profile scope, 300 s TTL, at most 128 entries.
-- **Local assets.** Leaflet 1.9.4, Leaflet.markercluster 1.5.3 and the Fraunces/IBM
+- **Local assets.** Leaflet 1.9.4, Leaflet.markercluster 1.5.3, MapLibre GL JS 6.19.0
+  (ES module and worker, BSD-3-Clause), the PMTiles reader 4.3.0 (BSD-3-Clause, licence
+  stated in its `package.json`; loaded only by the 3D mode) and the Fraunces/IBM
   Plex typefaces are served from `/static/vendor/` and `/static/fonts/` with their
   licences and `static/vendor/manifest.json` integrity hashes; no CDN or Google
   Fonts request remains. Map tiles and an explicit address search still contact

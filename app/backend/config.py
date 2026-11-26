@@ -132,6 +132,7 @@ class Configuration:
     transport_roots: tuple[Path, Path] = (ROOT.parent / '.local/transport', ROOT.parent / '.local/rail')
     osm_root: Path = ROOT.parent / '.local/osm-rail'
     cycle_root: Path = ROOT.parent / '.local/cycleways'
+    map3d_root: Path = ROOT.parent / '.local/map3d'
     geocoder_url: str = 'https://nominatim.openstreetmap.org/search'
     rate_file: Path = ROOT.parent / '.local/geocoding/request.lock'
     preview_dsn: str | None = None
@@ -155,6 +156,7 @@ class Configuration:
                              Path(os.environ.get('EGI_RAIL_ROOT', ROOT.parent / '.local/rail'))),
             osm_root=Path(os.environ.get('EGI_OSM_RAIL_ROOT', ROOT.parent / '.local/osm-rail')),
             cycle_root=Path(os.environ.get('EGI_CYCLEWAYS_ROOT', ROOT.parent / '.local/cycleways')),
+            map3d_root=Path(os.environ.get('EGI_MAP3D_ROOT', ROOT.parent / '.local/map3d')),
             geocoder_url=os.environ.get('EGI_GEOCODER_URL', 'https://nominatim.openstreetmap.org/search'),
             rate_file=Path(os.environ.get('EGI_GEOCODER_RATE_FILE', ROOT.parent / '.local/geocoding/request.lock')),
             preview_dsn=os.environ.get('EGI_PREVIEW_DSN'),

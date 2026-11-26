@@ -14,6 +14,7 @@ from .api.preview.subjects import PostgresSubjectSource, run_psql
 from .api.transport.service import Transport
 from .api.transport import network, osm_rail
 from .api.cycleways.service import Cycleways
+from .api.map3d.service import Map3d
 
 @dataclass
 class Resources:
@@ -28,6 +29,7 @@ class Resources:
     address_search: object
     geocoder: object
     cycleways: object
+    map3d: object
 
     @classmethod
     def create(cls, configuration, overrides=None):
@@ -45,7 +47,8 @@ class Resources:
             cfg.geocoder_url, cfg.rate_file)
         return cls(cfg, Jinja2Templates(directory=ROOT / 'app/frontend/templates'),
             overrides.get('diagnostics') or Diagnostics(cfg.error_dir), reader, source, directory, preview,
-            AddressSearch(geocoder), geocoder, Cycleways(cfg.policy, cfg.cycle_root))
+            AddressSearch(geocoder), geocoder, Cycleways(cfg.policy, cfg.cycle_root),
+            overrides.get('map3d') or Map3d(cfg.map3d_root))
 
     def close(self):
         """Release only resources owned by this application's lifecycle."""
@@ -55,7 +58,7 @@ class Resources:
 
     def pages_for(self, source):
         """Prepare page behavior with the source selected at the request's real Seam."""
-        return Pages(self.configuration, self.reader, source)
+        return Pages(self.configuration, self.reader, source, self.map3d)
 
     def transport_for(self, source):
         """Construct local-layer behavior with the selected canonical/preview points."""

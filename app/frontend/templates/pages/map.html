@@ -263,6 +263,7 @@
     apiBase: {{ (api_base or '/api/preview')|tojson }},
     canonical: {{ 'true' if canonical else 'false' }},
     localLayers: {{ 'true' if local_layers else 'false' }},
+    map3d: {{ (map3d or none)|tojson }},
     cityId: {{ city.id if city else 'null' }},
     profile: {{ profile|tojson }},
     cityName: {{ city.name|tojson if city else '"Roma"' }},
