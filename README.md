@@ -765,3 +765,21 @@ clears it. Reference points stay on the device, never in a request to a router.
 Vendored vector-tile 2.0.3, pbf 4.0.1 and vector-tile's required point-geometry
 1.1.0 are checked against npm SHA512 and the vendor manifest's file SHA256.
 The vector-tile bare point-geometry import alone is rewritten to a relative import.
+
+### Live buses in 3D
+
+The keyboard-operable **Live buses** control is off initially. It polls the local
+vehicles endpoint every 20 seconds only while enabled, the page is visible and
+MapLibre zoom is at least 15. Area/line selections travel only in POST bodies.
+Comma-separated line codes restrict the viewed area. Vehicles are 12 × 2.6 × 3.2 m
+yellow boxes, oriented by supplied bearing or observed movement; labels start at
+zoom 16. Snapshots interpolate for one second without extrapolation. Reduced motion
+updates immediately. Positions older than 120 seconds (or with unknown age) fade;
+a feed older than 180 seconds is cleared and announced, including while waiting
+for a slow response. Turning off, hiding the page and disposal cancel requests and
+timers. Roma Mobilità / CC BY-SA is visible while enabled.
+
+M2 remains a local candidate: the user deferred Catalan support and legal-notice
+updates; those five-language/notice criteria are explicitly unsatisfied. M1 phone
+acceptance remains pending. This feature does not install offline/PWA caching;
+walking works on locally available basemap tiles and never calls an external router.

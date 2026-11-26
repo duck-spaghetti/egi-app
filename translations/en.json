@@ -121,6 +121,17 @@
       "no_route": "No walking route found.",
       "too_far": "Indicative routes are available within 3 km in a straight line.",
       "summary": "Indicative route · {distance} · about {minutes} min"
+    },
+    "buses": {
+      "toggle": "Live buses",
+      "lines": "Lines (comma-separated)",
+      "all": "All lines",
+      "zoom": "Zoom in to see buses.",
+      "live": "Bus positions updated.",
+      "empty": "No buses in this area for the chosen lines.",
+      "stale": "Bus feed is out of date.",
+      "unavailable": "Live buses unavailable.",
+      "loading": "Loading bus positions…"
     }
   },
   "contribute": {

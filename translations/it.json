@@ -121,6 +121,17 @@
       "no_route": "Nessun percorso pedonale trovato.",
       "too_far": "Il percorso indicativo è disponibile entro 3 km in linea d’aria.",
       "summary": "Percorso indicativo · {distance} · circa {minutes} min"
+    },
+    "buses": {
+      "toggle": "Bus in tempo reale",
+      "lines": "Linee (separate da virgole)",
+      "all": "Tutte le linee",
+      "zoom": "Avvicina per vedere i bus.",
+      "live": "Posizioni dei bus aggiornate.",
+      "empty": "Nessun bus in questa zona per le linee scelte.",
+      "stale": "Dati dei bus non aggiornati.",
+      "unavailable": "Bus in tempo reale non disponibili.",
+      "loading": "Carico le posizioni dei bus…"
     }
   },
   "contribute": {

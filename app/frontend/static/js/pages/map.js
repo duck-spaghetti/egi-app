@@ -50,6 +50,7 @@ export function createMapPage(context, dependencies={}) {
  const origin=factories.origin({context,scope,http,contains:map.contains,translate:i18n.t,emit});
  const cycle=factories.cycleways();
  const walking=context.view?.mode==='3d'&&factories.walking?factories.walking({context,scope,translate:i18n.t}):null;
+ const buses=context.view?.mode==='3d'&&context.localLayers!==false&&factories.buses?factories.buses({scope,http,translate:i18n.t}):null;
  let mounted=false, loading=null, languageGeneration=0, refreshInFlight=false;
  const shell=factories.shell({state,scope,i18n,emit,actions:{refresh,
   renderFilters:renderFilters,renderSearchOptions:()=>search.update(snapshot()),resetFilters,
@@ -187,6 +188,7 @@ export function createMapPage(context, dependencies={}) {
     scope.own(services.dispose);scope.own(origin.dispose);scope.own(transit.dispose);scope.own(cycle.dispose);
     shell.bind();shell.layout();shell.translate();bindView();
     if(walking){walking.mount(map.attach);scope.own(walking.dispose);}
+    if(buses){buses.mount(map.attach);scope.own(buses.dispose);}
     if(context.localLayers!==false){transit.mount(map.attach);cycle.mount(map.attach);}
     if(!context.canonical && debug && context.view?.mode!=='3d'){
      const {DebugSources}=await import('../features/preview/debug.js');scope.check();
