@@ -115,6 +115,20 @@ class PreparationHttpTests(unittest.TestCase):
         self.assertEqual(restored.status_code, 200, restored.text)
         self.assertEqual(owner.get(raw_path).content, raw.content)
 
+    def test_editor_shell_uses_csp_and_safe_source_metadata(self):
+        """The real editor uses external scripts and safely encodes untrusted source names."""
+        owner = self.browser('mod1')
+        source = owner.post(BASE+'/fonti', json={'metadata': {'name': '</script><script>PRIVATE_TEST</script>', 'source_kind': 'directory'}, 'request_key': str(uuid4())}, headers=self.headers())
+        self.assertEqual(source.status_code, 201)
+        page = owner.get('/moderazione/contribuisci')
+        self.assertEqual(page.status_code, 200, page.text)
+        self.assertIn('/static/js/features/preparations/editor.js', page.text)
+        self.assertIn('application/json', page.text)
+        self.assertNotIn('<script>PRIVATE_TEST</script>', page.text)
+        self.assertNotIn("unsafe-inline", page.headers['content-security-policy'])
+        self.assertEqual(page.headers['cache-control'], 'no-store')
+        self.assertEqual(self.browser().get('/moderazione/contribuisci').status_code, 401)
+
     def test_people_sources_and_invalid_sessions(self):
         """Existing people listing and separate source admission keep their role boundary."""
         moderator, admin = self.browser('mod1'), self.browser('admin')

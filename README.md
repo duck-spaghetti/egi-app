@@ -830,3 +830,7 @@ Private Community preparation JSON/raw-text endpoints are documented in
 [preparation HTTP](docs/community/preparation-http.md). They reuse editorial
 sessions and require database changes 014–020; they do not enable CSV or real AI
 calls by themselves.
+
+The Community [card/field editor](docs/community/preparation-editor.md) is available
+at `/moderazione/contribuisci` in editorial mode. Its private drafts, sharing,
+recoverable trash and conflict recovery use the preparation HTTP contracts.

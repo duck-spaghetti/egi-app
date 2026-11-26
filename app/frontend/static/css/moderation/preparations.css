@@ -1,0 +1,33 @@
+/* Community uses the public font/color foundations and the editorial controls. */
+.preparation-heading { display:flex; align-items:baseline; justify-content:space-between; gap:1rem; }
+.preparation-heading h1 { font:2.4rem Fraunces,serif; margin:.25rem 0; }
+.preparation-layout { display:grid; grid-template-columns:16rem minmax(0,1fr); gap:1.25rem; align-items:start; }
+.preparation-sidebar { position:sticky; top:1rem; }
+.preparation-sidebar details { margin-top:1rem; border-top:1px solid var(--line); padding-top:1rem; }
+#preparation-workspace { display:grid; gap:1rem; }
+#preparation-workspace[hidden], [hidden] { display:none !important; }
+.preparation-cards { display:flex; flex-wrap:wrap; gap:.5rem; }
+.preparation-cards button[aria-current=true] { outline:2px solid var(--accent); outline-offset:2px; }
+.preparation-preview { display:grid; gap:1.25rem; margin:1.5rem 0; }
+.preparation-section { border-top:1px solid var(--line); padding-top:1rem; }
+.preparation-section h2 { font:1.7rem Fraunces,serif; }
+.preparation-control { display:grid; gap:.3rem; margin:.6rem 0; }
+.preparation-control input, .preparation-control textarea, .preparation-control select { box-sizing:border-box; width:100%; font:inherit; padding:.55rem .65rem; border:1px solid var(--line); border-radius:.3rem; background:var(--paper); color:var(--ink); }
+.preparation-control input[type=checkbox] { width:auto; justify-self:start; }
+.preparation-control[data-field=name] input { font:1.7rem Fraunces,serif; }
+.preparation-control[data-field=description] textarea { min-height:6rem; line-height:1.6; }
+.preparation-control .hint { display:flex; gap:.5rem; align-items:baseline; flex-wrap:wrap; }
+.preparation-control button { font-size:.8rem; }
+.preparation-repeat { border-left:2px solid var(--line); padding:.4rem 0 .8rem 1rem; margin:.6rem 0; }
+.preparation-repeat fieldset { border:1px solid var(--line); border-radius:.3rem; padding:.75rem; margin:.5rem 0; }
+.preparation-fields .preparation-control { grid-template-columns:minmax(9rem,1fr) minmax(12rem,2fr); align-items:start; }
+.preparation-fields .preparation-control .hint { grid-column:2; }
+.preparation-fields .preparation-control[data-field=name] input { font:inherit; }
+.preparation-view-switch { display:flex; gap:.25rem; }
+.preparation-view-switch button[aria-pressed=false] { background:var(--line); color:var(--ink); }
+#card-evidence blockquote { margin:.5rem 0; padding:.65rem; border-left:3px solid var(--accent); background:var(--bg); white-space:pre-wrap; }
+#conflict-panel { border:1px solid var(--accent); padding:1rem; margin:1rem 0; }
+#conflict-fields fieldset { margin:.75rem 0; border:1px solid var(--line); }
+#source-text { width:100%; box-sizing:border-box; }
+button:disabled { cursor:default; opacity:.55; }
+@media(max-width:800px) { .preparation-layout { grid-template-columns:1fr; } .preparation-sidebar { position:static; } .preparation-heading { display:block; } .preparation-fields .preparation-control { grid-template-columns:1fr; } .preparation-fields .preparation-control .hint { grid-column:1; } }

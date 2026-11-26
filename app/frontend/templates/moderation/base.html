@@ -16,6 +16,7 @@
       <a class="desk-brand" href="/moderazione">{{ t('moderation.title') }}</a>
       {% if person %}
       <nav class="desk-nav">
+        <a href="/moderazione/contribuisci">{{ t("community.title") }}</a>
         <a href="/moderazione/coda">{{ t('moderation.nav.queue') }}</a>
         <a href="/moderazione/servizi">{{ t('moderation.nav.services') }}</a>
         {% block nav %}{% endblock %}

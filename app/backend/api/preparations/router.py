@@ -43,6 +43,8 @@ async def create_workspace(request: Request):
 async def workspace(request: Request, workspace: UUID, offset: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=100)):
     """Read metadata, permission and a page of item summaries without full payloads."""
     value = await execute(request, 'SELECT preparation.read_workspace(%s) AS result', (workspace,))
+    if value.get('current_input_id'):
+        value['input_metadata'] = await execute(request, "SELECT preparation.read_input(%s,%s)-'original_base64' AS result", (workspace, value['current_input_id']))
     items = value['items']
     value['items'] = [{k: v for k, v in item.items() if k != 'payload'} for item in items[offset:offset + limit]]
     value.update(offset=offset, total=len(items))
