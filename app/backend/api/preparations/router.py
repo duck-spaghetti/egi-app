@@ -174,3 +174,44 @@ async def cancel_job(request: Request, workspace: UUID, job: UUID):
     body = await read_json(request,('request_key',))
     return reply(await execute(request,'SELECT preparation.cancel_job(%s,%s,%s) AS result',
         (workspace,job,identifier(body['request_key'])),True))
+
+
+@router.post('/preparazioni/{workspace}/invii')
+async def submit(request: Request, workspace: UUID):
+    """Submit selected heads independently, preserving stable per-item retry receipts."""
+    from uuid import uuid4, uuid5
+    import psycopg
+    from ..moderation.desk import Refused
+    from .http import SAFE_CODES
+
+    body = await read_json(request,('request_key','items'))
+    key = identifier(body['request_key'])
+    if not isinstance(body['items'],list) or not 1 <= len(body['items']) <= 1000:
+        raise Failure(422,'invalid_request')
+    items = []
+    for value in body['items']:
+        if not isinstance(value,dict) or set(value) != {'item_id','expected_version'}:
+            raise Failure(422,'invalid_request')
+        items.append((identifier(value['item_id']),identifier(value['expected_version'])))
+    if len({item for item,_ in items}) != len(items):
+        raise Failure(422,'invalid_request')
+    await execute(request,'SELECT preparation.read_workspace(%s) AS result',(workspace,))
+    outcomes = []
+    for item,version in items:
+        try:
+            receipt = await execute(request,'SELECT preparation.submit_item(%s,%s,%s,%s) AS result',
+                (workspace,item,version,uuid5(key,str(item))),True)
+            outcomes.append({'item_id':str(item),'outcome':'submitted','receipt':receipt})
+        except Refused as error:
+            status = SAFE_CODES.get(error.code,422)
+            outcomes.append({'item_id':str(item),'outcome':'excluded','status':status,
+                'code':error.code if error.code in SAFE_CODES else 'invalid_request','request_id':str(uuid4())})
+        except psycopg.Error as error:
+            status = {'P0002':404,'42501':403,'40001':409}.get(error.sqlstate,503)
+            outcomes.append({'item_id':str(item),'outcome':'excluded','status':status,
+                'code':{404:'preparation_not_found',403:'forbidden',409:'version_conflict',503:'database_unavailable'}[status],'request_id':str(uuid4())})
+    status = 200 if any(item['outcome']=='submitted' for item in outcomes) else outcomes[0]['status']
+    envelope={'items':outcomes}
+    if status>=400:
+        envelope.update(code=outcomes[0]['code'],request_id=outcomes[0]['request_id'])
+    return reply(envelope,status)

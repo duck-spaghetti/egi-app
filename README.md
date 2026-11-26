@@ -843,3 +843,8 @@ No real model, price, worker login or live dispatch is enabled automatically.
 [Interpretation selection](docs/community/interpretation-editor.md) connects first
 public insertion and explicit updates to durable jobs, with selected card creation
 and preservation of manual/cleared fields. A configured worker/model is still required.
+
+[Community submission and review](docs/community/submission-review.md) connects
+confirmed private cards to selective queue snapshots and editable acceptance into
+canonical drafts. Source admission and the existing approve/publish action remain
+separate. Database change 021 preserves component proof across collection edits.

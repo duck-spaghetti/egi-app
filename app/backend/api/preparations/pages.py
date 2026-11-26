@@ -5,6 +5,7 @@ from starlette.concurrency import run_in_threadpool
 from .fields import dictionary
 from .http import PreparationRoute, session
 from ..moderation.router import moderation
+from ..moderation.places import territories
 
 router = APIRouter(prefix='/moderazione/contribuisci', route_class=PreparationRoute)
 
@@ -20,8 +21,8 @@ async def editor(request: Request):
         """Read only registered source metadata as the freshly verified person."""
         with module.desk.acting(digest) as (connection, person):
             sources = connection.execute('SELECT source_id::text AS id,name FROM sources.registry ORDER BY name,source_id').fetchall()
-            return person, sources
-    person, sources = await run_in_threadpool(context)
+            return person, sources, territories(connection)
+    person, sources, areas = await run_in_threadpool(context)
     return module.render(request, 'preparations.html', person,
-        preparation_context={'sources': sources, 'fields': dictionary(),
+        preparation_context={'sources': sources, 'fields': dictionary(), 'references': {'territories':areas},
             'text': module.catalog.languages['it']['community']})

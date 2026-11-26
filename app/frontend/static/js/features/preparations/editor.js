@@ -7,6 +7,7 @@ const context = JSON.parse($('preparation-context').textContent), text = context
 const API = '/moderazione/contribuisci/api', token = $('preparation-form-token').value;
 let workspace, draft, mode = 'card', timer, saving, remote, historyAfter = 0, lastOperation;
 let analysis;
+let pendingSubmission;
 let pendingInput, creation, manualAttempt, inputBase = '', publicBase = false;
 const inputDirty = () => !!workspace && ($('source-text').value !== inputBase || $('public-material').checked !== publicBase);
 const canEdit = () => workspace?.state === 'active' && ['owner','edit'].includes(workspace?.permission);
@@ -112,6 +113,7 @@ function render() {
   $('view-fields').setAttribute('aria-pressed',String(mode === 'fields'));
   renderFields($('editable-fields'),draft,context,canEdit() && draft.payload.outcome !== 'trashed',changed);
   $('card-outcome').value = draft.payload.outcome;
+  $('submit-card').disabled = !canEdit() || draft.payload.outcome!=='confirmed';
   $('card-outcome').disabled = !canEdit() || draft.payload.outcome === 'trashed';
   $('save-card').disabled = !canEdit(); $('retry-card').disabled = !canEdit();
   $('trash-card').hidden = draft.payload.outcome === 'trashed'; $('trash-card').disabled = !canEdit();
@@ -131,7 +133,7 @@ function caption(path) { return path.split('/').filter(part=>part && part!=='bod
 async function openCard(id) {
   if (draft?.dirty && !await save()) return;
   const result = await api('/preparazioni/'+workspace.id+'/schede/'+id);
-  draft = new PreparationDraft(id,result.version); historyAfter = 0; remote = null; lastOperation = null;
+  draft = new PreparationDraft(id,result.version); historyAfter = 0; remote = null; lastOperation = null; pendingSubmission = null; $('submission-link').hidden = true;
   $('conflict-panel').hidden = true; $('compare-card').hidden = true; $('retry-card').hidden = true;
   $('card-history').replaceChildren(); $('save-state').textContent = text.saved;
   render(); await cardHistory();
@@ -181,7 +183,11 @@ for (const [id,action] of [['workspace-trash','cestina'],['workspace-restore','r
 });
 for (const [id,next] of [['view-card','card'],['view-fields','fields']]) $(id).addEventListener('click',() => {mode=next;render();});
 for (const id of ['save-card','retry-card']) $(id).addEventListener('click',() => save().then(clearProblem).catch(problem));
-$('card-outcome').addEventListener('change',event => {draft.edit('/outcome',event.target.value);changed();});
+$('card-outcome').addEventListener('change',event => {draft.edit('/outcome',event.target.value);$('submit-card').disabled=!canEdit() || event.target.value!=='confirmed';changed();});
+$('submit-card').addEventListener('click',async()=>{
+  try {if(!await save() || draft.payload.outcome!=='confirmed')return;pendingSubmission ??= {request_key:uuid(),items:[{item_id:draft.item,expected_version:draft.version}]};const result=await api('/preparazioni/'+workspace.id+'/invii',pendingSubmission);const receipt=result.items.find(item=>item.item_id===draft.item && item.outcome==='submitted');if(!receipt)throw new Error();pendingSubmission=null;$('submission-link').href='/moderazione/contributo/'+receipt.receipt.contribution_id;$('submission-link').hidden=false;$('save-state').textContent=text.submitted;clearProblem();}
+  catch(error){if(error.status && error.status<500)pendingSubmission=null;problem(error);}
+});
 $('trash-card').addEventListener('click',() => {draft.edit('/outcome','trashed');changed();save().then(render).catch(problem);});
 $('restore-card').addEventListener('click',() => {draft.edit('/outcome','review');changed();save().then(render).catch(problem);});
 $('history-panel').addEventListener('toggle',() => {if ($('history-panel').open && draft) cardHistory().catch(problem);});

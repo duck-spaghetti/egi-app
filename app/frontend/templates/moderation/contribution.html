@@ -14,6 +14,7 @@
   {% include 'moderation/proposal_actions.html' %}
   {% endif %}
 </section>
+{% block community_acceptance %}{% endblock %}
 {% if item.state != 'closed' %}
 <section class="desk-card">
   <h2>{{ t('moderation.contribution.work') }}</h2>

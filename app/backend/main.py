@@ -114,6 +114,8 @@ def mount_selected(application, configuration):
         application.include_router(preparations)
         from .api.preparations.pages import router as preparation_pages
         application.include_router(preparation_pages)
+        from .api.preparations.review import router as community_review
+        application.include_router(community_review)
     if not configuration.canonical or configuration.local_layers:
         from .api.transport.router import router as transport
         from .api.cycleways.router import router as cycleways

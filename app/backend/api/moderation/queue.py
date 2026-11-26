@@ -71,8 +71,14 @@ def contribution_page(request: Request, module: Moderation, contribution: str, *
         item = connection.execute('SELECT editorial.read_contribution(%s) AS item', (contribution,)).fetchone()['item']
         people = connection.execute('SELECT * FROM editorial.list_moderators()').fetchall()
         name = connection.execute(NAMES, ([item['service_id']] if item['service_id'] else [],)).fetchone()
-        review = decision_context(connection, item, request.query_params.get('q', '')[:200])
-    return module.render(request, 'contribution.html', person, item=item, people=people,
+        if item.get('author_kind') == 'community':
+            from ..preparations.review import review_context
+            review = review_context(connection,item,module,request.query_params.get('q','')[:200])
+            template = 'community-review.html'
+        else:
+            review = decision_context(connection, item, request.query_params.get('q', '')[:200])
+            template = 'contribution.html'
+    return module.render(request, template, person, item=item, people=people,
                          service_name=name['name'] if name else None, reasons=REASONS, **review, **context)
 
 

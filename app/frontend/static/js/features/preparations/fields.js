@@ -20,7 +20,12 @@ export function renderFields(root, draft, context, canEdit, changed) {
     const wrapper = node('div', undefined, 'preparation-control'); wrapper.dataset.field = key;
     wrapper.append(node('span', label(key)));
     let input;
-    if (dictionary.choices[key]) {
+    if (key==='territory_id' && context.references?.territories) {
+      input=node('select');input.append(new Option(text.not_set,''));
+      for(const area of context.references.territories)input.append(new Option(area.name,area.territory_id));
+      if(value && !context.references.territories.some(area=>area.territory_id===value))input.append(new Option(value,value));
+      input.value=value || '';
+    } else if (dictionary.choices[key]) {
       input = node('select'); input.append(new Option(text.not_set, ''));
       for (const option of dictionary.choices[key]) {
         const caption = key === 'end_day_offset' ? (option ? text.next_day : text.same_day) : text.choice_labels[option] || String(option);
@@ -59,7 +64,9 @@ export function renderFields(root, draft, context, canEdit, changed) {
     values.forEach((value, index) => {
       const group = node('fieldset'); group.append(node('legend', label(key) + ' · ' + (index + 1)));
       if (key === 'territories') {
-        const control = node('input'); control.value = value; control.disabled = !canEdit;
+        const control = node(context.references?.territories ? 'select':'input');
+        if(context.references?.territories){control.append(new Option(text.not_set,''));for(const area of context.references.territories)control.append(new Option(area.name,area.territory_id));if(value && !context.references.territories.some(area=>area.territory_id===value))control.append(new Option(value,value));}
+        control.value = value; control.disabled = !canEdit;
         control.setAttribute('aria-label', label('territory_id'));
         control.addEventListener('change', () => { const next = structuredClone(values); next[index] = control.value; edit(path, next); });
         group.append(control);
