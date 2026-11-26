@@ -13,7 +13,7 @@ export function createBuses({scope,http,translate:t,
  frame=globalThis.requestAnimationFrame?.bind(globalThis),cancel=globalThis.cancelAnimationFrame?.bind(globalThis),
  clock=()=>Date.now(),host=document,delay=setTimeout,undelay=clearTimeout}){
  let map=null,visible=false,disposed=false,request=null,timer=null,tick=null,animation=null,lines=[],snapshot=null,received=0,generation=0;
- let shown=new Map(),transition=null;const cleanup=[];
+ let shown=new Map(),transition=null,statusKey='';const cleanup=[];
  const panel=document.createElement('div');panel.className='map3d-buses';
  const button=document.createElement('button');button.type='button';button.className='btn';
  const input=document.createElement('input');input.type='text';input.maxLength=2000;
@@ -24,8 +24,8 @@ export function createBuses({scope,http,translate:t,
  input.setAttribute('aria-label',t('map.buses.lines'));input.placeholder=t('map.buses.all');
  const active=()=>visible&&!disposed&&!host.hidden&&map?.getZoom()>=15;
  const empty=()=>({type:'FeatureCollection',features:[]});
- const say=key=>{const text=key?t(`map.buses.${key}`):'';if(status.textContent!==text)status.textContent=text;};
- function refreshLabels(){button.textContent=t('map.buses.toggle');labelText.textContent=t('map.buses.lines');input.setAttribute('aria-label',t('map.buses.lines'));input.placeholder=t('map.buses.all');}
+ const say=key=>{statusKey=key;const text=key?t(`map.buses.${key}`):'';if(status.textContent!==text)status.textContent=text;};
+ function refreshLabels(){button.textContent=t('map.buses.toggle');labelText.textContent=t('map.buses.lines');input.setAttribute('aria-label',t('map.buses.lines'));input.placeholder=t('map.buses.all');say(statusKey);}
  function own(event,fn){map.on(event,fn);cleanup.push(()=>map.off?.(event,fn));}
  function ensure(){
   if(disposed||map.isStyleLoaded?.()===false||map.getSource(SOURCE))return;

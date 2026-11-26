@@ -19,8 +19,8 @@ const assert=require('node:assert/strict');const {environment,element}=require('
  await layer.reload();assert.equal(mutations,0,'unchanged live status is not announced again');
  assert(map.layers.filter(l=>l.type==='fill-extrusion').every(l=>l.minzoom===15));
  assert.equal(source.data.features.length,1);assert.equal(source.data.features[0].properties.old,true);
- map.zoom=14.9;handlers.zoom();assert.equal(source.data.features.length,0,'zoom gate clears immediately');map.zoom=15;
- language='fr';layer.refreshLabels();assert.match(box.children[0].children[0].textContent,/^fr:/);assert.match(box.children[0].children[1].children[0].textContent,/^fr:/);assert.match(box.children[0].children[1].children.at(-1).placeholder,/^fr:/);
+ map.zoom=14.9;handlers.zoom();assert.equal(source.data.features.length,0,'zoom gate clears immediately');
+ language='fr';layer.refreshLabels();assert.match(status.textContent,/^fr:map.buses.zoom/);map.zoom=15;assert.match(box.children[0].children[0].textContent,/^fr:/);assert.match(box.children[0].children[1].children[0].textContent,/^fr:/);assert.match(box.children[0].children[1].children.at(-1).placeholder,/^fr:/);
  assert.equal(map.layers.find(l=>l.id==='egi-live-buses-labels').minzoom,16);assert.equal(box.children[0].children[3].hidden,false);
  const input=box.children[0].children[1].children.at(-1);input.value='64,64';input.dispatch('input',{});await layer.reload();assert.equal(JSON.stringify(requests.at(-1).body.lines),'["64"]');assert(!requests.at(-1).url.includes('?'));
  host.hidden=true;host.changed();await layer.reload();assert.equal(requests.length,3);assert.equal(source.data.features.length,0,'hidden clears');
