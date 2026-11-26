@@ -9,14 +9,21 @@ const assert=require('node:assert/strict');const {environment,element}=require('
  getBounds:()=>({getWest:()=>12.49,getEast:()=>12.52,getSouth:()=>41.89,getNorth:()=>41.92}),
  getSource(id){return this.sources[id];},addSource(id,s){this.sources[id]={...s,setData(d){this.data=d;}};},removeSource(id){delete this.sources[id];},addLayer(l){this.layers.push(l);},getLayer(id){return this.layers.find(l=>l.id===id);},removeLayer(id){this.layers=this.layers.filter(l=>l.id!==id);},on(n,fn){handlers[n]=fn;},off(){}};
  let frames=0;
- const layer=createBuses({scope:{signal:new AbortController().signal},http:{request:async(url,o)=>{requests.push({url,body:JSON.parse(o.body)});return {ok:true,json:async()=>response};}},translate:k=>k,reduced:true,host,clock:()=>now,delay,undelay,frame:()=>frames++});
+ let language='it';
+ const layer=createBuses({scope:{signal:new AbortController().signal},http:{request:async(url,o)=>{requests.push({url,body:JSON.parse(o.body)});return {ok:true,json:async()=>response};}},translate:k=>language+':'+k,reduced:true,host,clock:()=>now,delay,undelay,frame:()=>frames++});
  layer.mount(fn=>fn(map,{}));await layer.reload();assert.equal(requests.length,0,'off by default');
  layer.setVisible(true);await layer.reload();assert.equal(requests.length,0,'below z15');assert.match(box.children[0].children[2].textContent,/zoom/);
  map.zoom=15;await layer.reload();assert.equal(requests.length,1);assert.equal(frames,0,'reduced motion');
- let source=map.sources['egi-live-buses'];assert.equal(source.data.features.length,1);assert.equal(source.data.features[0].properties.old,true);
+ let source=map.sources['egi-live-buses'];
+ const status=box.children[0].children[2];let text=status.textContent,mutations=0;Object.defineProperty(status,'textContent',{get:()=>text,set:v=>{text=v;mutations++;}});
+ await layer.reload();assert.equal(mutations,0,'unchanged live status is not announced again');
+ assert(map.layers.filter(l=>l.type==='fill-extrusion').every(l=>l.minzoom===15));
+ assert.equal(source.data.features.length,1);assert.equal(source.data.features[0].properties.old,true);
+ map.zoom=14.9;handlers.zoom();assert.equal(source.data.features.length,0,'zoom gate clears immediately');map.zoom=15;
+ language='fr';layer.refreshLabels();assert.match(box.children[0].children[0].textContent,/^fr:/);assert.match(box.children[0].children[1].children[0].textContent,/^fr:/);assert.match(box.children[0].children[1].children.at(-1).placeholder,/^fr:/);
  assert.equal(map.layers.find(l=>l.id==='egi-live-buses-labels').minzoom,16);assert.equal(box.children[0].children[3].hidden,false);
- const input=box.children[0].children[1].children[0];input.value='64,64';input.dispatch('input',{});await layer.reload();assert.equal(JSON.stringify(requests.at(-1).body.lines),'["64"]');assert(!requests.at(-1).url.includes('?'));
- host.hidden=true;host.changed();await layer.reload();assert.equal(requests.length,2);assert.equal(source.data.features.length,0,'hidden clears');
+ const input=box.children[0].children[1].children.at(-1);input.value='64,64';input.dispatch('input',{});await layer.reload();assert.equal(JSON.stringify(requests.at(-1).body.lines),'["64"]');assert(!requests.at(-1).url.includes('?'));
+ host.hidden=true;host.changed();await layer.reload();assert.equal(requests.length,3);assert.equal(source.data.features.length,0,'hidden clears');
  host.hidden=false;host.changed();response={...response,stale:true};await layer.reload();assert.equal(source.data.features.length,0);assert.match(box.children[0].children[2].textContent,/stale/);
  response={...response,stale:false};await layer.reload();now+=181000;
  const [tickId,tick]=[...jobs].find(([id,j])=>j.ms===1000);jobs.delete(tickId);tick.fn();assert.equal(source.data.features.length,0,'feed expires even before a new response');

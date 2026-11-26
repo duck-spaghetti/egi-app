@@ -41,6 +41,7 @@ export async function loadRoads(archive, a, b, {VectorTile, Pbf}, signal) {
   return lines;
 }
 export function buildGraph(lines) {
+  // Quantize duplicate vertices at tile seams to roughly one metre.
   const key = ([lon, lat]) => `${Math.round(lon * 1e5)},${Math.round(lat * 1e5)}`;
   const nodes = new Map(), adj = new Map();
   const node = p => { const k = key(p); if (!nodes.has(k)) { nodes.set(k, p); adj.set(k, []); } return k; };
@@ -50,21 +51,24 @@ export function buildGraph(lines) {
       const k1 = node(part[i - 1]), k2 = node(part[i]);
       if (k1 !== k2) link(k1, k2, dist(part[i - 1], part[i]));
     }
-  const cell = new Map(), C = 4e-5;
+  // Join endpoints less than four metres apart; inspect neighbouring grid cells.
+  const cell = new Map(), SNAP_CELL_DEGREES = 4e-5;
   for (const [k, p] of nodes) {
-    const c = `${Math.floor(p[0] / C)},${Math.floor(p[1] / C)}`;
+    const c = `${Math.floor(p[0] / SNAP_CELL_DEGREES)},${Math.floor(p[1] / SNAP_CELL_DEGREES)}`;
     (cell.get(c) || cell.set(c, []).get(c)).push(k);
   }
   for (const [k, p] of nodes) {
-    const cx = Math.floor(p[0] / C), cy = Math.floor(p[1] / C);
+    const cx = Math.floor(p[0] / SNAP_CELL_DEGREES), cy = Math.floor(p[1] / SNAP_CELL_DEGREES);
     for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++)
       for (const k2 of cell.get(`${cx + i},${cy + j}`) || [])
         if (k2 > k) { const d = dist(p, nodes.get(k2)); if (d < 4) link(k, k2, d); }
   }
-  const segs = new Map(), S = 1e-4;
+  // A simplified straight road can lose its T-junction vertex. Index segments
+  // on a roughly ten-metre grid and attach free endpoints within six metres.
+  const segs = new Map(), SEGMENT_CELL_DEGREES = 1e-4;
   const segCells = (a, b) => { const out = [];
-    for (let x = Math.floor(Math.min(a[0], b[0]) / S); x <= Math.floor(Math.max(a[0], b[0]) / S); x++)
-      for (let y = Math.floor(Math.min(a[1], b[1]) / S); y <= Math.floor(Math.max(a[1], b[1]) / S); y++) out.push(`${x},${y}`);
+    for (let x = Math.floor(Math.min(a[0], b[0]) / SEGMENT_CELL_DEGREES); x <= Math.floor(Math.max(a[0], b[0]) / SEGMENT_CELL_DEGREES); x++)
+      for (let y = Math.floor(Math.min(a[1], b[1]) / SEGMENT_CELL_DEGREES); y <= Math.floor(Math.max(a[1], b[1]) / SEGMENT_CELL_DEGREES); y++) out.push(`${x},${y}`);
     return out; };
   for (const [k1, list] of adj) for (const [k2] of list) if (k1 < k2) {
     const a = nodes.get(k1), b = nodes.get(k2);
@@ -73,7 +77,7 @@ export function buildGraph(lines) {
   for (const [k, p] of nodes) {
     if (adj.get(k).length > 1) continue;
     let best = null;
-    const cx = Math.floor(p[0] / S), cy = Math.floor(p[1] / S);
+    const cx = Math.floor(p[0] / SEGMENT_CELL_DEGREES), cy = Math.floor(p[1] / SEGMENT_CELL_DEGREES);
     for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++)
       for (const [k1, k2] of segs.get(`${cx + i},${cy + j}`) || []) {
         if (k1 === k || k2 === k) continue;
@@ -92,19 +96,21 @@ function component(adj, start) {
   while (stack.length) for (const [v] of adj.get(stack.pop())) if (!seen.has(v)) { seen.add(v); stack.push(v); }
   return seen;
 }
+/** Prefer the largest connected network over isolated clipped fragments. */
 function mainNetwork(nodes, adj) {
   let best = new Set(); const visited = new Set();
   for (const k of nodes.keys()) if (!visited.has(k)) { const c = component(adj, k); c.forEach(v => visited.add(v)); if (c.size > best.size) best = c; }
   return best;
 }
 function nearest(nodes, p, allowed) {
-  let best = null, bd = Infinity;
-  for (const [k, q] of nodes) { if (allowed && !allowed.has(k)) continue; const d = dist(p, q); if (d < bd) { bd = d; best = k; } }
+  let best = null, bestDistance = Infinity;
+  for (const [k, q] of nodes) { if (allowed && !allowed.has(k)) continue; const d = dist(p, q); if (d < bestDistance) { bestDistance = d; best = k; } }
   return best;
 }
 export function shortest({ nodes, adj }, from, to) {
   if (!from || !to) return null;
   const d = new Map([[from, 0]]), prev = new Map(), heap = [[0, from]], done = new Set();
+  // Binary min-heap keeps shortest-path search O((vertices + edges) log vertices).
   const push = x => { heap.push(x); let i = heap.length - 1; while (i) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
   const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0;
     for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };

@@ -17,19 +17,20 @@ export function createBuses({scope,http,translate:t,
  const panel=document.createElement('div');panel.className='map3d-buses';
  const button=document.createElement('button');button.type='button';button.className='btn';
  const input=document.createElement('input');input.type='text';input.maxLength=2000;
- const label=document.createElement('label');label.textContent=t('map.buses.lines');label.appendChild(input);
+ const label=document.createElement('label'),labelText=document.createElement('span');label.appendChild(labelText);label.appendChild(input);
  const status=document.createElement('div');status.setAttribute('role','status');status.setAttribute('aria-live','polite');
  const credit=document.createElement('div');credit.textContent='Roma Mobilità · CC BY-SA';credit.hidden=true;
  panel.appendChild(button);panel.appendChild(label);panel.appendChild(status);panel.appendChild(credit);
  input.setAttribute('aria-label',t('map.buses.lines'));input.placeholder=t('map.buses.all');
  const active=()=>visible&&!disposed&&!host.hidden&&map?.getZoom()>=15;
  const empty=()=>({type:'FeatureCollection',features:[]});
- const say=key=>{status.textContent=key?t(`map.buses.${key}`):'';};
+ const say=key=>{const text=key?t(`map.buses.${key}`):'';if(status.textContent!==text)status.textContent=text;};
+ function refreshLabels(){button.textContent=t('map.buses.toggle');labelText.textContent=t('map.buses.lines');input.setAttribute('aria-label',t('map.buses.lines'));input.placeholder=t('map.buses.all');}
  function own(event,fn){map.on(event,fn);cleanup.push(()=>map.off?.(event,fn));}
  function ensure(){
   if(disposed||map.isStyleLoaded?.()===false||map.getSource(SOURCE))return;
   map.addSource(SOURCE,{type:'geojson',data:empty()});
-  for(const [id,old,opacity] of [[LAYERS[0],false,.9],[LAYERS[1],true,.3]])map.addLayer({id,type:'fill-extrusion',source:SOURCE,filter:['==',['get','old'],old],paint:{'fill-extrusion-color':'#f5c400','fill-extrusion-height':3.2,'fill-extrusion-opacity':opacity}});
+  for(const [id,old,opacity] of [[LAYERS[0],false,.9],[LAYERS[1],true,.3]])map.addLayer({id,minzoom:15,type:'fill-extrusion',source:SOURCE,filter:['==',['get','old'],old],paint:{'fill-extrusion-color':'#f5c400','fill-extrusion-height':3.2,'fill-extrusion-opacity':opacity}});
   map.addLayer({id:LAYERS[2],type:'symbol',source:SOURCE,minzoom:16,layout:{'text-field':['get','code'],'text-font':['Noto Sans Regular'],'text-size':13,'text-allow-overlap':false},paint:{'text-color':'#302800','text-halo-color':'#fff','text-halo-width':1.5,'text-opacity':['case',['get','old'],.3,1]}});
  }
  function stop(){request?.abort();request=null;undelay(timer);timer=null;cancel?.(animation);animation=null;transition=null;}
@@ -66,13 +67,13 @@ export function createBuses({scope,http,translate:t,
   finally{if(active()&&!current.signal.aborted)timer=delay(load,20000);}
  }
  function schedule(){stop();snapshot=null;render();if(active())timer=delay(load,180);}
- function setVisible(value){visible=Boolean(value);button.setAttribute('aria-pressed',String(visible));button.textContent=t('map.buses.toggle');credit.hidden=!visible;label.hidden=!visible;status.hidden=!visible;schedule();}
+ function setVisible(value){visible=Boolean(value);button.setAttribute('aria-pressed',String(visible));refreshLabels();credit.hidden=!visible;label.hidden=!visible;status.hidden=!visible;schedule();}
  function setLines(values){lines=[...new Set(values.map(s=>s.trim()).filter(Boolean))].slice(0,80);schedule();}
  button.addEventListener('click',()=>setVisible(!visible),{signal:scope.signal});
  input.addEventListener('input',()=>setLines(input.value.split(',')),{signal:scope.signal});
  host.addEventListener('visibilitychange',schedule,{signal:scope.signal});
- function mount(attach){attach(m=>{map=m;map.getContainer().appendChild(panel);own('moveend',schedule);own('load',()=>{ensure();render();});ensure();setVisible(false);
+ function mount(attach){attach(m=>{map=m;map.getContainer().appendChild(panel);own('moveend',schedule);own('zoom',()=>{if(!active()){stop();snapshot=null;render();}});own('load',()=>{ensure();render();});ensure();setVisible(false);
   const age=()=>{if(disposed)return;if(active()&&snapshot&&!animation)render();tick=delay(age,1000);};tick=delay(age,1000);});}
  function dispose(){disposed=true;visible=false;stop();undelay(tick);for(const fn of cleanup)fn();panel.remove?.();for(const id of [...LAYERS].reverse())if(map?.getLayer?.(id))map.removeLayer(id);if(map?.getSource(SOURCE))map.removeSource(SOURCE);}
- return {mount,setVisible,setLines,reload:load,dispose};
+ return {mount,setVisible,setLines,refreshLabels,reload:load,dispose};
 }

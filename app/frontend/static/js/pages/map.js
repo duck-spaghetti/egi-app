@@ -128,7 +128,7 @@ export function createMapPage(context, dependencies={}) {
    const data=await services.load(code);scope.check();if(generation!==languageGeneration)return;
    const chosen=new Set(state.filters.cats);Object.assign(state,data);state.lang=code;
    state.filters.cats=new Set(state.categories.map(row=>row.slug).filter(slug=>chosen.has(slug)));
-   refresh();renderFilters();shell.translate();shell.close();
+   refresh();renderFilters();shell.translate();walking?.clear();buses?.refreshLabels();shell.close();
    if(state.selectedId)select(state.selectedId);
   }catch(error){if(!scope.signal.aborted && generation===languageGeneration)shell.toast('Catalogo temporaneamente non disponibile. Riprova.');}
  }
