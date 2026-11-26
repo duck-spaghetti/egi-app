@@ -1,5 +1,5 @@
 import {siteMarkers,USER_DOT_HTML,USER_DOT_LABEL} from "../map/pins.js";
-import {clusterSites,clusterAppearance,siteLabel,CLUSTER_DISTANCE,NAME_ZOOM,DETAIL_ZOOM} from "./sites.js";
+import {clusterSites,clusterAppearance,siteLabel,CLUSTER_DISTANCE,STEM_ZOOM,NAME_ZOOM,DETAIL_ZOOM} from "./sites.js";
 import {egiStyle,liftBridgeLabels} from "./style.js";
 /** createMap3d: the 3D mode's map module, on MapLibre GL JS, with the current map's interface.
  *
@@ -12,7 +12,7 @@ import {egiStyle,liftBridgeLabels} from "./style.js";
  * (both injected, so tests can pass fakes).
  */
 const PROTOCOLS = new WeakSet(); // MapLibre instances with the pmtiles protocol registered
-export const CLUSTER_PX = CLUSTER_DISTANCE, CLUSTER_MAX_ZOOM = 16, TILT = 55, ROTATE_STEP = 30;
+export const CLUSTER_PX = CLUSTER_DISTANCE, CLUSTER_MAX_ZOOM = 15, TILT = 55, ROTATE_STEP = 30;
 // Budget (spec, Performance): at least 30 fps while moving, JS memory under 150 MB.
 export const MIN_FPS = 30, MAX_HEAP_MB = 150, BUDGET_SAMPLES = 3;
 
@@ -28,7 +28,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   devicePixelRatio=globalThis.devicePixelRatio||1,origin=globalThis.location?.origin||"",
   frame=globalThis.requestAnimationFrame?.bind(globalThis),cancelFrame=globalThis.cancelAnimationFrame?.bind(globalThis),
   clock=()=>globalThis.performance?.now?.()??Date.now(),heap=()=>globalThis.performance?.memory?.usedJSHeapSize??null}) {
- let state={},list=[],visible=true,disposed=false;
+ let state={},entries=[],visible=true,disposed=false;
  const runtime={map:null,markers:new Map(),user:null,bounds:null,cleanups:[]};
  const t=(key,fallback)=>translate(key,{},fallback);
  const bounds=()=>[[Number(context.boundsWest),Number(context.boundsSouth)],[Number(context.boundsEast),Number(context.boundsNorth)]];
@@ -117,9 +117,15 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   if(!map||disposed)return;
   const next=new Map(),labels=[];
   if(visible){
-   for(const {site,members} of cluster(siteMarkers(list,{sites,describe}))){
-    const count=members.length;
+   const viewport=map.getContainer?.(),screenWidth=viewport?.clientWidth||Infinity,screenHeight=viewport?.clientHeight||Infinity;
+   const onscreen=screenWidth===Infinity?entries:entries.filter(site=>{const p=map.project([site.lng,site.lat]);return p.x>=-120&&p.x<=screenWidth+120&&p.y>=-120&&p.y<=screenHeight+120;});
+   const layout=cluster(onscreen).map(group=>{
+    const {site,members}=group,count=members.length;
     const lngLat=count>1?[members.reduce((a,m)=>a+m.lng,0)/count,members.reduce((a,m)=>a+m.lat,0)/count]:[site.lng,site.lat];
+    return {...group,lngLat,point:map.project(lngLat)};
+   });
+   for(const group of layout){
+    const {site,members,lngLat,point}=group,count=members.length;
     const key=`${lngLat[0].toFixed(6)},${lngLat[1].toFixed(6)},${count}`;
     let entry=runtime.markers.get(key);
     if(!entry){
@@ -142,22 +148,38 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
     entry.data={site,lngLat};
     if(count===1){
      const selected=site.serviceIds.includes(String(state.selectedId));
-     const anchored=map.getZoom()>=NAME_ZOOM,detail=selected||map.getZoom()>=DETAIL_ZOOM;
-     const point=map.project(lngLat),width=detail?240:200,viewport=map.getContainer?.();
-     const screenWidth=viewport?.clientWidth||Infinity,screenHeight=viewport?.clientHeight||Infinity;
-     const leftSide=point.x+30+width>screenWidth-140;
-     const left=leftSide?point.x-30-width:point.x+30;
-     const box={left,right:left+width,top:point.y-80,bottom:point.y-(detail?0:42)};
-     const onScreen=box.right>0&&box.left<screenWidth&&box.bottom>0&&box.top<screenHeight;
-     entry.el.dataset.labelSide=leftSide?'left':'right';
-     const overlap=labels.some(b=>box.left<b.right&&box.right>b.left&&box.top<b.bottom&&box.bottom>b.top);
-     const labelled=(selected||anchored)&&onScreen&&(!overlap||selected);
-     if(labelled)labels.push(box);
+     const anchored=map.getZoom()>=STEM_ZOOM,detail=selected||map.getZoom()>=DETAIL_ZOOM;
+     const maxWidth=Math.min(detail?260:200,Math.max(130,(screenWidth-50)/2-30));
+     const statusLength=Math.max(0,...(site.statuses||[]).map(s=>s?.label?.length||0),(site.statuses||[]).length>1?48:0);
+     const rtl=document.documentElement?.dir==='rtl';
+     const intersects=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
+     let placement=null;
+     // Try a narrower integrated head before dropping information in a dense view.
+     for(const width of new Set([maxWidth,Math.max(130,Math.floor(maxWidth*.7)),130])){
+      const columns=Math.max(1,Math.floor((width-20)/23));
+      const statusLines=Math.max(1,Math.ceil((statusLength*6+12)/(width-20)));
+      const labelHeight=detail?33+23*Math.ceil((site.allCategories||site.categories||[]).length/columns)+14*statusLines:44;
+      const preferred=point.x+30+width>screenWidth-140;
+      for(const leftSide of [preferred,!preferred]){
+       const left=leftSide?point.x-30-width:point.x-24,right=leftSide?point.x+24:point.x+30+width;
+       const box={left,right,top:point.y-24-Math.max(44,labelHeight),bottom:point.y-20};
+       const inFrame=box.left>=0&&box.right<=screenWidth&&box.top>=0&&box.bottom<=screenHeight;
+       const hitsPin=layout.some(other=>other!==group&&intersects(box,{left:other.point.x-24,right:other.point.x+24,top:other.point.y-70,bottom:other.point.y}));
+       const toolSide=rtl?box.left<140:box.right>screenWidth-140;
+       const hitsTools=toolSide&&box.top<470;
+       if(inFrame&&!hitsTools&&!hitsPin&&!labels.some(b=>intersects(box,b))){placement={width,leftSide,box};break;}
+      }
+      if(placement)break;
+     }
+     entry.el.style.setProperty?.('--site-label-width',`${(placement?.width||maxWidth)-20}px`);
+     const labelled=(selected||map.getZoom()>=NAME_ZOOM)&&Boolean(placement);
+     if(labelled)labels.push(placement.box);
+     entry.el.dataset.labelSide=placement?.leftSide?'left':'right';
      const html=`<span class="map3d-pin-body">${site.html}${labelled?siteLabel(site,detail,translate):''}</span><span class="map3d-stem" aria-hidden="true"></span><span class="map3d-ground" aria-hidden="true"></span>`;
-     entry.el.dataset.anchored=String(anchored);entry.el.dataset.selected=String(selected);
-     const accessible=[site.label,...detail?(site.statuses||[]).map(s=>s?.label):[]].filter(Boolean).join(" · ");
+     entry.el.dataset.anchored=String(anchored);entry.el.dataset.labelled=String(labelled);entry.el.dataset.selected=String(selected);
+     const accessible=[selected?`${site.name} · ${site.label}`:site.label,...(site.allCategories||[]).filter(c=>c.matched===false).map(c=>c.label||c.slug),...detail?(site.statuses||[]).map(s=>s?.label):[]].filter(Boolean).join(" · ");
      if(entry.el.dataset.html!==html+accessible){
-      entry.el.innerHTML=html;entry.el.setAttribute("aria-label",accessible);entry.el.title=site.label;entry.el.dataset.html=html+accessible;
+      entry.el.innerHTML=html;entry.el.setAttribute("aria-label",accessible);entry.el.title=selected?accessible:site.label;entry.el.dataset.html=html+accessible;
      }
     }
     next.set(key,entry);
@@ -176,12 +198,21 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   const [[w,s],[e,n]]=runtime.bounds||bounds();
   return lat>=s&&lat<=n&&lng>=w&&lng<=e;
  }
- function update(snapshot,rows){state=snapshot;list=rows;render();}
+ function update(snapshot,rows){
+  state=snapshot;
+  entries=siteMarkers(rows,{sites,describe}).map(site=>{
+   if(!site.serviceIds.includes(String(state.selectedId)))return site;
+   const selected=site.choose().items.find(p=>String(p.id)===String(state.selectedId));
+   if(!selected)return site;const view=describe(selected);
+   return {...site,name:view.title||site.name,statuses:[view.status]};
+  });
+  render();
+ }
  /** Layer factories receive the MapLibre map and the engine (so they pick their MapLibre version). */
  function attach(factory){return factory(runtime.map,{maplibre});}
  function center(lat,lng){if(runtime.map&&contains(lat,lng))move({center:[lng,lat],zoom:Math.max(runtime.map.getZoom(),15)});}
- /** Fly to a service's building: z17.5, tilted (a jump when motion is reduced). */
- function lookAt(lat,lng){if(runtime.map&&contains(lat,lng))move({center:[lng,lat],zoom:17.5,pitch:TILT,duration:reduceMotion?0:1600});}
+ /** Centre an opened service at z17.5, tilted; reduced motion jumps immediately. */
+ function focusService(lat,lng){if(runtime.map&&contains(lat,lng))move({center:[lng,lat],zoom:17.5,pitch:TILT,duration:reduceMotion?0:650});}
  function servicesVisible(value){visible=Boolean(value);render();}
  function dispose(){
   disposed=true;
@@ -190,6 +221,6 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   runtime.markers.clear();runtime.user?.remove();runtime.user=null;
   runtime.map?.remove();runtime.map=null;
  }
- return {mount,update,attach,center,contains,lookAt,invalidate:()=>runtime.map?.resize(),servicesVisible,dispose,
+ return {mount,update,attach,center,contains,focusService,invalidate:()=>runtime.map?.resize(),servicesVisible,dispose,
   markerCount:()=>runtime.markers.size};
 }

@@ -329,7 +329,7 @@ function renderServiceBar(poi) {
   const label={phone:"Chiama",email:"Scrivi",website:"Sito web"};
   const buttons=[
     reach ? `<a class="service-bar-btn primary ${reach.kind}" href="${escapeHtml(reach.href)}"${reach.external ? ' target="_blank" rel="noopener noreferrer"' : ""}><span class="contact-action-icon">${contactActionIcon(reach)}</span>${label[reach.kind]}</a>` : "",
-    go ? `<a class="service-bar-btn${reach ? "" : " primary"}" href="${escapeHtml(go.href)}" target="_blank" rel="noopener noreferrer"><span class="contact-action-icon">${contactActionIcon(go)}</span>Indicazioni</a>` : "",
+    go ? `<details class="service-directions"><summary class="service-bar-btn${reach ? "" : " primary"}"><span class="contact-action-icon">${contactActionIcon(go)}</span>${escapeHtml(t('map.directions.choose',{},'Ottieni indicazioni'))}</summary><div class="service-directions-options"><a href="${escapeHtml(go.href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(t('map.directions.google',{},'Apri Google Maps'))}</a><button type="button" data-walk-in-app${Number.isFinite(poi.latitude)&&Number.isFinite(poi.longitude)&&(context.view?.mode==='3d'||context.view?.available)?'':' disabled'}>${escapeHtml(t('map.directions.in_app',{},'Indicazioni in app · a piedi'))}</button></div></details>` : "",
   ].filter(Boolean);
   return buttons.join("");
 }
@@ -599,11 +599,16 @@ function renderCanonicalSources(poi) {
 }
 
 /** Refresh canonical opening results while retaining the visitor's filters and selection. */
+/** Calendar key for the current day in the service territory's timezone. */
+function localDayKey(now=new Date()) {
+ const day=new Intl.DateTimeFormat('en-GB',{timeZone:context.profile?.timezone||'UTC',weekday:'short'}).format(now);
+ return ['lun','mar','mer','gio','ven','sab','dom'][['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].indexOf(day)];
+}
+
 function todayHours(display, now=new Date()) {
   const structured=display?.days?.some(d=>d.intervals?.length);
   if (!structured) return display?.raw_text || display?.scoped?.length ? "Orari indicati come testo" : "";
-  const day=new Intl.DateTimeFormat("en-GB",{timeZone:context.profile?.timezone || "UTC",weekday:"short"}).format(now);
-  const key=["lun","mar","mer","gio","ven","sab","dom"][["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].indexOf(day)];
+  const key=localDayKey(now);
   const today=display.days.find(d=>d.day===key);
   return today?.intervals?.length ? `Oggi ${today.intervals.map(i=>i.label).join(", ")}` : "";  // closed today: the status says it
 }
@@ -620,7 +625,7 @@ function renderCourseHours(raw) {
   const enrol=raw.enrolment;
   const enrolState=enrol?.state==="aperte" ? "Iscrizioni aperte" : enrol?.state==="chiuse" ? "Iscrizioni chiuse" : "";
   // Week table like the other cards (r2): each lesson time with its levels as labels.
-  const week=display.kind==="lessons" ? `<div class="source-week lesson-week">${display.days.map(day=>`<div class="source-day"><strong>${escapeHtml(day.label)}</strong><span>${day.intervals.length ? day.intervals.map(v=>`<span class="lesson-slot"><span>${escapeHtml(v.label)}</span>${(v.levels || []).map(l=>`<span class="level-chip">${escapeHtml(l)}</span>`).join("")}</span>`).join("") : '<span class="unknown-value">Nessuna lezione</span>'}</span></div>`).join("")}</div>` : "";
+  const week=display.kind==="lessons" ? `<div class="source-week lesson-week">${display.days.map(day=>`<div class="source-day" data-calendar-day="${day.day}" data-today="${day.day===localDayKey()}"><strong>${escapeHtml(day.label)}</strong><span>${day.intervals.length ? day.intervals.map(v=>`<span class="lesson-slot"><span>${escapeHtml(v.label)}</span>${(v.levels || []).map(l=>`<span class="level-chip">${escapeHtml(l)}</span>`).join("")}</span>`).join("") : '<span class="unknown-value">Nessuna lezione</span>'}</span></div>`).join("")}</div>` : "";
   const notes=(display.courses || []).filter(c=>c.note || c.flags.length || !c.sessions.length).map(c=>`<li><span class="level-chip">${escapeHtml(c.level)}</span> ${escapeHtml([c.note, ...c.flags, c.sessions.length ? "" : "orario non indicato"].filter(Boolean).join(" · "))}</li>`).join("");
   return `${week ? `<h4>Orari delle lezioni</h4>${week}` : ""}${notes ? `<h4>Note dei corsi</h4><ul class="course-notes">${notes}</ul>` : ""}
     ${display.kind==="office" && display.cpia ? "<p>Iscrizioni e informazioni in segreteria.</p>" : ""}
@@ -664,7 +669,7 @@ function renderSourceHours(display) {
   if ("raw_text" in display) return `<p class="source-note">${escapeHtml(display.note)}</p>${display.raw_text?`<p class="source-hours-text">${escapeHtml(display.raw_text)}</p>`:""}`;
   // Days without hours are closed when the source declares other days (user, 2026-11-15).
   const empty=display.days.some(d=>d.intervals.length) ? '<span class="unknown-value">Chiuso</span>' : '<span class="unknown-value">Non indicato</span>';
-  return `${display.note ? `<p class="source-note">${escapeHtml(display.note)}</p>` : ""}<div class="source-week">${display.days.map(day=>`<div class="source-day"><strong>${escapeHtml(day.label)}</strong><span>${day.intervals.length ? day.intervals.map(v=>`<span>${escapeHtml(v.label)}${v.review_note ? ` <small>${escapeHtml(v.review_note)}</small>`:""}</span>`).join("<br>") : empty}${day.issues.length && !day.intervals.length ? `<small>${escapeHtml(day.issues.join("; "))}</small>`:""}</span></div>`).join("")}</div>${(display.warnings || []).map(w=>`<p class="source-note">${escapeHtml(w)}</p>`).join("")}`;
+  return `${display.note ? `<p class="source-note">${escapeHtml(display.note)}</p>` : ""}<div class="source-week">${display.days.map(day=>`<div class="source-day" data-calendar-day="${day.day}" data-today="${day.day===localDayKey()}"><strong>${escapeHtml(day.label)}</strong><span>${day.intervals.length ? day.intervals.map(v=>`<span>${escapeHtml(v.label)}${v.review_note ? ` <small>${escapeHtml(v.review_note)}</small>`:""}</span>`).join("<br>") : empty}${day.issues.length && !day.intervals.length ? `<small>${escapeHtml(day.issues.join("; "))}</small>`:""}</span></div>`).join("")}</div>${(display.warnings || []).map(w=>`<p class="source-note">${escapeHtml(w)}</p>`).join("")}`;
 }
 
 function nextLesson(display, now = new Date()) {
@@ -765,7 +770,7 @@ function renderCanonicalHours(poi) {
   const rows=days.map(day=>{
     const intervals=(day.intervals || []).map(interval=>escapeHtml(interval.label)).join("<br>");
     const label=intervals || (day.state==="closed" ? `Chiuso${hoursVerification(poi.raw?.hours_display) ? "" : " · da verificare"}` : "Da verificare");
-    return `<tr><th scope="row">${escapeHtml(day.label)}</th><td>${label}</td></tr>`;
+    return `<tr><th scope="row" data-calendar-day="${escapeHtml(day.day)}"${day.day===localDayKey()?' aria-current="date"':''}>${escapeHtml(day.label)}</th><td>${label}</td></tr>`;
   }).join("");
   return `<section class="detail-section service-section" id="sec-orari"><h3>Orari dichiarati</h3><table class="hours-table"><tbody>${rows}</tbody></table><p class="service-advice">Calendario interpretato come completo, in attesa di verifica. Giorni e fasce incerti restano da verificare. Le fasce notturne proseguono nel giorno seguente; eccezioni e variazioni possono prevalere.</p></section>`;
 }
@@ -780,5 +785,5 @@ function describe(poi, now=new Date()) {
   status:sourceOpeningStatus(poi.raw?.hours_display,now),today:todayHours(poi.raw?.hours_display,now)};
 }
 
-return {displayCategory,describe,normalizePublicService,normalizeArea,normalizeCategory,mergeServiceCategories,applyCategoryLabels,normalizeCategoryIconPath,resolveCategory,categoryBadge,serviceTitle,serviceKind,serviceOrganiser,sourceNames,formatDistance,sourceOpeningStatus,todayHours,renderServiceHeader,renderInfoSection,renderHoursSection,renderContactsSection,renderSourcesSection,renderServiceBar,serviceButton,SERVICE_SECTIONS,escapeHtml,t};
+return {localDayKey,displayCategory,describe,normalizePublicService,normalizeArea,normalizeCategory,mergeServiceCategories,applyCategoryLabels,normalizeCategoryIconPath,resolveCategory,categoryBadge,serviceTitle,serviceKind,serviceOrganiser,sourceNames,formatDistance,sourceOpeningStatus,todayHours,renderServiceHeader,renderInfoSection,renderHoursSection,renderContactsSection,renderSourcesSection,renderServiceBar,serviceButton,SERVICE_SECTIONS,escapeHtml,t};
 }

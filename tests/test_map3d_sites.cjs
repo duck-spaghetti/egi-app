@@ -2,7 +2,7 @@ const assert=require('node:assert/strict');const {environment}=require('./module
 (async()=>{
  const {clusterSites,clusterAppearance,siteLabel}=await environment().load('features/map3d/sites.js');
  const project=([x,y])=>({x,y}),sites=[{lng:63,lat:10},{lng:65,lat:10},{lng:200,lat:10}];
- assert.deepEqual(Array.from(clusterSites(sites,project,15),g=>g.members.length).sort(),[1,2],'neighbours across grid boundary merge');
+ assert.deepEqual(Array.from(clusterSites(sites,project,14),g=>g.members.length).sort(),[1,2],'neighbours across grid boundary merge');
  assert.equal(clusterSites(sites,project,16).length,3,'close zoom preserves each site');
  const groups=clusterSites(Array.from({length:1000},(_,i)=>({lng:i%40*10,lat:Math.floor(i/40)*10})),project,12);
  assert.equal(groups.reduce((n,g)=>n+g.members.length,0),1000,'no site lost or duplicated');
@@ -11,6 +11,7 @@ const assert=require('node:assert/strict');const {environment}=require('./module
  const t=(k,p,f)=>f,site={name:'<script>',label:'name',categories:[{label:'A&B'}],statuses:[{kind:'closing',label:'Chiude presto · da verificare',note:'<test>'}]};
  assert(!siteLabel(site,false,t).includes('A&amp;B'),'names before details');
  const html=siteLabel(site,true,t);assert(html.includes('&lt;script&gt;'));assert(html.includes('A&amp;B'));assert(html.includes('status closing'));assert(html.includes('da verificare'));assert(!html.includes('<test>'));
+ const all=siteLabel({...site,allCategories:[{slug:'first',label:'Visible'},{slug:'second',label:'Other service',matched:false}]},true,t);assert(all.includes('Other service'));assert(all.includes('outside-search'));assert(all.includes('fuori dai filtri'));
  const mixed=siteLabel({...site,statuses:[{kind:'closed',label:'Chiuso'},{kind:'unknown',label:'Non noto'}]},true,t);assert(mixed.includes('Orario da verificare'));assert(!mixed.includes('</i>Chiuso'));
  const unverified=siteLabel({...site,statuses:[1,2].map(()=>({kind:'open',label:'Aperto · da verificare',verificationLabel:'da verificare'}))},true,t);assert(unverified.includes('</i>da verificare · 2/2 servizi aperti'));
  assert.equal(clusterAppearance(64).ink,'#000');

@@ -114,7 +114,8 @@
       "look": "Look at the building",
       "slow": "The 3D view is slow on this device: you can go back to the flat map.",
       "site_open": "{open}/{total} services open",
-      "hours_unknown": "Hours to verify"
+      "hours_unknown": "Hours to verify",
+      "category_outside": "{category} · outside filters"
     },
     "walk": {
       "action": "Walk there",
@@ -135,7 +136,12 @@
       "unavailable": "Live buses unavailable.",
       "loading": "Loading bus positions…"
     },
-    "category_orientation": "Orientation"
+    "category_orientation": "Orientation",
+    "directions": {
+      "choose": "Get directions",
+      "google": "Open Google Maps",
+      "in_app": "In-app directions · walking"
+    }
   },
   "contribute": {
     "title": "New service",

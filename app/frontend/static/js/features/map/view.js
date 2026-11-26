@@ -27,7 +27,7 @@ export function viewMode({search = "", storage = null, context = {}, webgl2 = fa
 /** The page state that crosses a switch: filters, search text, reference point. */
 export function handoffState(state) {
   const f = state.filters;
-  return {filters: {...f, cats: [...f.cats], offersOff: [...f.offersOff]}, userLoc: state.userLoc || null};
+  return {filters: {...f, cats: [...f.cats], offersOff: [...f.offersOff]}, userLoc: state.userLoc || null,walkTo:state.pendingWalkId||null};
 }
 
 /** Remember the device choice and keep the handoff for the next page in this tab. */
@@ -55,6 +55,7 @@ export function applyHandoff(state, data) {
     if (!(key in state.filters)) continue;
     state.filters[key] = key === "cats" || key === "offersOff" ? new Set(Array.isArray(value) ? value : []) : value;
   }
+  if(typeof data.walkTo==="string"&&data.walkTo.length<100)state.pendingWalkId=data.walkTo;
   const loc = data.userLoc;
   if (loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng)) state.userLoc = {lat: loc.lat, lng: loc.lng, label: String(loc.label || "")};
 }

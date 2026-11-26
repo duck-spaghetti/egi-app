@@ -103,7 +103,7 @@ const live=c=>c.markers.filter(m=>!m.removed&&m.options.element.children?.[0]);
  for(const id of ['blocks-3d','parts-3d','roofs-3d','landmarks-3d','decks-3d','parapets-3d','piers-3d','fountains-3d','trees-3d','embankments','landmark-label'])assert(ids.includes(id),id);
  assert.match(style.sources.buildings.attribution,/CTRN Regione Lazio/);assert.match(style.sources.basemap.attribution,/OpenStreetMap.*Protomaps/);
  assert.equal(gl.options.attributionControl.compact,false);
- // "Look at the building": only with a map module that has lookAt (3D), in the sheet's action bar.
+ // Service focus is automatic; there is no separate building button.
  const {createMapPage}=await env.load('pages/map.js');
  async function page(mapModule){
   let emitService;const bar=env.get('detail-bar');bar.children=[];
@@ -118,8 +118,8 @@ const live=c=>c.markers.filter(m=>!m.removed&&m.options.element.children?.[0]);
  }
  const base={mount(){},update(){},dispose(){},attach(){},center(){},contains:()=>true,invalidate(){},servicesVisible(){}};
  let looked=null;
- const with3d=await page({...base,lookAt:(lat,lng)=>{looked=[lat,lng];}});
- assert.equal(with3d.length,1);assert.equal(with3d[0].textContent,"Guarda l'edificio");with3d[0].click();same(looked,[41.9,12.5]);
+ const with3d=await page({...base,focusService:(lat,lng)=>{looked=[lat,lng];}});
+ assert.equal(with3d.length,0,"separate building action removed");same(looked,[41.9,12.5],"detail focuses automatically");
  assert.equal((await page(base)).length,0,'no button on the current map');
  // Budget: three slow moves at z>=14 report once; a fast device reports nothing.
  const {overBudget}=await env.load('features/map3d/index.js');

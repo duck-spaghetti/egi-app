@@ -114,7 +114,8 @@
       "look": "Voir le bâtiment",
       "slow": "La vue 3D est lente sur cet appareil : vous pouvez revenir à la carte plane.",
       "site_open": "{open}/{total} services ouverts",
-      "hours_unknown": "Horaires à vérifier"
+      "hours_unknown": "Horaires à vérifier",
+      "category_outside": "{category} · hors des filtres"
     },
     "walk": {
       "action": "Y aller à pied",
@@ -135,7 +136,12 @@
       "unavailable": "Bus en temps réel indisponibles.",
       "loading": "Chargement des positions des bus…"
     },
-    "category_orientation": "Orientation"
+    "category_orientation": "Orientation",
+    "directions": {
+      "choose": "Obtenir un itinéraire",
+      "google": "Ouvrir Google Maps",
+      "in_app": "Itinéraire dans l’application · à pied"
+    }
   },
   "contribute": {
     "title": "Nouveau service",

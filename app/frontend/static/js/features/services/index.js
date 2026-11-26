@@ -135,6 +135,11 @@ function bindHoursToggle() {
 }
 
 function updateOpeningBadges() {
+  const today=model.localDayKey();
+  document.querySelectorAll('[data-calendar-day]').forEach(el=>{
+    const current=el.dataset.calendarDay===today;el.dataset.today=String(current);
+    el.setAttribute('aria-current',current?'date':'false');
+  });
   // Filter membership must change at opening/closing boundaries as well as labels.
 
   document.querySelectorAll("[data-opening-service]").forEach(el=>{

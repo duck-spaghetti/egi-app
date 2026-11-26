@@ -752,8 +752,10 @@ The assumed vehicle licence/version must be re-verified before launch.
 
 ### Indicative walking routes
 
-In 3D only, a located service's sheet offers **Walk there**. Without a reference
-point it opens the existing reference-choice flow. Routing reads z15 roads from
+A located service's sheet offers **Get directions**, with a choice of Google Maps
+or the in-app walking route. The latter uses 3D; choosing it from the flat map
+carries the service/reference into 3D in this tab. Without a reference point it opens
+the existing reference-choice flow, then continues the requested walk. Routing reads z15 roads from
 the active local basemap, excludes highways/rail/ferries, repairs simplified tile
 junctions and limits straight-line distance to 3 km. Snapping to the main connected
 network is capped at 100 m; absent coverage yields an explicit no-route message.
@@ -789,9 +791,29 @@ walking works on locally available basemap tiles and never calls an external rou
 
 3D starts at 45° pitch. Layers and the view switch share a toolbar. Screen-space
 clusters merge neighbours across cells, with translucent teal symbols sized and
-shaded by site count. At z16 service pins gain ground stems and names; at z17 they
-add categories and existing opening-status text/dots. Additional labels avoid one
-another and flip away from the right edge. Unknown, course and unverified hours
+shaded by site count. At z14 service pins gain ground stems and an integrated label with name, category
+icons and existing opening-status text/dots, when space permits. Clusters end at z15.
+The label includes every category at the site; categories outside active filters are
+dimmed. Labels avoid one another and other service buttons, and can extend to either
+side of the anchor. Unknown, course and unverified hours
 retain their existing meaning. Category icons share a stroke style (plain shield,
 compass, graduation cap and briefcase); Orientation has a short UI label. Stored
 source taxonomy and the 2D map behavior remain unchanged.
+
+The 3D renderer caches service presentation between camera moves and mounts only
+sites near the viewport, with a 120 px edge margin. Opening a detail from Map mode
+automatically centres its point (3D also sets z17.5 and tilt); List mode leaves the
+camera alone. There is no separate building-focus action. Opening-calendar day labels
+are left-aligned and only the current day in the territory timezone is bold. Category
+SVG ink is dark by default; coloured badges/pins and active filters apply white ink.
+
+Local browser comparison on 594 service records at the same centre/z17: marker
+redraw median 66 ms → 0.1 ms, mounted markers 365 → 4; the 1.6-second movement probe
+reported 41 → 60 fps. This is a desktop preview measurement, not phone acceptance.
+
+Directions are available in app only for finite public coordinates; address-only
+services keep Google's address fallback. Changing the selected target cancels both
+a pending reference intent and an in-flight route. Explicit cancellation also drops
+the intent. Cached legacy opening labels and current-day calendar emphasis refresh
+on the existing 30-second timer and when the page becomes visible. Narrow labels
+wrap the status qualification, adapt their width and avoid the map toolbar.

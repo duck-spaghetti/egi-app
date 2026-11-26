@@ -52,7 +52,7 @@ function bindUi() {
     if (event.target.open) void loadOriginTransit();
   }, {signal: scope.signal});
   document.addEventListener("keydown", event => {
-    if (event.key==="Escape") closeSheets();
+    if (event.key==="Escape") dismissSheets();
     if (event.key!=="Tab") return;
     const sheet=document.querySelector(".sheet.shown");
     if (!sheet) return;
@@ -78,11 +78,11 @@ function bindUi() {
     button.addEventListener("click", () => openSheet(`sheet-${button.dataset.sheetOpen}`), {signal: scope.signal});
   });
   document.querySelectorAll("[data-close]").forEach((button) => {
-    button.addEventListener("click", closeSheets, {signal: scope.signal});
+    button.addEventListener("click", dismissSheets, {signal: scope.signal});
   });
-  backdrop.addEventListener("click", closeSheets, {signal: scope.signal});
+  backdrop.addEventListener("click", dismissSheets, {signal: scope.signal});
 
-  viewToggle.addEventListener("click", toggleView, {signal: scope.signal});
+  viewToggle.addEventListener("click", ()=>{emit("cancelReference");toggleView();}, {signal: scope.signal});
   updateViewToggle();
   document.getElementById("reset-filters").addEventListener("click", resetFilters, {signal: scope.signal});
   document.getElementById("filters-search").addEventListener("click", () => {
@@ -114,6 +114,9 @@ function openSheet(id) {
   if (id === "sheet-location") document.querySelector('[data-sheet="location"]').classList.add("active");
   if (id === "sheet-settings") document.querySelector('[data-sheet="settings"]').classList.add("active");
 }
+
+/** User dismissal abandons reference selection; programmatic sheet changes keep it. */
+function dismissSheets() {emit('cancelReference');closeSheets();}
 
 function closeSheets() {
   document.querySelectorAll(".sheet").forEach((sheet) => sheet.classList.remove("shown"));

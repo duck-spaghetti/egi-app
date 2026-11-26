@@ -36,13 +36,17 @@ export const USER_DOT_LABEL="Punto di riferimento scelto";
 
 /** One marker description per site among the filtered services. */
 export function siteMarkers(list,{sites,describe}) {
-  const matched = new Set(list.map(p => p.id));
+  const matched = new Set(list.map(p => p.id)),descriptions=new Map();
+  const presentation=poi=>{const key=poi.id??poi;if(!descriptions.has(key))descriptions.set(key,describe(poi));return descriptions.get(key);};
   return sites.groups(list).map(items => {
-    const categories = [...new Map(items.map(p => {const c=describe(p).category; return [c?.slug,c];})).values()].filter(Boolean);
-    const poi = {...items[0], group_count:items.length, site_categories:categories, site_weights:categories.map(c=>items.filter(item=>describe(item).category?.slug===c.slug).length)};
+    const categories = [...new Map(items.map(p => {const c=presentation(p).category; return [c?.slug,c];})).values()].filter(Boolean);
+    const poi = {...items[0], group_count:items.length, site_categories:categories, site_weights:categories.map(c=>items.filter(item=>presentation(item).category?.slug===c.slug).length)};
     const label = `${poi.raw?.facility_name || poi.title}: ${items.length} servizi · ${categories.map(c=>categoryCaption(c.label || c.slug)).join(", ")}`;
     const siblings=sites.siblings(poi);
-    return {lat:poi.latitude,lng:poi.longitude,html:pinHtml(poi,describe),label,
-      name:describe(items[0]).title||poi.raw?.facility_name||poi.title,items,serviceIds:siblings.map(p=>String(p.id)),categories,statuses:items.map(p=>describe(p).status),choose:()=>({items:siblings,matched})};
+    const allCategories=[...new Map(siblings.map(p=>{const c=presentation(p).category;return [c?.slug,c];})).values()].filter(Boolean)
+      .map(c=>({...c,matched:categories.some(m=>m.slug===c.slug)}));
+    return {lat:poi.latitude,lng:poi.longitude,html:pinHtml(poi,presentation),label,
+      name:presentation(items[0]).title||poi.raw?.facility_name||poi.title,items,serviceIds:siblings.map(p=>String(p.id)),categories,allCategories,
+      statuses:items.map(p=>presentation(p).status),choose:()=>({items:siblings,matched})};
   });
 }

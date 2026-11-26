@@ -74,23 +74,29 @@ export function createMapPage(context, dependencies={}) {
    browser.location.assign(switchUrl(browser.location,{view:other,lang:state.lang,service:state.selectedId}));
   },{signal:scope.signal});
  }
- /** "Look at the building" in the service sheet, only with a map module that can (3D mode). */
- function lookButton(poi){
-  if(typeof map.lookAt!=='function'||!Number.isFinite(poi?.latitude)||!Number.isFinite(poi?.longitude))return;
-  const bar=document.getElementById('detail-bar');if(!bar)return;
-  const button=document.createElement('button');button.type='button';button.className='btn look3d';
-  button.textContent=i18n.t('map.map3d.look',{},"Guarda l'edificio");
-  button.addEventListener('click',()=>{shell.close();map.lookAt(poi.latitude,poi.longitude);},{signal:scope.signal});
-  bar.appendChild(button);
-  if(walking){
-   const walk=document.createElement('button');walk.type='button';walk.className='btn walk3d';
-   walk.textContent=i18n.t('map.walk.action',{},'Vai a piedi');
-   walk.addEventListener('click',()=>{
-    if(!state.userLoc){shell.toast(i18n.t('map.walk.reference',{},'Scegli prima un punto di riferimento.'));origin.choose();return;}
-    shell.close();if(state.view!=='map')shell.toggle();
-    void walking.walk([state.userLoc.lng,state.userLoc.lat],[poi.longitude,poi.latitude]);
-   },{signal:scope.signal});bar.appendChild(walk);
+ /** One directions choice reuses the reference flow and the existing 3D walking owner. */
+ function cancelReference(){
+  if(!state.pendingWalkId&&!state.choosingReference)return;
+  state.pendingWalkId=null;state.choosingReference=false;refresh();
+ }
+ function walkTo(poi){
+  if(!Number.isFinite(poi?.latitude)||!Number.isFinite(poi?.longitude))return;
+  if(!walking){
+   if(!context.view?.available)return;
+   state.pendingWalkId=String(poi.id);saveHandoff(browser,'3d',state);
+   browser.location.assign(switchUrl(browser.location,{view:'3d',lang:state.lang,service:poi.id}));return;
   }
+  if(!state.userLoc){state.pendingWalkId=String(poi.id);shell.toast(i18n.t('map.walk.reference',{},'Scegli prima un punto di riferimento.'));origin.choose();return;}
+  state.pendingWalkId=null;shell.close();if(state.view!=='map')shell.toggle();
+  void walking.walk([state.userLoc.lng,state.userLoc.lat],[poi.longitude,poi.latitude]);
+ }
+ function detailReady(poi){
+  const button=document.getElementById('detail-bar')?.querySelector('[data-walk-in-app]');
+  button?.addEventListener('click',()=>walkTo(poi),{signal:scope.signal});
+  if(state.view==='map'&&Number.isFinite(poi?.latitude)&&Number.isFinite(poi?.longitude)){
+   if(map.focusService)map.focusService(poi.latitude,poi.longitude);else map.center(poi.latitude,poi.longitude);
+  }
+  void transit.detail(poi);
  }
  /** Filters, search text and reference point from the previous view; selected service from the URL. */
  function restore(){
@@ -119,6 +125,10 @@ export function createMapPage(context, dependencies={}) {
  }
  function select(id){
   if(scope.signal.aborted)return;
+  if(String(state.selectedId)!==String(id)){
+   walking?.clear();
+   if(state.pendingWalkId!==String(id))cancelReference();
+  }
   state.selectedId=id;refresh();void services.show(id);
  }
  async function language(code){
@@ -159,18 +169,19 @@ export function createMapPage(context, dependencies={}) {
     const text=i18n.t('map.map3d.slow',{},'La vista 3D è lenta su questo dispositivo: puoi tornare alla mappa piana.');
     if(button){button.dataset.warning='true';button.title=text;}
     shell.toast(text);break;}
-   case 'detailReady':lookButton(payload.poi);void transit.detail(payload.poi);break;
+   case 'detailReady':detailReady(payload.poi);break;
    case 'openSheet':shell.open(payload.id);break;
-   case 'closeSheets':shell.close();break;
+   case 'closeSheets':cancelReference();shell.close();break;
+   case 'cancelReference':cancelReference();break;
    case 'showMap':shell.close();if(state.view!=='map')shell.toggle();break;
    case 'toast':shell.toast(payload.message);break;
    case 'invalidateMap':map.invalidate();break;
    case 'center':map.center(payload.lat,payload.lng);break;
    case 'pickedReference':origin.set(payload.lat,payload.lng,payload.label);break;
    case 'previewVisibility':map.servicesVisible(payload.visible);break;
-   case 'reference':walking?.clear();state.choosingReference=false;state.userLoc=payload;state.filters.order='distance';refresh();transit.referenceChanged();map.center(payload.lat,payload.lng);break;
+   case 'reference':walking?.clear();state.choosingReference=false;state.userLoc=payload;state.filters.order='distance';refresh();transit.referenceChanged();map.center(payload.lat,payload.lng);{const poi=state.pendingWalkId&&state.pois.find(p=>String(p.id)===state.pendingWalkId);if(poi)walkTo(poi);}break;
    case 'chooseReference':state.choosingReference=true;refresh();shell.close();if(state.view!=='map')shell.toggle();break;
-   case 'referenceCleared':walking?.clear();refresh();break;
+   case 'referenceCleared':walking?.clear();cancelReference();refresh();break;
    case 'originTransit':void transit.origin();break;
    case 'transit':state.transitByPlace=payload.places;state.transitAvailability=payload.availability;refresh();break;
    case 'focus':state.focusSiteKey=payload.key;refresh();break;
@@ -200,10 +211,10 @@ export function createMapPage(context, dependencies={}) {
     refresh();renderFilters();
     if(state.userLoc)transit.referenceChanged();
     const service=chosen&&state.pois.find(row=>String(row.id)===chosen);
-    if(service)select(service.id);
+    if(service){select(service.id);if(state.pendingWalkId===String(service.id))walkTo(service);}
     if(context.localLayers!==false){void transit.summaries();scope.every(transit.summaries,300000);}
-    scope.every(()=>{services.refreshHours();if(state.filters.openNow)refresh();void refreshOpening();},30000);
-    document.addEventListener('visibilitychange',()=>{if(!document.hidden){services.refreshHours();void refreshOpening();}},{signal:scope.signal});
+    scope.every(()=>{services.refreshHours();if(!context.canonical||state.filters.openNow)refresh();void refreshOpening();},30000);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden){services.refreshHours();if(!context.canonical)refresh();void refreshOpening();}},{signal:scope.signal});
    }catch(error){
     if(scope.signal.aborted)return;
     document.getElementById('poi-list').innerHTML='<div class="empty-state"><p>Catalogo temporaneamente non disponibile. Riprova.</p></div>';
