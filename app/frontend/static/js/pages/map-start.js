@@ -7,9 +7,9 @@ const view=viewMode({search:location.search,storage:local,context,webgl2:hasWebG
 context.view=view;
 if(view.mode==='3d'){
  try{
-  const [{loadMap3dLibraries},{createMap3d}]=await Promise.all([import('../features/map3d/load.js'),import('../features/map3d/index.js')]);
+  const [{loadMap3dLibraries},{createMap3d},{createWalking}]=await Promise.all([import('../features/map3d/load.js'),import('../features/map3d/index.js'),import('../features/walking/index.js')]);
   const libraries=await loadMap3dLibraries();
-  startMapPage(context,{factories:{map:args=>createMap3d({...args,...libraries})}});
+  startMapPage(context,{factories:{map:args=>createMap3d({...args,...libraries}),walking:args=>createWalking({...args,pmtiles:libraries.pmtiles})}});
  }catch(error){
   context.view={...view,mode:'2d',available:false,reason:'load'};
   startMapPage(context);

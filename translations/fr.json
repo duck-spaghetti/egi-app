@@ -113,6 +113,14 @@
       "cluster": "{count} lieux dans cette zone : zoomer",
       "look": "Voir le bâtiment",
       "slow": "La vue 3D est lente sur cet appareil : vous pouvez revenir à la carte plane."
+    },
+    "walk": {
+      "action": "Y aller à pied",
+      "reference": "Choisissez d’abord un point de référence.",
+      "loading": "Calcul du parcours indicatif…",
+      "no_route": "Aucun parcours piéton trouvé.",
+      "too_far": "Les parcours indicatifs sont disponibles dans un rayon de 3 km à vol d’oiseau.",
+      "summary": "Parcours indicatif · {distance} · environ {minutes} min"
     }
   },
   "contribute": {

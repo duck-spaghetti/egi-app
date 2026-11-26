@@ -23,3 +23,7 @@
 .view3d-trigger[data-warning="true"] .control-icon { position:relative; }
 .view3d-trigger[data-warning="true"] .control-icon::after { content:"!";position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;
   background:#c43c1e;color:#fff;font:800 11px/16px system-ui;text-align:center; }
+/* Persistent, screen-reader-announced route summary, clear of map attribution. */
+.map3d-route-status { position:absolute;inset-inline:12px;bottom:54px;z-index:3;max-width:440px;margin-inline:auto;
+ background:var(--bg,#fff);color:var(--ink,#212121);padding:10px 14px;border-radius:12px;box-shadow:0 2px 12px #0003;font:600 14px/1.4 system-ui; }
+.map3d-route-status[hidden] { display:none; }

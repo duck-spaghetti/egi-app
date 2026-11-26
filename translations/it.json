@@ -113,6 +113,14 @@
       "cluster": "{count} luoghi in quest'area: avvicina",
       "look": "Guarda l'edificio",
       "slow": "La vista 3D è lenta su questo dispositivo: puoi tornare alla mappa piana."
+    },
+    "walk": {
+      "action": "Vai a piedi",
+      "reference": "Scegli prima un punto di riferimento.",
+      "loading": "Calcolo il percorso indicativo…",
+      "no_route": "Nessun percorso pedonale trovato.",
+      "too_far": "Il percorso indicativo è disponibile entro 3 km in linea d’aria.",
+      "summary": "Percorso indicativo · {distance} · circa {minutes} min"
     }
   },
   "contribute": {

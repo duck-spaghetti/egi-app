@@ -49,6 +49,7 @@ export function createMapPage(context, dependencies={}) {
  const search=factories.search({scope,describe:services.describe,emit,debug});
  const origin=factories.origin({context,scope,http,contains:map.contains,translate:i18n.t,emit});
  const cycle=factories.cycleways();
+ const walking=context.view?.mode==='3d'&&factories.walking?factories.walking({context,scope,translate:i18n.t}):null;
  let mounted=false, loading=null, languageGeneration=0, refreshInFlight=false;
  const shell=factories.shell({state,scope,i18n,emit,actions:{refresh,
   renderFilters:renderFilters,renderSearchOptions:()=>search.update(snapshot()),resetFilters,
@@ -80,6 +81,15 @@ export function createMapPage(context, dependencies={}) {
   button.textContent=i18n.t('map.map3d.look',{},"Guarda l'edificio");
   button.addEventListener('click',()=>{shell.close();map.lookAt(poi.latitude,poi.longitude);},{signal:scope.signal});
   bar.appendChild(button);
+  if(walking){
+   const walk=document.createElement('button');walk.type='button';walk.className='btn walk3d';
+   walk.textContent=i18n.t('map.walk.action',{},'Vai a piedi');
+   walk.addEventListener('click',()=>{
+    if(!state.userLoc){shell.toast(i18n.t('map.walk.reference',{},'Scegli prima un punto di riferimento.'));origin.choose();return;}
+    shell.close();if(state.view!=='map')shell.toggle();
+    void walking.walk([state.userLoc.lng,state.userLoc.lat],[poi.longitude,poi.latitude]);
+   },{signal:scope.signal});bar.appendChild(walk);
+  }
  }
  /** Filters, search text and reference point from the previous view; selected service from the URL. */
  function restore(){
@@ -157,9 +167,9 @@ export function createMapPage(context, dependencies={}) {
    case 'center':map.center(payload.lat,payload.lng);break;
    case 'pickedReference':origin.set(payload.lat,payload.lng,payload.label);break;
    case 'previewVisibility':map.servicesVisible(payload.visible);break;
-   case 'reference':state.choosingReference=false;state.userLoc=payload;state.filters.order='distance';refresh();transit.referenceChanged();map.center(payload.lat,payload.lng);break;
+   case 'reference':walking?.clear();state.choosingReference=false;state.userLoc=payload;state.filters.order='distance';refresh();transit.referenceChanged();map.center(payload.lat,payload.lng);break;
    case 'chooseReference':state.choosingReference=true;refresh();shell.close();if(state.view!=='map')shell.toggle();break;
-   case 'referenceCleared':refresh();break;
+   case 'referenceCleared':walking?.clear();refresh();break;
    case 'originTransit':void transit.origin();break;
    case 'transit':state.transitByPlace=payload.places;state.transitAvailability=payload.availability;refresh();break;
    case 'focus':state.focusSiteKey=payload.key;refresh();break;
@@ -176,6 +186,7 @@ export function createMapPage(context, dependencies={}) {
     map.mount();mounted=true;scope.own(map.dispose);
     scope.own(services.dispose);scope.own(origin.dispose);scope.own(transit.dispose);scope.own(cycle.dispose);
     shell.bind();shell.layout();shell.translate();bindView();
+    if(walking){walking.mount(map.attach);scope.own(walking.dispose);}
     if(context.localLayers!==false){transit.mount(map.attach);cycle.mount(map.attach);}
     if(!context.canonical && debug && context.view?.mode!=='3d'){
      const {DebugSources}=await import('../features/preview/debug.js');scope.check();

@@ -749,3 +749,19 @@ endpoint reads files only, never calls a database or upstream feed, retains no
 request state and puts area/line selections only in the POST body, never the URL.
 Access logging remains disabled and responses use `Cache-Control: no-store`.
 The assumed vehicle licence/version must be re-verified before launch.
+
+### Indicative walking routes
+
+In 3D only, a located service's sheet offers **Walk there**. Without a reference
+point it opens the existing reference-choice flow. Routing reads z15 roads from
+the active local basemap, excludes highways/rail/ferries, repairs simplified tile
+junctions and limits straight-line distance to 3 km. Snapping to the main connected
+network is capped at 100 m; absent coverage yields an explicit no-route message.
+The device computes distance and time at 4.5 km/h. This is an indicative route,
+without verified crossings, stairs/accessibility or turn-by-turn instructions.
+The camera shows the whole route top-down, oriented from start at the bottom,
+then paints the line. Reduced motion shows it immediately; Escape cancels and
+clears it. Reference points stay on the device, never in a request to a router.
+Vendored vector-tile 2.0.3, pbf 4.0.1 and vector-tile's required point-geometry
+1.1.0 are checked against npm SHA512 and the vendor manifest's file SHA256.
+The vector-tile bare point-geometry import alone is rewritten to a relative import.
