@@ -98,7 +98,20 @@
     "email_action": "Email",
     "social_action": "Social",
     "telegram_action": "Telegram",
-    "menu": "Menu"
+    "menu": "Menu",
+    "map3d": {
+      "label_3d": "3D view",
+      "label_2d": "flat map",
+      "open": "Open the 3D view (reloads the page)",
+      "close": "Back to the flat map (reloads the page)",
+      "unavailable_webgl": "3D view unavailable: this device or browser does not support WebGL2.",
+      "unavailable_data": "3D view unavailable: the city’s 3D data is not ready.",
+      "unavailable_load": "3D view unavailable: loading failed. Try again later.",
+      "rotate_left": "Rotate left",
+      "rotate_right": "Rotate right",
+      "tilt": "Tilt the view",
+      "cluster": "{count} places in this area: zoom in"
+    }
   },
   "contribute": {
     "title": "New service",

@@ -1,3 +1,4 @@
+import {isMapLibre,inertLayer} from "../map/engine.js";
 import {TransportLayer} from "./layer.js";
 import {escapeHtml} from "../../format.js";
 /** createTransport owns its behavior; dependencies and snapshots are explicit. */
@@ -209,7 +210,7 @@ async function loadOriginTransit() {
   } catch(error) {if (!scope.signal.aborted && !current.signal.aborted) node.textContent="Mezzi vicini non disponibili al momento. La ricerca servizi resta disponibile.";}
 }
 
-function mount(attach){runtime.transport=attach(map=>TransportLayer.create(map,{
+function mount(attach){runtime.transport=attach(map=>isMapLibre(map)?inertLayer():TransportLayer.create(map,{
  toggle:document.getElementById('transport-toggle'),status:document.getElementById('transport-status'),
  modes:Object.fromEntries(['metro','rail','tram','bus'].map(mode=>[mode,document.getElementById('transport-'+mode)]))}));}
 function update(snapshot){state=snapshot;}

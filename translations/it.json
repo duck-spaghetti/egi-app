@@ -98,7 +98,20 @@
     "email_action": "Email",
     "social_action": "Social",
     "telegram_action": "Telegram",
-    "menu": "Menu"
+    "menu": "Menu",
+    "map3d": {
+      "label_3d": "vista 3D",
+      "label_2d": "mappa piana",
+      "open": "Apri la vista 3D (ricarica la pagina)",
+      "close": "Torna alla mappa piana (ricarica la pagina)",
+      "unavailable_webgl": "Vista 3D non disponibile: questo dispositivo o browser non supporta WebGL2.",
+      "unavailable_data": "Vista 3D non disponibile: i dati 3D della città non sono pronti.",
+      "unavailable_load": "Vista 3D non disponibile: caricamento non riuscito. Riprova più tardi.",
+      "rotate_left": "Ruota a sinistra",
+      "rotate_right": "Ruota a destra",
+      "tilt": "Inclina la vista",
+      "cluster": "{count} luoghi in quest'area: avvicina"
+    }
   },
   "contribute": {
     "title": "Nuovo servizio",

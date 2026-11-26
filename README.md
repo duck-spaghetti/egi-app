@@ -84,7 +84,10 @@ The optional 3D mode of the map reads the 3D data set built by
 `active.json` and serves only the active version's listed files at
 `/map3d/<version>/<path>`, with HTTP Range (PMTiles) and a one-year immutable cache;
 `/map3d/active` reports availability. A missing or invalid active version disables the
-3D mode; the current map is unaffected.
+3D mode; the current map is unaffected. The "3D" map control reloads the page with
+`?vista=3d` (back with `?vista=2d`); without WebGL2 or an active version it is disabled
+and explains why. Filters, search text and reference point cross the switch in
+sessionStorage only.
 
 For native verification set `EGI_DATABASE_REPO` to the explicit database worktree,
 `EGI_SQITCH` to Sqitch and, if necessary, `PERL5LIB` to its local runtime library.

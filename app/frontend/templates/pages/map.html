@@ -33,6 +33,7 @@
       <img src="/static/assets/icons/egi-logo.svg" alt="EGI" class="brand-logo" />
     </div>
     <button type="button" class="nav-btn layers-trigger" data-sheet="layers" aria-label="Livelli della mappa"><span class="control-icon"><img src="/static/assets/icons/ui/layers.svg" alt="" aria-hidden="true" /></span><span class="control-label">Livelli</span></button>
+    <button type="button" class="nav-btn view3d-trigger" id="view3d-toggle" aria-pressed="false"><span class="control-icon view3d-icon" aria-hidden="true"><span class="view3d-to-3d">3D</span><span class="view3d-to-2d">2D</span></span><span class="control-label view3d-to-3d" data-i18n="map.map3d.label_3d">vista 3D</span><span class="control-label view3d-to-2d" data-i18n="map.map3d.label_2d">mappa piana</span></button>
     <span class="map-city-tag" id="city-label">{{ city.name if city else "Territorio" }}</span>
 
     <div class="floating-actions" aria-label="Controlli mappa">

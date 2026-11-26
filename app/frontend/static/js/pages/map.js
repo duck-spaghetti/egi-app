@@ -12,6 +12,7 @@ import {createOrigin} from '../features/origin/index.js';
 import {createTransport} from '../features/transport/index.js';
 import {createCycleways} from '../features/cycleways/index.js';
 import {createShell} from './shell.js';
+import {saveHandoff,takeHandoff,applyHandoff,switchUrl} from '../features/map/view.js';
 
 export function createMapPage(context, dependencies={}) {
  const scope=dependencies.scope||new Lifecycle();
@@ -43,7 +44,8 @@ export function createMapPage(context, dependencies={}) {
  const loader=createLoader({context,http,scope,debug});
  const transit=factories.transport({scope,http,sites,emit});
  const services=factories.services({context,scope,loader,sites,transit,translate:i18n.t,emit});
- const map=factories.map({context,sites,describe:services.describe,emit,leaflet:dependencies.leaflet||globalThis.L});
+ const map=factories.map({context,sites,describe:services.describe,emit,leaflet:dependencies.leaflet||globalThis.L,translate:i18n.t});
+ const browser=dependencies.browser||{location:globalThis.location,local:storage('localStorage'),session:storage('sessionStorage')};
  const search=factories.search({scope,describe:services.describe,emit,debug});
  const origin=factories.origin({context,scope,http,contains:map.contains,translate:i18n.t,emit});
  const cycle=factories.cycleways();
@@ -53,6 +55,34 @@ export function createMapPage(context, dependencies={}) {
   chooseReferencePoint:origin.choose,geocodeAddress:origin.search,locateUser:origin.locate,loadOriginTransit:transit.origin}});
 
  function snapshot(){return structuredClone(state);}
+ function storage(name){try{return globalThis[name]||null;}catch{return null;}}
+ /** The 3D/current-map control: switch by reloading, carrying state in this tab only. */
+ function bindView(){
+  const button=document.getElementById('view3d-toggle');if(!button)return;
+  const view=context.view||{mode:'2d',available:false,reason:'data'};
+  const other=view.mode==='3d'?'2d':'3d';
+  button.dataset.view=view.mode;button.setAttribute('aria-pressed',String(view.mode==='3d'));
+  const unavailable=other==='3d'&&!view.available;
+  const reason=i18n.t(`map.map3d.unavailable_${view.reason||'data'}`,{},'Vista 3D non disponibile.');
+  button.setAttribute('aria-disabled',String(unavailable));
+  button.title=unavailable?reason:i18n.t(other==='3d'?'map.map3d.open':'map.map3d.close',{},other==='3d'?'Apri la vista 3D':'Torna alla mappa piana');
+  button.addEventListener('click',()=>{
+   if(unavailable)return shell.toast(reason);
+   saveHandoff(browser,other,state);
+   browser.location.assign(switchUrl(browser.location,{view:other,lang:state.lang,service:state.selectedId}));
+  },{signal:scope.signal});
+ }
+ /** Filters, search text and reference point from the previous view; selected service from the URL. */
+ function restore(){
+  const data=takeHandoff(browser.session);
+  if(data){
+   applyHandoff(state,data);
+   document.getElementById('service-query').value=state.filters.q||'';
+   document.getElementById('open-now-filter').checked=Boolean(state.filters.openNow);
+   document.getElementById('section-filter').value=state.filters.section||'all';
+  }
+  return new URLSearchParams(browser.location?.search||'').get('servizio');
+ }
  function refresh(){
   if(scope.signal.aborted)return;
   let view=snapshot();services.update(view);transit.update(view);origin.update(view);
@@ -131,7 +161,7 @@ export function createMapPage(context, dependencies={}) {
     await i18n.setLanguage(state.lang);scope.check();
     map.mount();mounted=true;scope.own(map.dispose);
     scope.own(services.dispose);scope.own(origin.dispose);scope.own(transit.dispose);scope.own(cycle.dispose);
-    shell.bind();shell.layout();shell.translate();
+    shell.bind();shell.layout();shell.translate();bindView();
     if(context.localLayers!==false){transit.mount(map.attach);cycle.mount(map.attach);}
     if(!context.canonical && debug){
      const {DebugSources}=await import('../features/preview/debug.js');scope.check();
@@ -139,7 +169,11 @@ export function createMapPage(context, dependencies={}) {
      scope.own(debugPanel.dispose);
     }
     const data=await services.load(state.lang);scope.check();if(generation!==languageGeneration)return;Object.assign(state,data);
+    const chosen=restore();
     refresh();renderFilters();
+    if(state.userLoc)transit.referenceChanged();
+    const service=chosen&&state.pois.find(row=>String(row.id)===chosen);
+    if(service)select(service.id);
     if(context.localLayers!==false){void transit.summaries();scope.every(transit.summaries,300000);}
     scope.every(()=>{services.refreshHours();if(state.filters.openNow)refresh();void refreshOpening();},30000);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden){services.refreshHours();void refreshOpening();}},{signal:scope.signal});
@@ -153,6 +187,6 @@ export function createMapPage(context, dependencies={}) {
  return {mount,dispose:()=>scope.dispose()};
 }
 
-export function startMapPage(context=globalThis.window.EGI_MAP_CONTEXT){
- return startPage(()=>createMapPage(context));
+export function startMapPage(context=globalThis.window.EGI_MAP_CONTEXT,dependencies={}){
+ return startPage(()=>createMapPage(context,dependencies));
 }
