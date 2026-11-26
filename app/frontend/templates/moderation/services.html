@@ -1,0 +1,23 @@
+{% extends 'moderation/base.html' %}
+{% block body %}
+<section class="desk-card">
+  <h1>{{ t('moderation.services.title') }}</h1>
+  <form method="get" action="/moderazione/servizi" class="desk-filters" role="search">
+    <label>{{ t('moderation.services.search') }}<input type="search" name="q" value="{{ q }}" /></label>
+    <button type="submit">{{ t('moderation.services.find') }}</button>
+  </form>
+</section>
+<section class="desk-card">
+  {% if found %}
+  <ul class="queue-list">
+    {% for s in found %}
+    <li><a href="/moderazione/servizio/{{ s.service_id }}">{{ s.name or s.service_id }}</a>
+      {% if not s.published %}<span class="badge state-new">{{ t('moderation.services.unpublished') }}</span>{% endif %}
+      {% if s.has_draft %}<span class="badge state-waiting">{{ t('moderation.services.draft') }}</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="hint">{{ t('moderation.services.empty') }}</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -242,4 +242,6 @@ async def revoke(request: Request, session: str, module: Moderation = Depends(mo
 
 
 from .queue import router as queue_router  # noqa: E402  (after this module's routes, same prefix)
+from .workspace import router as workspace_router  # noqa: E402
 router.include_router(queue_router)
+router.include_router(workspace_router)

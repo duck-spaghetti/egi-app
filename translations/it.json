@@ -256,7 +256,8 @@
     "nav": {
       "accounts": "Account",
       "sign_out": "Esci",
-      "queue": "Coda"
+      "queue": "Coda",
+      "services": "Servizi"
     },
     "sign_in": {
       "title": "Accedi",
@@ -341,7 +342,11 @@
       "no_submitter_contact": "Il segnalante non ha lasciato un contatto.",
       "not_waiting": "Il contributo non è in attesa.",
       "contribution_closed": "Il contributo è già chiuso.",
-      "contribution_not_found": "Contributo non trovato."
+      "contribution_not_found": "Contributo non trovato.",
+      "stale": "Qualcuno ha salvato o pubblicato una versione più recente. Non è stato sovrascritto nulla: i tuoi valori sono qui sotto, non salvati. Ricarica la scheda per ripartire dalla versione attuale.",
+      "no_changes": "Non hai modificato nulla.",
+      "summary_required": "Scrivi un riepilogo delle modifiche.",
+      "publication_incomplete": "La bozza non si può pubblicare: mancano dati obbligatori (per esempio descrizione o contatti)."
     },
     "queue": {
       "title": "Coda dei contributi",
@@ -403,7 +408,128 @@
       "resume": "Riprendi (nessuna attesa)",
       "set_waiting": "Imposta l'attesa",
       "history": "Storia",
-      "visitor": "visitatore"
+      "visitor": "visitatore",
+      "open_workspace": "Apri la scheda del servizio"
+    },
+    "services": {
+      "title": "Servizi",
+      "search": "Nome del servizio",
+      "find": "Cerca",
+      "empty": "Nessun servizio trovato.",
+      "unpublished": "mai pubblicato",
+      "draft": "bozza da pubblicare",
+      "back": "← Torna ai servizi"
+    },
+    "workspace": {
+      "title": "Scheda del servizio",
+      "unnamed": "Servizio senza nome",
+      "published": "Pubblicato",
+      "never_published": "Mai pubblicato",
+      "has_draft": "Bozza da pubblicare",
+      "published_now": "Pubblicato. La scheda pubblica mostra ora questa versione.",
+      "contributions": "Contributi aperti su questo servizio",
+      "compare": "Confronto",
+      "field": "Campo",
+      "source": "Fonte",
+      "public": "Pubblico",
+      "draft": "Bozza",
+      "no_draft": "nessuna bozza",
+      "changed": "modificato",
+      "summary": "Riepilogo delle modifiche",
+      "publish_hint": "Pubblichi esattamente la bozza qui sopra. Se nel frattempo qualcuno ha salvato o pubblicato, la pubblicazione viene rifiutata.",
+      "publish": "Approva e pubblica",
+      "edit": "Modifica",
+      "edit_hint": "Salvare crea una bozza: la scheda pubblica non cambia finché non pubblichi.",
+      "save": "Salva bozza",
+      "draft_note": "Bozza dalla scheda di lavoro",
+      "fields": {
+        "name": "Nome",
+        "description": "Descrizione",
+        "delivery_mode": "Modalità",
+        "operational_status": "Stato del servizio",
+        "cost_state": "Costo",
+        "cost_note": "Nota sul costo",
+        "needs": "Bisogni",
+        "contacts": "Contatti",
+        "conditions": "Condizioni di accesso"
+      },
+      "values": {
+        "delivery_mode": {
+          "in_person": "Di persona",
+          "telephone": "Al telefono",
+          "online": "Online",
+          "itinerant": "Itinerante"
+        },
+        "operational_status": {
+          "active": "Attivo",
+          "inactive": "Non attivo",
+          "temporarily_closed": "Chiuso temporaneamente",
+          "defunct": "Non esiste più",
+          "unknown": "Non noto"
+        },
+        "cost_state": {
+          "free": "Gratuito",
+          "paid": "A pagamento",
+          "variable": "Variabile",
+          "unknown": "Non noto"
+        },
+        "channel": {
+          "phone": "Telefono",
+          "email": "Email",
+          "web": "Sito",
+          "whatsapp": "WhatsApp",
+          "other": "Altro"
+        },
+        "condition_kind": {
+          "appointment": "Appuntamento",
+          "referral": "Invio da un servizio",
+          "document": "Documenti",
+          "eligibility": "Requisiti",
+          "other": "Altro"
+        },
+        "requirement_state": {
+          "required": "necessario",
+          "not_required": "non necessario",
+          "conditional": "dipende",
+          "unknown": "non noto"
+        }
+      },
+      "private": "privato",
+      "no_terms": "Nessun bisogno disponibile per i territori di questo servizio.",
+      "protections_active": "Protezioni attive su questo servizio: {count} numeri non vengono mai mostrati al pubblico, anche se li segni come pubblici. Solo l’admin può rilasciarle.",
+      "phone_hold": "I telefoni incerti restano nascosti.",
+      "protections_none": "Nessuna protezione attiva sui contatti.",
+      "channel": "Canale",
+      "contact_value": "Nuovo contatto",
+      "contact_label": "Etichetta",
+      "is_public": "pubblico",
+      "remove": "rimuovi",
+      "condition_kind": "Condizione",
+      "requirement_state": "Requisito",
+      "details": "Dettagli",
+      "add_condition": "Aggiungi condizione…",
+      "read_only": "Luogo e orari",
+      "read_only_hint": "Qui sono in sola lettura; si modificano nel prossimo passo del lavoro.",
+      "place": "Luogo",
+      "no_place": "Nessun luogo.",
+      "hours": "Orari",
+      "no_hours": "Nessun orario.",
+      "weekdays": {
+        "1": "Lunedì",
+        "2": "Martedì",
+        "3": "Mercoledì",
+        "4": "Giovedì",
+        "5": "Venerdì",
+        "6": "Sabato",
+        "7": "Domenica"
+      },
+      "day_states": {
+        "closed": "chiuso",
+        "unknown": "non noto",
+        "intervals": "aperto"
+      },
+      "evidence": "Testo delle fonti",
+      "no_evidence": "Nessuna fonte collegata."
     }
   }
 }

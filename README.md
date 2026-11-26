@@ -199,6 +199,19 @@ reason ("serve l'admin" puts it in the admin's view). Tests:
 `tests/test_moderation_access.py`, `tests/test_moderation_queue.py` (need `EGI_DATABASE_REPO`) and
 `tests/test_moderation_oidc.py` (ID token verification against a mock provider).
 
+`/moderazione/servizi` finds any service by name, published or not; its workspace
+(`/moderazione/servizio/<id>`, EGI-83) edits name, description, need, delivery mode,
+status, cost, contacts and access conditions. The form starts from the complete
+revision body read by the database (`editorial.revision_body`, egi_database 012), so
+untouched parts keep their components and evidence; a changed value cites no source.
+"Salva bozza" creates a working draft and leaves the public card unchanged; the
+comparison shows source, public and draft values side by side with the source records'
+text; "Approva e pubblica" publishes exactly that draft with a change summary. A save
+or publication built on revisions that have since moved is refused and the person's
+unsaved values stay on the page. Contact protections are applied by the database on
+public reads, so an edit cannot release them. Place and hours are read-only here.
+Tests: `tests/test_moderation_workspace.py`.
+
 ### Visitor contributions (EGI-22)
 
 `/contribuisci` receives reports from a card's "Segnala un errore", still-valid

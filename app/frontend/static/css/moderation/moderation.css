@@ -39,3 +39,12 @@ form.inline { display: inline; margin-right: .75rem; }
 .desk-inline-form { display: flex; gap: .5rem; align-items: center; }
 .desk-quote { margin: .5rem 0; padding: .5rem .75rem; border-left: 3px solid var(--line); background: #fff; white-space: pre-wrap; }
 .desk-history { padding-left: 1.25rem; color: var(--ink-soft); }
+/* Service workspace (EGI-83) */
+.desk-row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.desk-row input:not([type=checkbox]), .desk-row select { font: inherit; padding: .4rem; border: 1px solid var(--line); border-radius: .25rem; background: #fff; }
+.desk-table.compare tr.changed td:last-child { background: #fff6dc; }
+.desk-table.compare th[scope=row] { white-space: nowrap; }
+.desk-hours { list-style: none; padding: 0; margin: 0 0 .75rem; display: grid; gap: .15rem; }
+.desk-hours span { display: inline-block; min-width: 6rem; color: var(--ink-soft); }
+.desk-source { white-space: pre-wrap; overflow-wrap: anywhere; font-family: "IBM Plex Mono", monospace; font-size: .85rem; background: #fff; border: 1px solid var(--line); padding: .5rem; max-height: 20rem; overflow: auto; }
+.desk-notice { background: #dfeedd; padding: .5rem .75rem; border-radius: .25rem; }

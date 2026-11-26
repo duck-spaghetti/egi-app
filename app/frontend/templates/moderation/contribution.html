@@ -3,7 +3,8 @@
 <section class="desk-card">
   <p class="hint"><a href="/moderazione/coda">{{ t('moderation.queue.back') }}</a></p>
   <h1>{{ t('moderation.kinds.' ~ item.kind) }}{% if item.category %} · {{ t('contribute.intake.categories.' ~ item.category) }}{% endif %}</h1>
-  {% if service_name %}<p>{{ t('moderation.contribution.service') }} <strong>{{ service_name }}</strong></p>{% endif %}
+  {% if service_name %}<p>{{ t('moderation.contribution.service') }} <strong>{{ service_name }}</strong>
+    · <a href="/moderazione/servizio/{{ item.service_id }}">{{ t('moderation.contribution.open_workspace') }}</a></p>{% endif %}
   <p><span class="badge state-{{ item.state }}">{{ t('moderation.contribution_states.' ~ item.state) }}{% if item.waiting_reason %}: {{ t('moderation.reasons.' ~ item.waiting_reason) }}{% endif %}</span>
     {% if item.claimed_by_name %}{{ t('moderation.queue.claimed_by', name=item.claimed_by_name) }}{% endif %}</p>
   {% if item.text %}<blockquote class="desk-quote">{{ item.text }}</blockquote>{% endif %}

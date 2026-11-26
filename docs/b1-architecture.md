@@ -37,7 +37,7 @@ and exceptions responsibilities:
 | transport | Viewport, public-place summaries/detail, origin and departures, timed and untimed source composition. |
 | cycleways | Bounded geographic infrastructure reads and availability. |
 | preview | Retained source cards, coverage, debug positions and overlap review; never mounted in canonical mode. |
-| moderation | `/moderazione`: sign-in (Google or password, admin TOTP), invitations, accounts; acts through the editorial login as the person of a database-verified session (ADR 0011). Mounted only when `EGI_EDITORIAL_DATABASE_URL` is set. |
+| moderation | `/moderazione`: sign-in (Google or password, admin TOTP), invitations, accounts; acts through the editorial login as the person of a database-verified session (ADR 0011). Queue and claims (EGI-24); service workspace with draft, comparison, evidence and publication (EGI-83). Mounted only when `EGI_EDITORIAL_DATABASE_URL` is set. |
 | contribute | `/contribuisci`: report, still-valid and new-service forms; submits through the intake login only (EGI-22). Without intake in canonical mode the page only explains. |
 
 Routers validate HTTP and delegate; behavior raises family errors derived from the

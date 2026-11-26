@@ -1,0 +1,122 @@
+{% extends 'moderation/base.html' %}
+{% block title %}{{ shown.name or t('moderation.workspace.title') }}{% endblock %}
+{% block body %}
+{% set w = 'moderation.workspace.' %}
+<section class="desk-card">
+  <p class="hint"><a href="/moderazione/servizi">{{ t('moderation.services.back') }}</a></p>
+  <h1>{{ shown.name or t(w ~ 'unnamed') }}</h1>
+  <p>
+    {% if public %}<span class="badge state-closed">{{ t(w ~ 'published') }}</span>{% else %}<span class="badge state-new">{{ t(w ~ 'never_published') }}</span>{% endif %}
+    {% if draft %}<span class="badge state-waiting">{{ t(w ~ 'has_draft') }}</span>{% endif %}
+  </p>
+  {% if request.query_params.get('pubblicato') %}<p class="desk-notice" role="status">{{ t(w ~ 'published_now') }}</p>{% endif %}
+  {% if contributions %}
+  <h2>{{ t(w ~ 'contributions') }}</h2>
+  <ul>{% for c in contributions %}<li><a href="/moderazione/contributo/{{ c.contribution_id }}">{{ t('moderation.kinds.' ~ c.kind) }}{% if c.category %} · {{ t('contribute.intake.categories.' ~ c.category) }}{% endif %}</a>
+    <span class="badge state-{{ c.state }}">{{ t('moderation.contribution_states.' ~ c.state) }}</span></li>{% endfor %}</ul>
+  {% endif %}
+</section>
+
+<section class="desk-card" id="confronto">
+  <h2>{{ t(w ~ 'compare') }}</h2>
+  <table class="desk-table compare">
+    <thead><tr><th>{{ t(w ~ 'field') }}</th><th>{{ t(w ~ 'source') }}</th><th>{{ t(w ~ 'public') }}</th><th>{{ t(w ~ 'draft') }}</th></tr></thead>
+    <tbody>
+    {% for row in rows %}
+    <tr{% if row.changed %} class="changed"{% endif %}><th scope="row">{{ t(w ~ 'fields.' ~ row.field) }}</th>
+      <td>{{ row.source }}</td><td>{{ row.public }}</td>
+      <td>{% if row.draft is none %}<span class="hint">{{ t(w ~ 'no_draft') }}</span>{% else %}{{ row.draft }}{% if row.changed %} <span class="badge">{{ t(w ~ 'changed') }}</span>{% endif %}{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if draft %}
+  <form method="post" action="/moderazione/servizio/{{ service_id }}/pubblica" class="desk-form publish">
+    <input type="hidden" name="form_token" value="{{ form_token }}" />
+    <input type="hidden" name="working" value="{{ working or '' }}" />
+    <input type="hidden" name="public" value="{{ public_revision or '' }}" />
+    <label>{{ t(w ~ 'summary') }}<textarea name="summary" rows="2" required>{{ posted.summary or '' }}</textarea></label>
+    <p class="hint">{{ t(w ~ 'publish_hint') }}</p>
+    <div><button type="submit">{{ t(w ~ 'publish') }}</button></div>
+  </form>
+  {% endif %}
+</section>
+
+<section class="desk-card">
+  <h2>{{ t(w ~ 'edit') }}</h2>
+  <p class="hint">{{ t(w ~ 'edit_hint') }}</p>
+  <form method="post" action="/moderazione/servizio/{{ service_id }}/bozza" class="desk-form">
+    <input type="hidden" name="form_token" value="{{ form_token }}" />
+    <input type="hidden" name="working" value="{{ working or '' }}" />
+    <input type="hidden" name="public" value="{{ public_revision or '' }}" />
+    <label>{{ t(w ~ 'fields.name') }}<input name="name" value="{{ shown.name or '' }}" required /></label>
+    <label>{{ t(w ~ 'fields.description') }}<textarea name="description" rows="4">{{ shown.description or '' }}</textarea></label>
+    {% for field, values in choices.items() %}
+    <label>{{ t(w ~ 'fields.' ~ field) }}<select name="{{ field }}">
+      {% if not shown[field] %}<option value="" selected>—</option>{% endif %}
+      {% for v in values %}<option value="{{ v }}" {% if shown[field] == v %}selected{% endif %}>{{ t(w ~ 'values.' ~ field ~ '.' ~ v) }}</option>{% endfor %}
+    </select></label>
+    {% endfor %}
+    <label>{{ t(w ~ 'fields.cost_note') }}<input name="cost_note" value="{{ shown.cost_note or '' }}" /></label>
+
+    <fieldset><legend>{{ t(w ~ 'fields.needs') }}</legend>
+      <input type="hidden" name="needs" value="1" />
+      {% for term in terms %}
+      <label class="check"><input type="checkbox" name="need_{{ term.adoption_id }}_{{ term.term_id }}" value="1" {% if (term.adoption_id, term.term_id) in chosen %}checked{% endif %} />{{ term.name }}</label>
+      {% else %}<p class="hint">{{ t(w ~ 'no_terms') }}</p>{% endfor %}
+    </fieldset>
+
+    <fieldset><legend>{{ t(w ~ 'fields.contacts') }}</legend>
+      {% if protections %}
+      <p class="hint">{% if protections.numbers or protections.phone_hold %}{{ t(w ~ 'protections_active', count=protections.numbers|length) }}{% if protections.phone_hold %} {{ t(w ~ 'phone_hold') }}{% endif %}{% else %}{{ t(w ~ 'protections_none') }}{% endif %}</p>
+      {% endif %}
+      {% set contacts = shown.contacts or [] %}
+      <input type="hidden" name="contacts" value="{{ contacts|length + 1 }}" />
+      {% for c in contacts + [{}] %}{% set k = 'contact_' ~ loop.index0 ~ '_' %}
+      <div class="desk-row">
+        <input type="hidden" name="{{ k }}component" value="{{ c.component_id or '' }}" />
+        <select name="{{ k }}channel" aria-label="{{ t(w ~ 'channel') }}">{% for ch in channels %}<option value="{{ ch }}" {% if c.channel_type == ch %}selected{% endif %}>{{ t(w ~ 'values.channel.' ~ ch) }}</option>{% endfor %}</select>
+        <input name="{{ k }}value" value="{{ c.value or '' }}" aria-label="{{ t(w ~ 'contact_value') }}" placeholder="{{ t(w ~ 'contact_value') if not c else '' }}" />
+        <input name="{{ k }}label" value="{{ c.label or '' }}" aria-label="{{ t(w ~ 'contact_label') }}" placeholder="{{ t(w ~ 'contact_label') }}" />
+        <label class="check"><input type="checkbox" name="{{ k }}public" value="1" {% if not c or c.is_public != false %}checked{% endif %} />{{ t(w ~ 'is_public') }}</label>
+        {% if c %}<label class="check"><input type="checkbox" name="{{ k }}remove" value="1" />{{ t(w ~ 'remove') }}</label>{% endif %}
+      </div>
+      {% endfor %}
+    </fieldset>
+
+    <fieldset><legend>{{ t(w ~ 'fields.conditions') }}</legend>
+      {% set conditions = shown.conditions or [] %}
+      <input type="hidden" name="conditions" value="{{ conditions|length + 1 }}" />
+      {% for c in conditions + [{}] %}{% set k = 'condition_' ~ loop.index0 ~ '_' %}
+      <div class="desk-row">
+        <input type="hidden" name="{{ k }}component" value="{{ c.component_id or '' }}" />
+        <select name="{{ k }}kind" aria-label="{{ t(w ~ 'condition_kind') }}">{% if not c %}<option value="">{{ t(w ~ 'add_condition') }}</option>{% endif %}{% for v in condition_kinds %}<option value="{{ v }}" {% if c.condition_kind == v %}selected{% endif %}>{{ t(w ~ 'values.condition_kind.' ~ v) }}</option>{% endfor %}</select>
+        <select name="{{ k }}state" aria-label="{{ t(w ~ 'requirement_state') }}">{% for v in requirements %}<option value="{{ v }}" {% if c.requirement_state == v %}selected{% endif %}>{{ t(w ~ 'values.requirement_state.' ~ v) }}</option>{% endfor %}</select>
+        <input name="{{ k }}details" value="{{ c.details or '' }}" aria-label="{{ t(w ~ 'details') }}" placeholder="{{ t(w ~ 'details') }}" />
+        {% if c %}<label class="check"><input type="checkbox" name="{{ k }}remove" value="1" />{{ t(w ~ 'remove') }}</label>{% endif %}
+      </div>
+      {% endfor %}
+    </fieldset>
+    <div><button type="submit">{{ t(w ~ 'save') }}</button></div>
+  </form>
+</section>
+
+<section class="desk-card">
+  <h2>{{ t(w ~ 'read_only') }}</h2>
+  <p class="hint">{{ t(w ~ 'read_only_hint') }}</p>
+  <h3>{{ t(w ~ 'place') }}</h3>
+  {% if place %}<p>{{ place.name or '—' }}{% if place.address %} · {{ place.address }}{% endif %}</p>{% else %}<p class="hint">{{ t(w ~ 'no_place') }}</p>{% endif %}
+  <h3>{{ t(w ~ 'hours') }}</h3>
+  {% for s in schedules %}
+  <ul class="desk-hours">{% for d in s.days %}<li><span>{{ t(w ~ 'weekdays.' ~ d.weekday) }}</span>
+    {% if d.state == 'intervals' %}{% for i in d.intervals %}{{ i.opens }}–{{ i.closes }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}{{ t(w ~ 'day_states.' ~ d.state) }}{% endif %}</li>{% endfor %}</ul>
+  {% else %}<p class="hint">{{ t(w ~ 'no_hours') }}</p>{% endfor %}
+</section>
+
+<section class="desk-card">
+  <h2>{{ t(w ~ 'evidence') }}</h2>
+  {% for r in records %}
+  <details><summary>{{ r.source }}</summary><pre class="desk-source">{{ r.text }}{% if r.cut %}
+…{% endif %}</pre></details>
+  {% else %}<p class="hint">{{ t(w ~ 'no_evidence') }}</p>{% endfor %}
+</section>
+{% endblock %}
