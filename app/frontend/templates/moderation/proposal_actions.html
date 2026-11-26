@@ -1,0 +1,56 @@
+{# One contribution's individually decided proposals, using the workspace's revision heads. #}
+{% set r = 'moderation.review.' %}{% set w = 'moderation.workspace.' %}
+{% for p in item.proposals %}
+<details class="desk-card" id="proposta-{{ p.proposal_id }}">
+  <summary>{{ t(r ~ 'proposal') }} · {{ p.field }}{% if p.decision %} · {{ t('moderation.decisions.' ~ p.decision) }}{% endif %}</summary>
+  <blockquote class="desk-quote">{{ p.value if p.value is not none else '—' }}</blockquote>
+  {% if p.decision %}
+    {% if p.decided_value is not none %}<p>{{ t(r ~ 'decided_value') }}:
+    {% if p.decided_value is string %}{{ p.decided_value }}
+    {% elif p.decided_value.value %}{{ p.decided_value.value }}
+    {% elif p.decided_value.details %}{{ p.decided_value.details }}
+    {% elif p.decided_value.weekday %}{{ t(w ~ 'weekdays.' ~ p.decided_value.weekday) }} · {{ t(w ~ 'day_states.' ~ p.decided_value.state) }}{% for i in p.decided_value.intervals %} {{ i.opens }}–{{ i.closes }}{% endfor %}
+    {% else %}{{ t(r ~ 'structured_saved') }}{% endif %}</p>{% endif %}
+  {% elif item.state != 'closed' and item.service_id %}
+  {% set target = p.target %}{% set input_values = review_posted if review_proposal == p.proposal_id else {} %}
+  <form method="post" action="/moderazione/contributo/{{ item.contribution_id }}/proposta/{{ p.proposal_id }}" class="desk-form">
+    <input type="hidden" name="form_token" value="{{ form_token }}" />
+    <input type="hidden" name="working" value="{{ working or '' }}" /><input type="hidden" name="public" value="{{ public_revision or '' }}" />
+    <label>{{ t(r ~ 'corrected') }}<textarea name="value" rows="2">{{ input_values.get('value', p.value or '') }}</textarea></label>
+    {% if target not in ['name','description','cost_note','contacts','conditions','hours','closed','address'] %}
+      <label>{{ t(r ~ 'target') }}<select name="target" required><option value="">—</option>
+        {% for f in ['name','description','cost_note'] %}<option value="{{ f }}">{{ t(w ~ 'fields.' ~ f) }}</option>{% endfor %}</select></label>
+    {% endif %}
+    {% if target == 'contacts' %}
+      <label>{{ t(r ~ 'contact_line') }}<select name="component"><option value="">{{ t(r ~ 'add') }}</option>{% for c in review_body.contacts or [] %}<option value="{{ c.component_id }}">{{ c.value }}</option>{% endfor %}</select></label>
+      <label>{{ t(w ~ 'channel') }}<select name="channel">{% for c in channels %}<option value="{{ c }}" {% if c == input_values.get('channel', 'other') %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></label>
+      <label class="check"><input type="checkbox" name="public_contact" value="1" {% if input_values.public_contact %}checked{% endif %} />{{ t(r ~ 'public_contact') }}</label>
+    {% elif target == 'conditions' %}
+      <label>{{ t(r ~ 'condition_line') }}<select name="component"><option value="">{{ t(r ~ 'add') }}</option>{% for c in review_body.conditions or [] %}<option value="{{ c.component_id }}">{{ c.details or c.condition_kind }}</option>{% endfor %}</select></label>
+      <label>{{ t(w ~ 'fields.conditions') }}<select name="condition_kind">{% for k in condition_kinds %}<option value="{{ k }}">{{ t(w ~ 'values.condition_kind.' ~ k) }}</option>{% endfor %}</select></label>
+      <label>{{ t(r ~ 'requirement') }}<select name="requirement_state">{% for k in requirements %}<option value="{{ k }}">{{ t(w ~ 'values.requirement_state.' ~ k) }}</option>{% endfor %}</select></label>
+    {% elif target == 'hours' %}
+      <p class="hint">{{ t(r ~ 'hours_hint') }}</p>
+      <label>{{ t(w ~ 'audience') }}<select name="schedule"><option value="">{{ t(r ~ 'new_schedule') }}</option>{% for s in review_body.schedules or [] %}<option value="{{ s.component_id }}">{{ t(w ~ 'scopes.' ~ s.scope) }}{% if s.contact_component_id %} · {{ s.contact_component_id }}{% endif %}</option>{% endfor %}</select></label>
+      <label>{{ t(r ~ 'new_scope') }}<select name="scope"><option value="service">{{ t(w ~ 'scopes.service') }}</option><option value="intake">{{ t(w ~ 'scopes.intake') }}</option></select></label>
+      <label>{{ t(w ~ 'day') }}<select name="weekday">{% for d in range(1,8) %}<option value="{{ d }}">{{ t(w ~ 'weekdays.' ~ d) }}</option>{% endfor %}</select></label>
+      <label>{{ t(w ~ 'day_state') }}<select name="day_state">{% for s in day_states %}<option value="{{ s }}">{{ t(w ~ 'day_states.' ~ s) }}</option>{% endfor %}</select></label>
+      {% for n in range(6) %}<div class="desk-inline"><label>{{ t(w ~ 'opens') }} {{ n + 1 }}<input type="time" name="range_{{ n }}_opens" value="{{ input_values.get('range_' ~ n ~ '_opens', '') }}" /></label><label>{{ t(w ~ 'closes') }} {{ n + 1 }}<input type="time" name="range_{{ n }}_closes" value="{{ input_values.get('range_' ~ n ~ '_closes', '') }}" /></label></div>{% endfor %}
+    {% elif target == 'closed' %}
+      <label>{{ t(w ~ 'fields.operational_status') }}<select name="operational_status" required><option value="">—</option>{% for s in ['active','inactive','temporarily_closed','defunct','unknown'] %}<option value="{{ s }}">{{ t(w ~ 'values.operational_status.' ~ s) }}</option>{% endfor %}</select></label>
+    {% elif target == 'address' %}
+      <p class="hint">{{ t(w ~ 'move_hint') }}</p>
+      <label>{{ t(w ~ 'location.street') }}<input name="location_street" value="{{ p.value or '' }}" /></label>
+      <label>{{ t(r ~ 'locality') }}<input name="location_locality" /></label><input type="hidden" name="location_kind" value="address" />
+    {% endif %}
+    {% set posted = input_values %}{% include 'moderation/observation_fields.html' %}
+    <div class="desk-actions">
+      <button name="decision" value="accepted">{{ t(r ~ 'accept') }}</button><button name="decision" value="amended">{{ t(r ~ 'amend') }}</button>
+      <button name="decision" value="rejected" class="link" formnovalidate>{{ t(r ~ 'reject') }}</button>
+    </div>
+    <p class="hint">{{ t(r ~ 'draft_only') }}</p>
+  </form>
+  {% elif item.state != 'closed' and not item.service_id %}{% if p.field == 'name' %}<p><a href="/moderazione/servizi/nuovo?contributo={{ item.contribution_id }}">{{ t(r ~ 'new_service') }}</a></p>{% endif %}<form method="post" action="/moderazione/contributo/{{ item.contribution_id }}/proposta/{{ p.proposal_id }}"><input type="hidden" name="form_token" value="{{ form_token }}" /><button name="decision" value="rejected" class="link">{{ t(r ~ 'reject') }}</button></form>
+  {% endif %}
+</details>
+{% endfor %}

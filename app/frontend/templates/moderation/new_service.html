@@ -8,6 +8,7 @@
   <h1>{{ t(n ~ 'title') }}</h1>
   <p class="hint">{{ t(n ~ 'intro') }}</p>
   <form method="get" action="/moderazione/servizi/nuovo" class="desk-filters" role="search">
+    {% if contribution %}<input type="hidden" name="contributo" value="{{ contribution }}" />{% endif %}
     <label>{{ t(w ~ 'find_place') }}<input type="search" name="luogo" value="{{ query }}" /></label>
     <button type="submit">{{ t('moderation.services.find') }}</button>
   </form>
@@ -15,6 +16,7 @@
 <section class="desk-card">
   <form method="post" action="/moderazione/servizi/nuovo" class="desk-form">
     <input type="hidden" name="form_token" value="{{ form_token }}" />
+    {% if contribution %}<input type="hidden" name="contribution" value="{{ contribution }}" />{% endif %}
     <input type="hidden" name="query" value="{{ query }}" />
     <fieldset><legend>{{ t(n ~ 'step_place') }}</legend>
       {% if query and not found_locations %}<p class="hint">{{ t(w ~ 'no_places_found') }}</p>{% endif %}
@@ -32,6 +34,8 @@
     </fieldset>
     <fieldset><legend>{{ t(n ~ 'step_service') }}</legend>
       <label>{{ t(w ~ 'fields.name') }}<input name="name" value="{{ posted.name or '' }}" required /></label>
+      <label>{{ t(w ~ 'fields.description') }}<textarea name="description" rows="3">{{ posted.description or '' }}</textarea></label>
+      <label>{{ t('moderation.review.service_link') }}<input name="service_link" value="{{ posted.service_link or '' }}" /></label>
       <label>{{ t(w ~ 'fields.delivery_mode') }}<select name="delivery_mode" required>
         <option value="">—</option>
         {% for v in modes %}<option value="{{ v }}" {% if posted.delivery_mode == v %}selected{% endif %}>{{ t(w ~ 'values.delivery_mode.' ~ v) }}</option>{% endfor %}

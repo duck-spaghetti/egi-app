@@ -65,12 +65,15 @@ def keep(row: dict, filters: dict, person: dict) -> bool:
 
 def contribution_page(request: Request, module: Moderation, contribution: str, **context):
     """Render one contribution with its history and the people it can go to."""
+    from .decisions import context as decision_context
+
     with module.desk.acting(module.session_hash(request)) as (connection, person):
         item = connection.execute('SELECT editorial.read_contribution(%s) AS item', (contribution,)).fetchone()['item']
         people = connection.execute('SELECT * FROM editorial.list_moderators()').fetchall()
         name = connection.execute(NAMES, ([item['service_id']] if item['service_id'] else [],)).fetchone()
+        review = decision_context(connection, item, request.query_params.get('q', '')[:200])
     return module.render(request, 'contribution.html', person, item=item, people=people,
-                         service_name=name['name'] if name else None, reasons=REASONS, **context)
+                         service_name=name['name'] if name else None, reasons=REASONS, **review, **context)
 
 
 @router.get('/contributo/{contribution}', response_class=HTMLResponse)

@@ -225,6 +225,40 @@ egi_database 013); a new location is published together with the service. The
 moderation pages allow images from `tile.openstreetmap.org` for that map, sent with
 the origin only as referrer. Tests: `tests/test_moderation_workspace.py`.
 
+### Contribution decisions (EGI-85)
+
+The contribution detail and the service workspace show proposals individually.
+Accept or amend one into a draft, or reject it without changing the service. A
+moderator explicitly enters and verifies structured contacts, one weekday's hours,
+a single access condition or a new delivery location; visitor prose is not parsed
+into those structures automatically. Changed facts cite the selected observation
+method as Redazione EGI. The other components keep their identities and evidence.
+Concurrent/stale forms are refused; a decision and its draft save commit together.
+Existing contact/condition collections and interval sets above the UI insertion
+bounds are preserved rather than truncated. A refused hours form retains its
+unvalidated controls so other unsaved changes can be corrected and resubmitted.
+
+A new-service contribution opens the location-first creation form with its name,
+offer, address and link prefilled. The moderator confirms the delivery mode and
+verification. It remains a draft; repeating the same accepted name proposal does
+not create a second service. The existing contribution keeps its original target
+(NULL for a new service); at closure the moderator explicitly selects the matching
+published service, searchable by name. Durable preparation/update lineage belongs
+to the separately approved Community work, not this visitor intake.
+
+Closing uses Published (an explicitly selected publication, made after accepted
+proposal decisions), No change, Rejected or Duplicate (reason required). Closure
+uses the existing database retention rules; it does not publish a draft. Admin's
+separate protection-release form approves/publishes an exact draft while releasing
+one chosen protection under the existing database capability and scope checks.
+Ordinary publication never releases it.
+
+Native tests: `tests/test_moderation_decisions.py` with `EGI_DATABASE_REPO`. The
+retention scheduler templates remain in the database repository's
+`scripts/retention/`; installing one, provisioning a real login or applying SQL to
+a non-disposable demo still requires the existing separate grant. Tests use only
+their own temporary clusters/accounts and call the real retention function.
+
 ### Visitor contributions (EGI-22)
 
 `/contribuisci` receives reports from a card's "Segnala un errore", still-valid

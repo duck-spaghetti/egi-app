@@ -75,12 +75,15 @@ def assertion_ids(value) -> set[str]:
     return set()
 
 
-def rows(form: dict, name: str) -> range:
-    """Return the row indexes a list in the form declares, at most MAX_ROWS."""
+def rows(form: dict, name: str, existing: int = 0) -> range:
+    """Read a bounded row count without truncating an aggregate's existing components."""
     try:
-        return range(min(max(int(form.get(name, 0) or 0), 0), MAX_ROWS))
+        count = int(form.get(name, 0) or 0)
     except ValueError:
         raise HTTPException(400) from None
+    if count < 0 or count > max(MAX_ROWS, existing + 1):
+        raise Refused('too_many_rows')
+    return range(count)
 
 
 def edited(base: dict, form: dict, terms: list[dict]) -> dict:
@@ -108,7 +111,7 @@ def edited(base: dict, form: dict, terms: list[dict]) -> dict:
 
     contacts, known = [], {item.get('component_id'): item for item in base.get('contacts', [])}
     order = max([item.get('sort_order', 0) for item in known.values()], default=0)
-    for index in rows(form, 'contacts'):
+    for index in rows(form, 'contacts', len(known)):
         key = f'contact_{index}_'
         value = form.get(key + 'value', '').strip()
         if form.get(key + 'remove') or not value:
@@ -133,7 +136,7 @@ def edited(base: dict, form: dict, terms: list[dict]) -> dict:
         body['contacts'] = contacts
 
     conditions, known = [], {item.get('component_id'): item for item in base.get('conditions', [])}
-    for index in rows(form, 'conditions'):
+    for index in rows(form, 'conditions', len(known)):
         key = f'condition_{index}_'
         kind, state = form.get(key + 'kind'), form.get(key + 'state')
         if form.get(key + 'remove') or kind not in CONDITION_KINDS or state not in REQUIREMENTS:
@@ -222,8 +225,13 @@ class Workspace:
                                                       (self.service,)).fetchone()['p']
         except Exception:  # noqa: BLE001  a missing territorial grant only hides the summary
             protections = None
-        contributions = [row for row in self.connection.execute('SELECT * FROM editorial.list_contributions(false)').fetchall()
+        contributions = [self.connection.execute('SELECT editorial.read_contribution(%s) AS item',
+                         (row['contribution_id'],)).fetchone()['item']
+                         for row in self.connection.execute('SELECT * FROM editorial.list_contributions(false)').fetchall()
                          if str(row['service_id']) == self.service]
+        from .decisions import decorate
+
+        contributions = [decorate(item) for item in contributions]
         rows = [{'field': field, 'source': self.source(field, base or {}, by_id),
                  'public': self.show(field, public, names), 'draft': self.show(field, draft, names) if draft else None}
                 for field in COMPARED]
@@ -233,7 +241,8 @@ class Workspace:
                 'public': public, 'draft': draft, 'shown': shown, 'terms': terms,
                 'chosen': {(i['adoption_id'], i['term_id']) for i in shown.get('classifications', [])},
                 'rows': rows, 'records': list(records.values()), 'protections': protections, 'place': place,
-                'schedules': hours.form_rows(shown.get('schedules', [])), 'calendars': len(shown.get('calendar_links', [])),
+                'schedules': hours.posted_rows(shown.get('schedules', []), posted or {}),
+                'calendars': len(shown.get('calendar_links', [])),
                 'saved_contacts': [c for c in shown.get('contacts', []) if c.get('component_id')],
                 'contributions': contributions, 'posted': posted or {}, 'query': query,
                 'found_locations': places.find_locations(self.connection, query), 'territories': places.territories(self.connection),
@@ -378,9 +387,25 @@ def new_service(request: Request, luogo: str = '', module: Moderation = Depends(
 def new_page(request: Request, module: Moderation, query: str, posted: dict | None = None, status: int = 200, **extra):
     """Render the new-service form as the verified person."""
     with module.desk.acting(module.session_hash(request)) as (connection, person):
+        contribution = request.query_params.get('contributo') or (posted or {}).get('contribution')
+        if contribution:
+            try:
+                contribution = str(UUID(contribution))
+            except ValueError:
+                raise HTTPException(400) from None
+            item = connection.execute('SELECT editorial.read_contribution(%s) AS item', (contribution,)).fetchone()['item']
+            if item['kind'] != 'new_service' or item['state'] == 'closed':
+                raise HTTPException(400)
+            if posted is None:
+                proposed = {p['field']: p['value'] for p in item['proposals'] if p['decision'] is None}
+                posted = {'name': proposed.get('name', ''), 'description': proposed.get('offer', ''),
+                          'location_street': proposed.get('address', ''), 'service_link': proposed.get('link', ''),
+                          'contribution': contribution}
+                if proposed.get('online'):
+                    posted.update(delivery_mode='online', location='none')
         context = {'query': query, 'found_locations': places.find_locations(connection, query),
                    'territories': places.territories(connection), 'kinds': places.KINDS, 'methods': places.METHODS,
-                   'modes': CHOICES['delivery_mode'], 'posted': posted or {}}
+                   'modes': CHOICES['delivery_mode'], 'posted': posted or {}, 'contribution': contribution}
     return module.render(request, 'new_service.html', person, status=status, **context, **extra)
 
 
@@ -396,6 +421,14 @@ async def create_service(request: Request, module: Moderation = Depends(moderati
         if mode not in CHOICES['delivery_mode']:
             raise Refused('mode_required')
         with module.desk.acting(module.session_hash(request)) as (connection, _):
+            contribution = revision(form, 'contribution')
+            item = None
+            if contribution:
+                from .decisions import read_open
+
+                item = read_open(connection, contribution)
+                if item['kind'] != 'new_service' or any(p['field'] == 'name' and p['decision'] is not None for p in item['proposals']):
+                    raise Refused('stale_submission')
             note = module.text('moderation.workspace.created_note')
             if choice == 'new':
                 location = places.create_location(connection, form, note)
@@ -407,16 +440,36 @@ async def create_service(request: Request, module: Moderation = Depends(moderati
                 if location is None:
                     raise Refused('location_required')
                 where = places.location_territories(connection, location) or [places.chosen_territory(connection, form, '')]
-            cited = places.observation(connection, 'service', {'name': name, 'delivery_mode': mode}, form)
+            observed = {'name': name, 'delivery_mode': mode}
+            description, link = form.get('description', '').strip(), form.get('service_link', '').strip()
+            if description:
+                observed['description'] = description
+            if link:
+                observed['contact'] = link
+            cited = places.observation(connection, 'service', observed, form)
             body = {'name': name, 'delivery_mode': mode, 'original_language': 'it', 'territories': where,
                     'evidence': {'record': cited['name'] + cited['delivery_mode'], 'name': cited['name'],
                                  'delivery_mode': cited['delivery_mode'], 'original_language': [], 'territories': []}}
             if location:
                 body['place'] = {'location_id': location, 'evidence': []}
+            if description:
+                body['description'] = description
+                body['evidence']['description'] = cited['description']
+            if link:
+                body['contacts'] = [{'channel_type': 'web', 'value': link, 'is_public': True, 'evidence': cited['contact']}]
             made = connection.execute("SELECT governance.save_revision('service',NULL,NULL,NULL,%s,%s) AS r",
                                       (json.dumps(body), note)).fetchone()['r']
             service = connection.execute('SELECT entity_id::text FROM governance.entity_revisions WHERE revision_id=%s',
                                          (made,)).fetchone()['entity_id']
+            if item:
+                chosen = {'name': name, 'offer': description, 'link': link,
+                          'online': 'sì' if mode == 'online' else mode, 'address': form.get('location_street', '').strip()}
+                for proposal in item['proposals']:
+                    value = chosen.get(proposal['field'])
+                    if proposal['decision'] is None and value:
+                        decision = 'accepted' if value == proposal['value'] else 'amended'
+                        connection.execute('SELECT editorial.decide_proposal(%s,%s,%s,%s)',
+                                           (proposal['proposal_id'], decision, json.dumps(value) if decision == 'amended' else None, note))
     except Refused as refusal:
         return new_page(request, module, form.get('query', '')[:200], posted=form, status=400, error=workspace_error(refusal.code))
     return RedirectResponse(f'{PATH}/servizio/{service}', status_code=303)

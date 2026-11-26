@@ -11,7 +11,7 @@
   {% if item.contact %}<p>{{ t('moderation.contribution.contact') }} <code>{{ item.contact }}</code></p>{% endif %}
   {% if item.proposals %}
   <h2>{{ t('moderation.contribution.proposals') }}</h2>
-  <ul>{% for p in item.proposals %}<li><code>{{ p.field }}</code>: {{ p.value if p.value is not none else '—' }}{% if p.decision %} · {{ t('moderation.decisions.' ~ p.decision) }}{% endif %}</li>{% endfor %}</ul>
+  {% include 'moderation/proposal_actions.html' %}
   {% endif %}
 </section>
 {% if item.state != 'closed' %}
@@ -39,6 +39,19 @@
   </div>
 </section>
 {% endif %}
+{% if item.state != 'closed' %}
+<section class="desk-card">
+  <h2>{{ t('moderation.review.close') }}</h2>
+  {% if not item.service_id %}<form method="get" class="desk-filters"><label>{{ t('moderation.review.find_publication') }}<input name="q" value="{{ publication_query }}" /></label><button>{{ t('moderation.services.find') }}</button></form>{% endif %}
+  <form method="post" action="/moderazione/contributo/{{ item.contribution_id }}/chiudi" class="desk-form">
+    <input type="hidden" name="form_token" value="{{ form_token }}" />
+    <label>{{ t('moderation.review.outcome') }}<select name="outcome">{% for o in outcomes %}<option value="{{ o }}">{{ t('moderation.review.outcomes.' ~ o) }}</option>{% endfor %}</select></label>
+    <label>{{ t('moderation.review.publication') }}<select name="publication"><option value="">—</option>{% for p in publications %}<option value="{{ p.publication_id }}">{{ p.name or '—' }}</option>{% endfor %}</select></label>
+    <label>{{ t('moderation.review.reason') }}<textarea name="reason" rows="2"></textarea></label>
+    <button>{{ t('moderation.review.close') }}</button><p class="hint">{{ t('moderation.review.close_hint') }}</p>
+  </form>
+</section>
+{% else %}<p class="desk-notice">{{ t('moderation.review.outcomes.' ~ item.outcome) }}</p>{% endif %}
 <section class="desk-card">
   <h2>{{ t('moderation.contribution.history') }}</h2>
   <ol class="desk-history">{% for e in item.events %}<li>{{ e.created_at[:16].replace('T', ' ') }} · {{ e.actor_name or t('moderation.contribution.visitor') }} · {{ t('moderation.events.' ~ e.action) }}</li>{% endfor %}</ol>

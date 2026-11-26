@@ -358,7 +358,8 @@
       "note_too_long": "La nota supera i 1000 caratteri.",
       "invalid_point": "Coordinate non valide: servono latitudine e longitudine, in gradi decimali.",
       "name_required": "Il nome del servizio è obbligatorio.",
-      "mode_required": "Scegli la modalità del servizio."
+      "mode_required": "Scegli la modalità del servizio.",
+      "review_refused": "Operazione non applicata. Verifica lo stato del contributo, le revisioni, i campi richiesti e la pubblicazione selezionata."
     },
     "queue": {
       "title": "Coda dei contributi",
@@ -635,6 +636,48 @@
       "step_check": "3. Verifica",
       "after": "Il servizio non è visibile al pubblico finché non lo pubblichi.",
       "create": "Crea la bozza"
+    },
+    "review": {
+      "proposal": "Proposta",
+      "decided_value": "Valore deciso",
+      "corrected": "Valore corretto (per Modifica e accetta)",
+      "contact_line": "Contatto da correggere",
+      "condition_line": "Condizione da correggere",
+      "add": "Aggiungi una riga",
+      "public_contact": "Contatto pubblico",
+      "requirement": "Requisito",
+      "target": "Campo da aggiornare",
+      "hours_hint": "Inserisci i dati verificati per un giorno. Gli altri giorni e orari restano invariati. Per correggere un orario esistente selezionalo; aggiungerne uno sovrapposto non è consentito.",
+      "new_schedule": "Nuovo orario",
+      "new_scope": "Destinatario di un nuovo orario",
+      "locality": "Comune",
+      "accept": "Accetta nella bozza",
+      "amend": "Modifica e accetta",
+      "reject": "Rifiuta",
+      "draft_only": "La decisione salva una bozza. Per pubblicarla apri il confronto del servizio.",
+      "new_service": "Prepara il nuovo servizio da questa proposta",
+      "draft_note": "Valori verificati da una proposta",
+      "service_link": "Sito o canale online verificato",
+      "close": "Chiudi il contributo",
+      "outcome": "Esito",
+      "find_publication": "Cerca il servizio pubblicato",
+      "publication": "Pubblicazione (solo per esito Pubblicato)",
+      "reason": "Motivazione",
+      "close_hint": "Pubblicato richiede una pubblicazione del servizio; gli altri esiti richiedono una motivazione e nessuna pubblicazione.",
+      "outcomes": {
+        "published": "Pubblicato",
+        "no_change": "Nessuna modifica",
+        "rejected": "Rifiutato",
+        "duplicate": "Duplicato"
+      },
+      "release": "Rilascio di una protezione",
+      "release_hint": "Solo Admin. Questa azione approva e pubblica la bozza e rilascia la protezione selezionata, se i controlli del database lo consentono.",
+      "protection": "Protezione",
+      "scope": "Ambito del rilascio",
+      "scope_service": "Solo questo servizio (protezione ereditata)",
+      "scope_global": "Protezione originata da questo servizio",
+      "release_publish": "Approva, pubblica e rilascia",
+      "structured_saved": "Dati strutturati salvati nella bozza"
     }
   }
 }

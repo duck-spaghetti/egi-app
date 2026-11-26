@@ -245,3 +245,5 @@ from .queue import router as queue_router  # noqa: E402  (after this module's ro
 from .workspace import router as workspace_router  # noqa: E402
 router.include_router(queue_router)
 router.include_router(workspace_router)
+from .decisions import router as decisions_router  # noqa: E402
+router.include_router(decisions_router)

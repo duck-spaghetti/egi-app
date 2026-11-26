@@ -18,6 +18,23 @@
   {% endif %}
 </section>
 
+{% if contributions %}<section class="desk-card" id="proposte">
+  <h2>{{ t('moderation.contribution.proposals') }}</h2>{% set review_body = shown %}
+  {% for item in contributions %}<h3><a href="/moderazione/contributo/{{ item.contribution_id }}">{{ t('moderation.kinds.' ~ item.kind) }}</a></h3>
+    {% if item.text %}<blockquote class="desk-quote">{{ item.text }}</blockquote>{% endif %}
+    {% include 'moderation/proposal_actions.html' %}
+  {% endfor %}
+</section>{% endif %}
+{% if person.role == 'admin' and draft and protections and protections.protection_ids %}
+<section class="desk-card">
+  <h2>{{ t('moderation.review.release') }}</h2><p class="hint">{{ t('moderation.review.release_hint') }}</p>
+  <form method="post" action="/moderazione/servizio/{{ service_id }}/protezione" class="desk-form">
+    <input type="hidden" name="form_token" value="{{ form_token }}" /><input type="hidden" name="working" value="{{ working }}" /><input type="hidden" name="public" value="{{ public_revision or '' }}" />
+    <label>{{ t('moderation.review.protection') }}<select name="protection">{% for id in protections.protection_ids %}<option value="{{ id }}">{{ t('moderation.review.protection') }} {{ loop.index }}</option>{% endfor %}</select></label>
+    <label>{{ t('moderation.review.scope') }}<select name="scope"><option value="service">{{ t('moderation.review.scope_service') }}</option><option value="global">{{ t('moderation.review.scope_global') }}</option></select></label>
+    <label>{{ t('moderation.review.reason') }}<textarea name="reason" required rows="2"></textarea></label><button>{{ t('moderation.review.release_publish') }}</button>
+  </form>
+</section>{% endif %}
 <section class="desk-card" id="confronto">
   <h2>{{ t(w ~ 'compare') }}</h2>
   <table class="desk-table compare">
@@ -122,7 +139,7 @@
           <label>{{ t(w ~ 'completeness') }}<select name="{{ k }}completeness">
             {% for v in completeness %}<option value="{{ v }}" {% if (s.completeness or 'complete') == v %}selected{% endif %}>{{ t(w ~ 'completeness_values.' ~ v) }}</option>{% endfor %}
           </select></label>
-          {% if s %}<label class="check"><input type="checkbox" name="{{ k }}remove" value="1" />{{ t(w ~ 'remove') }}</label>{% endif %}
+          {% if s %}<label class="check"><input type="checkbox" name="{{ k }}remove" value="1" {% if row.removed %}checked{% endif %} />{{ t(w ~ 'remove') }}</label>{% endif %}
         </div>
         <table class="desk-week">
           <thead><tr><th scope="col">{{ t(w ~ 'day') }}</th><th scope="col">{{ t(w ~ 'day_state') }}</th><th scope="col" colspan="{{ row.slots }}">{{ t(w ~ 'ranges') }}</th></tr></thead>

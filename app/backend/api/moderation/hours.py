@@ -41,7 +41,7 @@ def seconds(value: str) -> int:
 def slots(schedule: dict) -> int:
     """Return how many range slots each day of a schedule's form offers."""
     most = max((len(day.get('intervals') or []) for day in schedule.get('days') or []), default=0)
-    return min(max(most + FREE_RANGES, 2), MAX_RANGES)
+    return max(most + FREE_RANGES, 2)
 
 
 def form_rows(schedules: list[dict]) -> list[dict]:
@@ -54,10 +54,45 @@ def form_rows(schedules: list[dict]) -> list[dict]:
     return shown
 
 
-def _ranges(form: dict, key: str, count: int) -> list[dict]:
+def posted_rows(schedules: list[dict], form: dict) -> list[dict]:
+    """Render submitted schedule controls after refusal, independently of their validity."""
+    if 'schedules' not in form:
+        return form_rows(schedules)
+    try:
+        count = int(form.get('schedules') or 0)
+    except ValueError:
+        return form_rows(schedules)
+    if not 0 <= count <= max(MAX_SCHEDULES, len(schedules)) + 1:
+        return form_rows(schedules)
+    known = {s.get('component_id'): s for s in schedules}
+    shown = []
+    for index in range(count):
+        key = f'schedule_{index}_'
+        before = known.get(form.get(key + 'component')) or {}
+        try:
+            size = int(form.get(key + 'slots') or 0)
+        except ValueError:
+            size = slots(before)
+        size = min(max(size, 0), max(MAX_RANGES, slots(before)))
+        schedule = copy.deepcopy(before)
+        mapping = {'scope': 'scope', 'contact': 'contact_component_id', 'from': 'valid_from',
+                   'until': 'valid_until', 'completeness': 'completeness'}
+        if before or form.get(key + 'scope'):
+            schedule.update({field: form.get(key + name, '') for name, field in mapping.items()})
+        days = [{'weekday': day, 'state': form.get(f'{key}day_{day}_state', 'unknown'),
+                 'intervals': [{'opens': form.get(f'{key}day_{day}_{n}_opens', ''),
+                                'closes': form.get(f'{key}day_{day}_{n}_closes', '')} for n in range(size)]}
+                for day in WEEKDAYS]
+        shown.append({'schedule': schedule, 'slots': size, 'days': days, 'removed': bool(form.get(key + 'remove'))})
+    return shown or form_rows([])
+
+
+def _ranges(form: dict, key: str, count: int, limit: int = MAX_RANGES) -> list[dict]:
     """Read one day's ranges; a half-filled or unreadable range is refused."""
+    if count < 0 or count > limit:
+        raise Refused('invalid_hours')
     found = []
-    for index in range(min(count, MAX_RANGES)):
+    for index in range(count):
         opens, closes = form.get(f'{key}{index}_opens', '').strip(), form.get(f'{key}{index}_closes', '').strip()
         if not opens and not closes:
             continue
@@ -104,6 +139,36 @@ def _overlap(first: dict, second: dict) -> bool:
     return starts <= ends
 
 
+def correct_day(body: dict, form: dict) -> dict:
+    """Apply one moderator-entered weekday correction, preserving all other schedules/days."""
+    try:
+        weekday = int(form.get('weekday', ''))
+    except ValueError:
+        raise Refused('invalid_hours') from None
+    state = form.get('day_state')
+    if weekday not in WEEKDAYS or state not in DAY_STATES:
+        raise Refused('invalid_hours')
+    schedules = body.setdefault('schedules', [])
+    wanted = form.get('schedule')
+    schedule = next((s for s in schedules if s.get('component_id') == wanted), None) if wanted else None
+    if wanted and schedule is None:
+        raise Refused('invalid_hours')
+    if schedule is None:
+        if len(schedules) >= MAX_SCHEDULES or form.get('scope') not in ('service', 'intake'):
+            raise Refused('invalid_hours')
+        schedule = {'scope': form['scope'], 'timezone': TIMEZONE, 'completeness': 'partial', 'days': []}
+        if any(_overlap(schedule, other) for other in schedules):
+            raise Refused('schedule_overlap')
+        schedules.append(schedule)
+    before = next((d for d in schedule.get('days', []) if d['weekday'] == weekday), None)
+    ranges = _ranges(form, 'range_', MAX_RANGES) if state == 'intervals' else []
+    corrected = _day(before, weekday, state, ranges)
+    schedule['days'] = sorted([d for d in schedule.get('days', []) if d['weekday'] != weekday] + [corrected],
+                              key=lambda d: d['weekday'])
+    return {'index': schedules.index(schedule), 'weekday': weekday, 'scope': schedule['scope'],
+            'state': state, 'intervals': ranges}
+
+
 def edited_schedules(base: dict, form: dict, contacts: list[dict]) -> tuple[list[dict], list[dict]]:
     """Apply the hours form to a body's schedules; return the schedules and the calendar links kept.
 
@@ -114,9 +179,11 @@ def edited_schedules(base: dict, form: dict, contacts: list[dict]) -> tuple[list
     if 'schedules' not in form:
         return schedules, links
     try:
-        count = min(max(int(form.get('schedules') or 0), 0), MAX_SCHEDULES + 1)
+        count = int(form.get('schedules') or 0)
     except ValueError:
         raise Refused('invalid_hours') from None
+    if count < 0 or count > max(MAX_SCHEDULES, len(schedules)) + 1:
+        raise Refused('invalid_hours')
     known = {item.get('component_id'): item for item in schedules}
     saved_contacts = {item['component_id'] for item in contacts if item.get('component_id')}
     result = []
@@ -137,7 +204,8 @@ def edited_schedules(base: dict, form: dict, contacts: list[dict]) -> tuple[list
             state = form.get(f'{key}day_{weekday}_state', 'unknown')
             if state not in DAY_STATES:
                 raise Refused('invalid_hours')
-            days.append(_day(old_days.get(weekday), weekday, state, _ranges(form, f'{key}day_{weekday}_', slots_count)))
+            days.append(_day(old_days.get(weekday), weekday, state,
+                             _ranges(form, f'{key}day_{weekday}_', slots_count, max(MAX_RANGES, slots(before or {})))))
         contact = form.get(key + 'contact') or None if scope == 'contact' else None
         if scope == 'contact' and contact not in saved_contacts:
             raise Refused('schedule_contact')
@@ -155,7 +223,7 @@ def edited_schedules(base: dict, form: dict, contacts: list[dict]) -> tuple[list
         if before is None or schedule != before:
             schedule['evidence'] = []
         result.append(schedule)
-    if len(result) > MAX_SCHEDULES:
+    if len(result) > max(MAX_SCHEDULES, len(schedules)):
         raise Refused('invalid_hours')
     for position, first in enumerate(result):
         if any(_overlap(first, second) for second in result[position + 1:]):
