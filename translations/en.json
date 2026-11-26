@@ -110,7 +110,8 @@
       "rotate_left": "Rotate left",
       "rotate_right": "Rotate right",
       "tilt": "Tilt the view",
-      "cluster": "{count} places in this area: zoom in"
+      "cluster": "{count} places in this area: zoom in",
+      "look": "Look at the building"
     }
   },
   "contribute": {

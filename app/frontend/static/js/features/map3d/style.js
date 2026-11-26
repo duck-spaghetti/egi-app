@@ -118,8 +118,111 @@ export function labelLayers(C = COLORS) {
   ];
 }
 
-/** Sources and layers of the 3D components; empty until they are added. */
-export function layers3d() { return {sources: {}, layers: [], labels: []}; }
+export const COLORS_3D = {
+  roof: "#df9277", extrude: "#ddd5c4", tall: "#d6d3cc", monument: "#ece3cf", iconic: "#efe2c4", iconicEdge: "#c9b385",
+  iconicLabel: "#5a3d1a", bridge: "#f1ece2", bridgeCase: "#b9ad94", parapet: "#d6c9ae", pier: "#cbbfa6",
+  treeA: "#9fbd7e", treeB: "#8fb273", treeC: "#adc68c", tree2d: "#a9c98a", wall: "#d9cdb4",
+  fountainStone: "#e7e0cf", fountainWater: "#7fbfd6", fountainJet: "#dff3fa",
+};
+// Buildings grow in between Z0 and Z1; from M0 the parts morph from block to their own shape by M1.
+export const Z0 = 14, Z1 = 15.5, M0 = 16, M1 = 17.2;
+export const ATTRIBUTION_CTRN = 'Edifici: <a href="https://dati.lazio.it/">CTRN Regione Lazio 2002–2003</a> (CC BY 4.0)';
+const grow = (value, z0 = Z0, z1 = Z1) => ["interpolate", ["linear"], ["zoom"], z0, 0, z1, value];
+
+/** Sources and layers of the 3D components: buildings, landmarks, bridges, fountains, trees. */
+export function layers3d(base, C = COLORS_3D) {
+  const blockColor = cls => ["match", cls, "monument", C.monument, "tall", C.tall, C.roof];
+  const partColor = ["match", ["get", "class"], "monument", C.monument, "tall", C.tall, C.extrude];
+  const morph = (from, to) => ["interpolate", ["linear"], ["zoom"], M0, from, M1, to];
+  const osm = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+  return {
+    sources: {
+      buildings: {type: "vector", url: `pmtiles://${base}/buildings.pmtiles`, attribution: ATTRIBUTION_CTRN},
+      bridges: {type: "vector", url: `pmtiles://${base}/bridges.pmtiles`, attribution: osm},
+      fountains: {type: "vector", url: `pmtiles://${base}/fountains.pmtiles`, attribution: osm},
+      landmarks: {type: "geojson", data: `${base}/landmarks.geojson`, attribution: osm},
+      "landmark-labels": {type: "geojson", data: `${base}/landmark-labels.geojson`},
+    },
+    layers: [
+      // Bridges in plan: a light deck with an edge, and a shadow on the water around Tiber bridges.
+      {id: "bridge-shadow", type: "line", source: "bridges", "source-layer": "decks", minzoom: 14, filter: ["==", ["get", "water"], 1],
+        paint: {"line-color": "#4d7383", "line-opacity": 0.35, "line-width": ["interpolate", ["linear"], ["zoom"], 14, 2, 18, 10],
+          "line-offset": ["interpolate", ["linear"], ["zoom"], 14, -1, 18, -5], "line-blur": ["interpolate", ["linear"], ["zoom"], 14, 1, 18, 8]}},
+      {id: "bridge-plan", type: "fill", source: "bridges", "source-layer": "decks", minzoom: 13,
+        paint: {"fill-color": C.bridge, "fill-outline-color": C.bridgeCase, "fill-opacity": fade(1, 13, 14)}},
+      // Tiber embankment walls: drawn as a light parapet line (flat terrain cannot step down to the water).
+      {id: "embankments", type: "line", source: "buildings", "source-layer": "embankments", minzoom: 14,
+        paint: {"line-color": C.wall, "line-width": ["interpolate", ["linear"], ["zoom"], 13, 1, 17, 3.5]}},
+      {id: "landmark-plan", type: "fill", source: "landmarks", minzoom: 13,
+        paint: {"fill-color": C.iconic, "fill-outline-color": C.iconicEdge, "fill-opacity": fade(1, 13, 14)}},
+      {id: "tree-plan", type: "fill", source: "buildings", "source-layer": "trees", minzoom: 16,
+        filter: ["all", ["==", ["get", "p"], "crown"], ["<", ["get", "b"], 4]], paint: {"fill-color": C.tree2d, "fill-opacity": 0.9}},
+      {id: "blocks-3d", type: "fill-extrusion", source: "buildings", "source-layer": "blocks", minzoom: Z0, maxzoom: M0,
+        filter: ["!=", ["get", "class"], "replaced"],
+        paint: {"fill-extrusion-color": blockColor(["get", "class"]), "fill-extrusion-opacity": fade(0.6, Z0, Z1),
+          "fill-extrusion-height": grow(["get", "h"]), "fill-extrusion-base": 0}},
+      {id: "parts-3d", type: "fill-extrusion", source: "buildings", "source-layer": "parts", minzoom: M0,
+        filter: ["!=", ["get", "class"], "replaced"],
+        paint: {"fill-extrusion-color": morph(blockColor(["get", "cb"]), partColor), "fill-extrusion-opacity": 0.6,
+          "fill-extrusion-base": 0, "fill-extrusion-height": morph(["get", "hb"], ["get", "h"])}},
+      {id: "roofs-3d", type: "fill-extrusion", source: "buildings", "source-layer": "parts", minzoom: M0 + 0.3,
+        filter: ["==", ["get", "class"], "home"],
+        paint: {"fill-extrusion-color": C.roof, "fill-extrusion-opacity": fade(0.8, M0 + 0.3, M1),
+          "fill-extrusion-base": morph(["get", "hb"], ["get", "h"]),
+          "fill-extrusion-height": morph(["+", ["get", "hb"], 0.6], ["+", ["get", "h"], 0.6])}},
+      {id: "landmarks-3d", type: "fill-extrusion", source: "landmarks", minzoom: 13,
+        paint: {"fill-extrusion-color": C.iconic, "fill-extrusion-opacity": fade(0.85, 13, 14.5),
+          "fill-extrusion-base": grow(["get", "b"], 13, 14.5), "fill-extrusion-height": grow(["get", "t"], 13, 14.5),
+          "fill-extrusion-vertical-gradient": true}},
+      {id: "fountains-3d", type: "fill-extrusion", source: "fountains", "source-layer": "parts", minzoom: 16,
+        paint: {"fill-extrusion-color": ["match", ["get", "p"], "water", C.fountainWater, "jet", C.fountainJet, C.fountainStone],
+          "fill-extrusion-opacity": fade(0.95, 16, 16.5),
+          "fill-extrusion-base": grow(["get", "b"], 16, 16.5), "fill-extrusion-height": grow(["get", "t"], 16, 16.5)}},
+      {id: "piers-3d", type: "fill-extrusion", source: "bridges", "source-layer": "piers", minzoom: Z0,
+        paint: {"fill-extrusion-color": C.pier, "fill-extrusion-opacity": fade(0.7, Z0, Z1),
+          "fill-extrusion-base": 0, "fill-extrusion-height": grow(["get", "t"])}},
+      {id: "decks-3d", type: "fill-extrusion", source: "bridges", "source-layer": "decks", minzoom: Z0,
+        paint: {"fill-extrusion-color": C.bridge, "fill-extrusion-opacity": fade(0.75, Z0, Z1),
+          "fill-extrusion-base": grow(["get", "b"]), "fill-extrusion-height": grow(["get", "t"])}},
+      {id: "parapets-3d", type: "fill-extrusion", source: "bridges", "source-layer": "parapets", minzoom: 16,
+        paint: {"fill-extrusion-color": C.parapet, "fill-extrusion-opacity": fade(0.7, 16, 16.5),
+          "fill-extrusion-base": grow(["get", "b"], 16, 16.5), "fill-extrusion-height": grow(["get", "t"], 16, 16.5)}},
+      {id: "trees-3d", type: "fill-extrusion", source: "buildings", "source-layer": "trees", minzoom: 16,
+        paint: {"fill-extrusion-color": ["match", ["get", "p"], "top", ["match", ["get", "v"], 0, C.treeC, C.treeA],
+          ["match", ["get", "v"], 0, C.treeA, 1, C.treeB, C.treeC]],
+          "fill-extrusion-opacity": fade(0.7, 16, 16.6), "fill-extrusion-base": grow(["get", "b"], 16, 16.6),
+          "fill-extrusion-height": grow(["get", "t"], 16, 16.6), "fill-extrusion-vertical-gradient": false}},
+    ],
+    labels: [
+      // Street names on bridges: lifted on screen by the deck height as the camera tilts (liftBridgeLabels).
+      ...[["water", 1, 6.9], ["high", 0, 7.4]].map(([id, water, lift]) => ({
+        id: `bridge-label-${id}`, type: "symbol", source: "bridges", "source-layer": "lines", minzoom: 14,
+        metadata: {"egi:lift": lift}, filter: ["all", ["==", ["get", "water"], water], ["!=", ["get", "name"], ""]],
+        layout: {"symbol-placement": "line", "text-field": ["get", "name"], "text-font": ["Noto Sans Regular"],
+          "text-size": ["interpolate", ["linear"], ["zoom"], 14, 11, 18, 14]},
+        paint: {"text-color": COLORS.label, "text-halo-color": COLORS.halo, "text-halo-width": 1.5,
+          "text-translate": [0, 0], "text-translate-anchor": "viewport"}})),
+      {id: "landmark-label", type: "symbol", source: "landmark-labels", minzoom: 12,
+        layout: {"text-field": ["get", "name"], "text-font": ["Noto Sans Medium"], "text-max-width": 9,
+          "text-size": ["interpolate", ["linear"], ["zoom"], 12, 12, 16, 15]},
+        paint: {"text-color": C.iconicLabel, "text-halo-color": COLORS.halo, "text-halo-width": 2}},
+    ],
+  };
+}
+
+/** Lift bridge labels: MapLibre draws symbols at ground level, decks are raised, so labels move
+ * up on screen by as much as a point h metres high does at the current zoom and pitch. */
+export function liftBridgeLabels(map) {
+  const ids = map.getStyle().layers.filter(l => l.metadata?.["egi:lift"]).map(l => [l.id, l.metadata["egi:lift"]]);
+  const update = () => {
+    const z = map.getZoom(), lat = map.getCenter().lat, pitch = map.getPitch() * Math.PI / 180;
+    const ppm = 512 * 2 ** z / (40075016.686 * Math.cos(lat * Math.PI / 180));
+    for (const [id, h] of ids) map.setPaintProperty(id, "text-translate", [0, -h * ppm * Math.sin(pitch)]);
+  };
+  map.on("move", update);
+  update();
+  return () => map.off("move", update);
+}
 
 /** Complete style for the active data set version. */
 export function egiStyle(base) {

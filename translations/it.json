@@ -110,7 +110,8 @@
       "rotate_left": "Ruota a sinistra",
       "rotate_right": "Ruota a destra",
       "tilt": "Inclina la vista",
-      "cluster": "{count} luoghi in quest'area: avvicina"
+      "cluster": "{count} luoghi in quest'area: avvicina",
+      "look": "Guarda l'edificio"
     }
   },
   "contribute": {

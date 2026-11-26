@@ -93,5 +93,28 @@ const live=c=>c.markers.filter(m=>!m.removed&&m.options.element.children?.[0]);
  same([...restored.filters.cats],['mangiare']);assert.equal(restored.filters.q,'doccia vicino casa');
  same(restored.userLoc,{lat:41.9,lng:12.5,label:'Via X 1'});
  assert.equal(takeHandoff(storage),null,'the handoff is read once');
+ // 3D layers only in the 3D style, removed with the map; attributions; decorative canvas.
+ const style=gl.options.style;const ids=style.layers.map(l=>l.id);
+ for(const id of ['blocks-3d','parts-3d','roofs-3d','landmarks-3d','decks-3d','parapets-3d','piers-3d','fountains-3d','trees-3d','embankments','landmark-label'])assert(ids.includes(id),id);
+ assert.match(style.sources.buildings.attribution,/CTRN Regione Lazio/);assert.match(style.sources.basemap.attribution,/OpenStreetMap.*Protomaps/);
+ assert.equal(gl.options.attributionControl.compact,false);
+ // "Look at the building": only with a map module that has lookAt (3D), in the sheet's action bar.
+ const {createMapPage}=await env.load('pages/map.js');
+ async function page(mapModule){
+  let emitService;const bar=env.get('detail-bar');bar.children=[];
+  const services={load:async()=>({pois:[]}),update(){},show(){},choose(){},refreshHours(){},describe:()=>({}),dispose(){}};
+  const feature={update(){},mount(){},dispose(){},summaries(){},detail(){},origin(){},referenceChanged(){},set(){}};
+  const shell={bind(){},layout(){},translate(){},close(){},toggle(){},update(){},languages(){},cities(){},toast(){}};
+  const p=createMapPage({languageCode:'it',localLayers:false,cityName:'Test',view:{mode:'3d',available:true}},
+   {i18n:{setLanguage:async()=>{},t:(k,x,f)=>f,translatePage(){}},http:{request(){throw Error('unexpected');}},
+    browser:{location:{search:'',pathname:'/map',assign(){}},local:null,session:null},
+    factories:{map:()=>mapModule,services:args=>{emitService=args.emit;return services;},search:()=>({select:()=>[],update(){}}),origin:()=>feature,transport:()=>feature,cycleways:()=>feature,shell:()=>shell}});
+  await p.mount();emitService('detailReady',{poi:{latitude:41.9,longitude:12.5}});p.dispose();return bar.children;
+ }
+ const base={mount(){},update(){},dispose(){},attach(){},center(){},contains:()=>true,invalidate(){},servicesVisible(){}};
+ let looked=null;
+ const with3d=await page({...base,lookAt:(lat,lng)=>{looked=[lat,lng];}});
+ assert.equal(with3d.length,1);assert.equal(with3d[0].textContent,"Guarda l'edificio");with3d[0].click();same(looked,[41.9,12.5]);
+ assert.equal((await page(base)).length,0,'no button on the current map');
  console.log('PASS: 3D map module parity (sites, choose, reference, clusters, controls, dispose) and view switch/handoff');
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -110,7 +110,8 @@
       "rotate_left": "Tourner à gauche",
       "rotate_right": "Tourner à droite",
       "tilt": "Incliner la vue",
-      "cluster": "{count} lieux dans cette zone : zoomer"
+      "cluster": "{count} lieux dans cette zone : zoomer",
+      "look": "Voir le bâtiment"
     }
   },
   "contribute": {

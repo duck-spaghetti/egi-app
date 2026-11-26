@@ -72,6 +72,15 @@ export function createMapPage(context, dependencies={}) {
    browser.location.assign(switchUrl(browser.location,{view:other,lang:state.lang,service:state.selectedId}));
   },{signal:scope.signal});
  }
+ /** "Look at the building" in the service sheet, only with a map module that can (3D mode). */
+ function lookButton(poi){
+  if(typeof map.lookAt!=='function'||!Number.isFinite(poi?.latitude)||!Number.isFinite(poi?.longitude))return;
+  const bar=document.getElementById('detail-bar');if(!bar)return;
+  const button=document.createElement('button');button.type='button';button.className='btn look3d';
+  button.textContent=i18n.t('map.map3d.look',{},"Guarda l'edificio");
+  button.addEventListener('click',()=>{shell.close();map.lookAt(poi.latitude,poi.longitude);},{signal:scope.signal});
+  bar.appendChild(button);
+ }
  /** Filters, search text and reference point from the previous view; selected service from the URL. */
  function restore(){
   const data=takeHandoff(browser.session);
@@ -134,7 +143,7 @@ export function createMapPage(context, dependencies={}) {
    case 'toggleOffer':if(state.filters.offersOff.has(payload.code))state.filters.offersOff.delete(payload.code);else state.filters.offersOff.add(payload.code);refresh();break;
    case 'select':select(payload.id);break;
    case 'choose':services.choose(payload.items,payload.matched);break;
-   case 'detailReady':void transit.detail(payload.poi);break;
+   case 'detailReady':lookButton(payload.poi);void transit.detail(payload.poi);break;
    case 'openSheet':shell.open(payload.id);break;
    case 'closeSheets':shell.close();break;
    case 'showMap':shell.close();if(state.view!=='map')shell.toggle();break;

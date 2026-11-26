@@ -1,5 +1,5 @@
 import {siteMarkers,USER_DOT_HTML,USER_DOT_LABEL} from "../map/pins.js";
-import {egiStyle} from "./style.js";
+import {egiStyle,liftBridgeLabels} from "./style.js";
 /** createMap3d: the 3D mode's map module, on MapLibre GL JS, with the current map's interface.
  *
  * mount, update(snapshot, list), attach(factory), center, contains, invalidate,
@@ -17,10 +17,10 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   reduceMotion=Boolean(globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches),
   devicePixelRatio=globalThis.devicePixelRatio||1,origin=globalThis.location?.origin||""}) {
  let state={},list=[],visible=true,disposed=false;
- const runtime={map:null,markers:new Map(),user:null,bounds:null};
+ const runtime={map:null,markers:new Map(),user:null,bounds:null,cleanups:[]};
  const t=(key,fallback)=>translate(key,{},fallback);
  const bounds=()=>[[Number(context.boundsWest),Number(context.boundsSouth)],[Number(context.boundsEast),Number(context.boundsNorth)]];
- const move=options=>reduceMotion?runtime.map.jumpTo(options):runtime.map.easeTo({...options,duration:500});
+ const move=options=>reduceMotion?runtime.map.jumpTo(options):runtime.map.easeTo({duration:500,...options});
 
  function mount() {
   if(runtime.map||disposed)return;
@@ -31,7 +31,8 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
    container:"map",style:egiStyle(base),
    center:[Number(context.longitude),Number(context.latitude)],zoom:Math.max(Number(context.zoom)||12,11),
    pitch:0,maxPitch:60,touchPitch:false,pitchWithRotate:false,
-   attributionControl:{compact:true},fadeDuration:reduceMotion?0:300,
+   // Attributions (CTRN Regione Lazio, OpenStreetMap, Protomaps) always shown in full.
+   attributionControl:{compact:false},fadeDuration:reduceMotion?0:300,
    // Pixel ratio capped at 2 (3x screens would draw 2.25 times the pixels for no visible
    // gain), antialiasing only below 2x, a bounded tile cache, the city's bounds, no world copies.
    pixelRatio:Math.min(devicePixelRatio,2),canvasContextAttributes:{antialias:devicePixelRatio<2},
@@ -44,7 +45,9 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
    emit("pickedReference",{lat:event.lngLat.lat,lng:event.lngLat.lng,label:"Punto scelto sulla mappa"});
   });
   map.on("moveend",render);
-  map.on("load",render);
+  map.on("load",()=>{if(map.getStyle)runtime.cleanups.push(liftBridgeLabels(map));render();});
+  // The drawing itself is decorative: services, controls and attributions are separate HTML.
+  const canvas=map.getCanvas?.();canvas?.setAttribute("aria-hidden","true");canvas?.removeAttribute?.("role");
  }
 
  /** Rotate left/right and tilt: explicit buttons, labelled, keyboard reachable. */
@@ -62,6 +65,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
     const flat=runtime.map.getPitch()<1;move({pitch:flat?TILT:0});tilt.setAttribute("aria-pressed",String(flat));
    });
    tilt.setAttribute("aria-pressed","false");
+   runtime.map.on("pitchend",()=>tilt.setAttribute("aria-pressed",String(runtime.map.getPitch()>=1)));
    for(const b of [button("rotate_left","Ruota a sinistra","⟲",()=>rotate(-ROTATE_STEP)),button("rotate_right","Ruota a destra","⟳",()=>rotate(ROTATE_STEP)),tilt])box.append(b);
    return box;
   },onRemove(){box?.remove();}};
@@ -130,13 +134,16 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
  function update(snapshot,rows){state=snapshot;list=rows;render();}
  function attach(factory){return factory(runtime.map);}
  function center(lat,lng){if(runtime.map&&contains(lat,lng))move({center:[lng,lat],zoom:Math.max(runtime.map.getZoom(),15)});}
+ /** Fly to a service's building: z17.5, tilted (a jump when motion is reduced). */
+ function lookAt(lat,lng){if(runtime.map&&contains(lat,lng))move({center:[lng,lat],zoom:17.5,pitch:TILT,duration:reduceMotion?0:1600});}
  function servicesVisible(value){visible=Boolean(value);render();}
  function dispose(){
   disposed=true;
+  for(const clean of runtime.cleanups.splice(0))clean();
   for(const entry of runtime.markers.values())entry.marker.remove();
   runtime.markers.clear();runtime.user?.remove();runtime.user=null;
   runtime.map?.remove();runtime.map=null;
  }
- return {mount,update,attach,center,contains,invalidate:()=>runtime.map?.resize(),servicesVisible,dispose,
+ return {mount,update,attach,center,contains,lookAt,invalidate:()=>runtime.map?.resize(),servicesVisible,dispose,
   markerCount:()=>runtime.markers.size};
 }
