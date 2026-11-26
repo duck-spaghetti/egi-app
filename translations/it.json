@@ -577,7 +577,7 @@
       "place_unpublished": "non ancora pubblicato",
       "move_hint": "Cambiare luogo crea una bozza solo per questo servizio: il luogo e gli altri servizi che ci sono non cambiano. Salva prima le altre modifiche del modulo qui sopra.",
       "find_place": "Cerca un luogo per nome o indirizzo",
-      "services_here": "{count} servizi pubblicati qui",
+      "services_here": "Servizi pubblicati qui: {count}",
       "use_place": "Usa questo luogo",
       "no_places_found": "Nessun luogo trovato.",
       "new_place": "Crea un nuovo luogo",

@@ -16,7 +16,7 @@ COOKIE = 'egi_moderation'
 OIDC_COOKIE = 'egi_moderation_oidc'
 PATH = '/moderazione'
 MAX_FORM = 64 * 1024
-HEADERS = {'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer',
+HEADERS = {'X-Frame-Options': 'DENY', 'Referrer-Policy': 'same-origin',  # 'no-referrer' makes browsers send Origin: null
            'Content-Security-Policy': "default-src 'self'; img-src 'self' https://tile.openstreetmap.org; "
                                       "form-action 'self' https:; frame-ancestors 'none'"}
 

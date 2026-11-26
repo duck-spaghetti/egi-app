@@ -26,7 +26,7 @@ def page(request: Request, lang: str, status: int = 200, **context):
     """Render the contribution page in `lang`, falling back to Italian text."""
     response = request.app.state.resources.templates.TemplateResponse(request=request, name='pages/contribute.html',
         status_code=status, context={'t': lambda key, **values: CATALOG.text(key, lang, **values), 'lang': lang, **context})
-    response.headers['Referrer-Policy'] = 'no-referrer'
+    response.headers['Referrer-Policy'] = 'same-origin'  # 'no-referrer' makes browsers send Origin: null on POST
     return response
 
 

@@ -225,6 +225,8 @@ class ServiceWorkspaceTests(unittest.TestCase):
     def test_post_needs_origin_and_session(self):
         """Forms without Origin or token, or with a malformed revision, are refused."""
         mod1 = self.browser('mod1')
+        self.assertEqual(mod1.get('/moderazione/servizi').headers['referrer-policy'], 'same-origin',
+                         "with 'no-referrer' browsers send Origin: null and every form would be refused")
         self.assertEqual(mod1.post(f'/moderazione/servizio/{self.service}/bozza', data={'name': 'x'}).status_code, 403)
         form = self.edit_form(self.workspace(mod1))
         self.assertEqual(mod1.post(f'/moderazione/servizio/{self.service}/bozza', data={**form, 'working': 'nope'},
