@@ -834,3 +834,8 @@ calls by themselves.
 The Community [card/field editor](docs/community/preparation-editor.md) is available
 at `/moderazione/contribuisci` in editorial mode. Its private drafts, sharing,
 recoverable trash and conflict recovery use the preparation HTTP contracts.
+
+The separate [Community interpretation worker](docs/community/interpretation-worker.md)
+uses the hash-pinned Reviewer wheel and the existing httpx stack. Install its
+`requirements-community.lock.txt` before running the full Community test suite.
+No real model, price, worker login or live dispatch is enabled automatically.

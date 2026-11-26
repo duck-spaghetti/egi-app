@@ -150,3 +150,27 @@ async def admit_source(request: Request, source: UUID):
     if not isinstance(body['reason'], str):
         raise Failure(422, 'invalid_request')
     return reply(await execute(request, 'SELECT editorial.admit_community_source(%s,%s) AS result', (source, body['reason']), True))
+
+
+@router.post('/preparazioni/{workspace}/analisi')
+async def analysis(request: Request, workspace: UUID):
+    """Queue one eligible durable interpretation; later retries require explicit keys."""
+    body = await read_json(request, ('input_id','task','request_key'))
+    if body['task'] != 'extract_text':
+        raise Failure(422,'invalid_request')
+    return reply(await execute(request, 'SELECT preparation.request_interpretation(%s,%s,%s,%s) AS result',
+        (workspace,identifier(body['input_id']),body['task'],identifier(body['request_key'])),True),202)
+
+
+@router.get('/preparazioni/{workspace}/lavori/{job}')
+async def job(request: Request, workspace: UUID, job: UUID):
+    """Read authorized status/results without exposing worker leases or raw originals."""
+    return reply(await execute(request,'SELECT preparation.read_job(%s,%s) AS result',(workspace,job)))
+
+
+@router.post('/preparazioni/{workspace}/lavori/{job}/annulla')
+async def cancel_job(request: Request, workspace: UUID, job: UUID):
+    """Cancel result use while keeping any already-dispatched usage accountable."""
+    body = await read_json(request,('request_key',))
+    return reply(await execute(request,'SELECT preparation.cancel_job(%s,%s,%s) AS result',
+        (workspace,job,identifier(body['request_key'])),True))
