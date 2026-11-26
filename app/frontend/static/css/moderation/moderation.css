@@ -44,7 +44,15 @@ form.inline { display: inline; margin-right: .75rem; }
 .desk-row input:not([type=checkbox]), .desk-row select { font: inherit; padding: .4rem; border: 1px solid var(--line); border-radius: .25rem; background: #fff; }
 .desk-table.compare tr.changed td:last-child { background: #fff6dc; }
 .desk-table.compare th[scope=row] { white-space: nowrap; }
-.desk-hours { list-style: none; padding: 0; margin: 0 0 .75rem; display: grid; gap: .15rem; }
-.desk-hours span { display: inline-block; min-width: 6rem; color: var(--ink-soft); }
 .desk-source { white-space: pre-wrap; overflow-wrap: anywhere; font-family: "IBM Plex Mono", monospace; font-size: .85rem; background: #fff; border: 1px solid var(--line); padding: .5rem; max-height: 20rem; overflow: auto; }
 .desk-notice { background: #dfeedd; padding: .5rem .75rem; border-radius: .25rem; }
+/* Hours, place and new services (EGI-84) */
+.desk-row label { display: grid; gap: .25rem; font-size: .9rem; }
+.desk-schedule { border-top: 1px solid var(--line); padding-top: .75rem; display: grid; gap: .5rem; }
+.desk-week { border-collapse: collapse; }
+.desk-week th, .desk-week td { text-align: left; padding: .2rem .4rem .2rem 0; white-space: nowrap; }
+.desk-week select, .desk-range input { font: inherit; padding: .25rem; border: 1px solid var(--line); border-radius: .25rem; background: #fff; }
+.desk-schedule { overflow-x: auto; }
+.desk-map { height: 16rem; border: 1px solid var(--line); border-radius: .25rem; }
+.desk-inline { display: flex; flex-wrap: wrap; gap: .75rem; align-items: baseline; }
+.desk-subform { display: grid; gap: .5rem; margin-left: 1.5rem; padding-left: .75rem; border-left: 3px solid var(--line); }

@@ -1,10 +1,12 @@
-"""The service workspace: edit, save a draft, compare and publish (EGI-83).
+"""The service workspace: edit, save a draft, compare and publish (EGI-83); hours,
+locations and new services (EGI-84).
 
-Needs EGI_DATABASE_REPO (see tests/native.py) with 012_revision_body. The canonical
-fixture's "Public service" has a public and a private phone; the private one stays
-protected even when a moderator marks it public.
+Needs EGI_DATABASE_REPO (see tests/native.py) with 013_editorial_observations. The
+canonical fixture's "Public service" has a public and a private phone; the private one
+stays protected even when a moderator marks it public.
 """
 import getpass
+import json
 import re
 import tempfile
 import unittest
@@ -13,6 +15,8 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 import psycopg
 
+from app.backend.api.moderation.desk import Refused
+from app.backend.api.moderation.hours import edited_schedules
 from app.backend.api.moderation.workspace import edited
 from app.backend.api.preview.subjects import StaticSubjectSource
 from app.backend.config import Configuration, DirectorySettings, EditorialSettings, profile
@@ -52,12 +56,43 @@ class ServiceWorkspaceTests(unittest.TestCase):
             cls.owner.execute('SELECT governance.publish_revision(%s,%s,NULL)', (revision, decision))
             cls.protected = cls.owner.execute('SELECT entity_id::text FROM governance.entity_revisions WHERE revision_id=%s',
                                               (revision,)).fetchone()[0]
+            cls.territory = territory
+            # Two published locations; two services share the first.
+            cls.shared, cls.other = (cls.publish(f"""SELECT governance.save_revision('location',NULL,NULL,NULL,
+                jsonb_build_object('name',%s::text,'location_kind','building','coordinate_state','unknown','territories',jsonb_build_array(%s::uuid),
+                  'evidence','{{"record":[{{"assertion_id":"57000000-0000-0000-0000-000000000001","role":"supporting"}}]}}'::jsonb),'test')""",
+                (name, territory)) for name in ('Casa comune', 'Altra sede'))
+            cls.first, cls.second = (cls.publish("""SELECT governance.save_revision('service',NULL,NULL,NULL,
+                jsonb_build_object('name',%s::text,'description','Shared place','delivery_mode','in_person','territories',jsonb_build_array(%s::uuid),
+                  'place',jsonb_build_object('location_id',%s::uuid),
+                  'evidence','{"record":[{"assertion_id":"57000000-0000-0000-0000-000000000001","role":"supporting"}]}'::jsonb),'test')""",
+                (name, territory, cls.shared)) for name in ('First tenant', 'Second tenant'))
         errors = tempfile.TemporaryDirectory()
         cls.addClassCleanup(errors.cleanup)
         cls.app = create_app(Configuration(profile(), canonical=True, error_dir=Path(errors.name),
             directory=DirectorySettings(database_url=cls.cluster.dsn('egi_app_test_reader')),
             editorial=EditorialSettings(database_url=cls.cluster.dsn('egi_test_desk'), cookie_secret='s' * 40, secure_cookie=False)),
             {'source': StaticSubjectSource([])})
+
+    @classmethod
+    def publish(cls, statement: str, params: tuple) -> str:
+        """Save and publish one revision as the fixture's editor; return its entity."""
+        revision = cls.owner.execute(statement, params).fetchone()[0]
+        decision = cls.owner.execute("SELECT governance.review_revision(%s,NULL,'approved','test')", (revision,)).fetchone()[0]
+        cls.owner.execute('SELECT governance.publish_revision(%s,%s,NULL)', (revision, decision))
+        return cls.owner.execute('SELECT entity_id::text FROM governance.entity_revisions WHERE revision_id=%s', (revision,)).fetchone()[0]
+
+    def published(self, entity: str) -> tuple:
+        """Return an entity's published revision and the location its service points at."""
+        return self.owner.execute("""SELECT h.revision_id::text,p.location_id::text,pub.actor_id::text FROM governance.published_heads h
+            JOIN governance.publications pub USING(publication_id) LEFT JOIN data.service_places p ON p.revision_id=h.revision_id
+            WHERE h.entity_id=%s""", (entity,)).fetchone()
+
+    def card(self, service: str) -> dict:
+        """Return a service's public card."""
+        response = self.browser(None).get(f'/api/public/services/{service}')
+        self.assertEqual(response.status_code, 200, response.text[:300])
+        return response.json()
 
     def browser(self, login: str | None) -> TestClient:
         """Return a client signed in as `login` (or anonymous)."""
@@ -119,8 +154,7 @@ class ServiceWorkspaceTests(unittest.TestCase):
         page = self.workspace(mod1)
         self.assertIn('synthetic service', page, 'the source text is shown')
         self.assertIn('nessuna bozza', page)
-        self.assertIn('Luogo e orari', page)
-        self.assertNotIn('name="hours', page, 'hours are read-only here')
+        self.assertIn('name="schedule_0_scope"', page, 'hours are edited here')
         before = self.public()
         self.assertIn('Approved description', before)
         self.assertNotIn('PRIVATE999', before)
@@ -197,6 +231,95 @@ class ServiceWorkspaceTests(unittest.TestCase):
                                    headers=ORIGIN).status_code, 400)
         self.assertEqual(mod1.get('/moderazione/servizio/00000000-0000-0000-0000-000000000000').status_code, 404)
 
+    def week(self, form: dict, index: int, state: str, opens: str = '', closes: str = '') -> dict:
+        """Fill one schedule row of a workspace form with the same day seven times."""
+        for day in range(1, 8):
+            form[f'schedule_{index}_day_{day}_state'] = state
+            form[f'schedule_{index}_day_{day}_0_opens'], form[f'schedule_{index}_day_{day}_0_closes'] = opens, closes
+        return form
+
+    def test_create_service_with_location_hours_and_publish(self):
+        """A created location and service are drafts until published, cite the editorial source and open as edited."""
+        mod1 = self.browser('mod1')
+        start = mod1.get('/moderazione/servizi/nuovo').text
+        self.assertIn('Prima il luogo', start)
+        new = {'form_token': self.fields(start, 'method="post" action="/moderazione/servizi/nuovo"')['form_token'], 'location': 'new', 'location_name': 'Sportello nuovo', 'location_kind': 'building',
+               'location_street': 'Via Prova 3', 'location_postal_code': '00100', 'location_locality': 'Roma',
+               'location_latitude': '41,9', 'location_longitude': '12.49', 'location_territory': self.territory,
+               'territory': self.territory, 'name': 'Servizio nuovo', 'delivery_mode': 'in_person', 'method': ''}
+        refused = mod1.post('/moderazione/servizi/nuovo', data=new, headers=ORIGIN)
+        self.assertEqual(refused.status_code, 400)
+        self.assertIn('Indica come hai verificato', refused.text)
+        self.assertIn('Sportello nuovo', refused.text, 'the values stay on the page')
+        made = mod1.post('/moderazione/servizi/nuovo', data={**new, 'method': 'phone_call', 'note': 'Sentiti al telefono'},
+                         headers=ORIGIN, follow_redirects=False)
+        self.assertEqual(made.status_code, 303, made.text[:500])
+        service = made.headers['location'].rsplit('/', 1)[1]
+        self.assertEqual(self.browser(None).get(f'/api/public/services/{service}').status_code, 404, 'a draft is not public')
+        location = self.owner.execute("""SELECT p.location_id::text FROM governance.working_heads w JOIN data.service_places p USING(revision_id)
+            WHERE w.entity_id=%s""", (service,)).fetchone()[0]
+        self.assertIsNone(self.owner.execute('SELECT revision_id FROM governance.published_heads WHERE entity_id=%s', (location,)).fetchone())
+        self.assertEqual(self.owner.execute("""SELECT l.latitude,l.longitude,r.name FROM governance.working_heads w JOIN data.location_revisions l USING(revision_id)
+            JOIN governance.value_decisions d ON d.revision_id=w.revision_id JOIN governance.value_evidence e USING(value_decision_id)
+            JOIN sources.assertions a USING(assertion_id) JOIN sources.normalized_subjects n USING(subject_id)
+            JOIN sources.record_versions v USING(record_version_id) JOIN sources.registry r ON r.source_id=(SELECT source_id FROM sources.datasets WHERE dataset_id=v.dataset_id)
+            WHERE w.entity_id=%s LIMIT 1""", (location,)).fetchone(), (41.9, 12.49, 'Redazione EGI'))
+
+        url = f'/moderazione/servizio/{service}'
+        page = mod1.get(url).text
+        self.assertIn('Sportello nuovo', page)
+        self.assertIn('non ancora pubblicato', page)
+        form = self.fields(page, f'action="{url}/bozza"')
+        form.update(self.week({'description': 'Aperto sempre', 'schedule_0_scope': 'service', 'schedule_0_completeness': 'complete'},
+                              0, 'intervals', '00:00', '00:00'))
+        self.assertEqual(mod1.post(url + '/bozza', data=form, headers=ORIGIN,
+                                   follow_redirects=False).status_code, 303)
+        page = mod1.get(url).text
+        self.assertIn('Apertura del servizio: Lun 00:00–00:00', page, 'the comparison shows the hours')
+        missing = mod1.post(url + '/pubblica', data={**self.fields(page, f'action="{url}/pubblica"'), 'summary': ''}, headers=ORIGIN)
+        self.assertEqual(missing.status_code, 400)
+        done = mod1.post(url + '/pubblica', data={**self.fields(page, f'action="{url}/pubblica"'), 'summary': 'Nuovo servizio verificato'},
+                         headers=ORIGIN, follow_redirects=False)
+        self.assertEqual(done.status_code, 303, done.text[:800])
+        actor = self.people['mod1']['actor']
+        self.assertEqual(self.published(service)[1:], (location, actor), 'published with its place, by the person')
+        self.assertEqual(self.published(location)[2], actor, 'the new location was published with it')
+        card = self.card(service)
+        self.assertEqual(card['canonical_opening']['status'], 'open', json.dumps(card['canonical_opening']))
+        self.assertIn('Redazione EGI', [source['name'] for source in card['sources']])
+        self.assertEqual(card['place']['id'], location)
+
+        form = self.week(self.fields(mod1.get(url).text, f'action="{url}/bozza"'), 0, 'closed')
+        self.assertEqual(mod1.post(url + '/bozza', data=form, headers=ORIGIN, follow_redirects=False).status_code, 303)
+        page = mod1.get(url).text
+        self.assertEqual(mod1.post(url + '/pubblica', data={**self.fields(page, f'action="{url}/pubblica"'), 'summary': 'Chiuso'},
+                                   headers=ORIGIN, follow_redirects=False).status_code, 303)
+        self.assertEqual(self.card(service)['canonical_opening']['status'], 'closed')
+
+        form = self.fields(mod1.get(url).text, f'action="{url}/bozza"')
+        overlap = mod1.post(url + '/bozza', data=self.week({**form, 'schedule_1_scope': 'service'}, 1, 'unknown'), headers=ORIGIN)
+        self.assertEqual(overlap.status_code, 400)
+        self.assertIn('stesso pubblico', overlap.text)
+        empty = mod1.post(url + '/bozza', data=self.week(dict(form), 0, 'intervals'), headers=ORIGIN)
+        self.assertEqual(empty.status_code, 400)
+        self.assertIn('Orari non validi', empty.text)
+
+    def test_moving_a_service_leaves_its_old_location_and_neighbours(self):
+        """A service moved to another location changes alone: the old location and its other service stay."""
+        mod1, url = self.browser('mod1'), f'/moderazione/servizio/{self.first}'
+        before = {entity: self.published(entity) for entity in (self.shared, self.other, self.second)}
+        page = mod1.get(url, params={'luogo': 'Altra'}).text
+        self.assertIn('Altra sede', page)
+        choice = self.fields(page, f'action="{url}/luogo"')
+        self.assertEqual(choice['location'], self.other)
+        self.assertEqual(mod1.post(url + '/luogo', data=choice, headers=ORIGIN, follow_redirects=False).status_code, 303)
+        page = mod1.get(url).text
+        self.assertEqual(mod1.post(url + '/pubblica', data={**self.fields(page, f'action="{url}/pubblica"'), 'summary': 'Trasferito'},
+                                   headers=ORIGIN, follow_redirects=False).status_code, 303)
+        self.assertEqual(self.published(self.first)[1], self.other)
+        self.assertEqual({entity: self.published(entity) for entity in before}, before, 'nothing else changed')
+        self.assertEqual(self.card(self.second)['place']['id'], self.shared)
+
 
 class EditedBodyTests(unittest.TestCase):
     """The form-to-body mapping, without a database."""
@@ -230,3 +353,52 @@ class EditedBodyTests(unittest.TestCase):
         self.assertEqual((body['contacts'], body['classifications']), (self.BASE['contacts'], self.BASE['classifications']))
         twice = {**self.FORM, 'contacts': '2', 'contact_1_component': 'c1', 'contact_1_channel': 'phone', 'contact_1_value': '06 9'}
         self.assertEqual([c.get('component_id') for c in edited(self.BASE, twice, self.TERMS)['contacts']], ['c1', None])
+
+
+class EditedSchedulesTests(unittest.TestCase):
+    """The hours form, without a database."""
+
+    SCHEDULE = {'component_id': 's1', 'scope': 'service', 'timezone': 'Europe/Rome', 'completeness': 'complete',
+                'evidence': [{'assertion_id': 'a1', 'role': 'supporting'}],
+                'days': [{'weekday': day, 'state': 'intervals' if day == 1 else 'closed', 'completeness': 'complete',
+                          'intervals': [{'component_id': 'i1', 'opens': '09:00', 'closes': '12:00', 'end_day_offset': 0,
+                                         'evidence': [{'assertion_id': 'a2', 'role': 'supporting'}]}] if day == 1 else []}
+                         for day in range(1, 8)]}
+    BASE = {'schedules': [SCHEDULE], 'calendar_links': [{'schedule_id': 's1', 'calendar_id': 'c1', 'effects': []}]}
+
+    def form(self, **changes) -> dict:
+        """Return the form the workspace shows for BASE, with `changes`."""
+        form = {'schedules': '2', 'schedule_0_component': 's1', 'schedule_0_scope': 'service', 'schedule_0_slots': '2',
+                'schedule_0_completeness': 'complete', 'schedule_1_scope': '', 'schedule_1_slots': '2'}
+        for day in range(1, 8):
+            form[f'schedule_0_day_{day}_state'] = 'intervals' if day == 1 else 'closed'
+            form[f'schedule_1_day_{day}_state'] = 'unknown'
+        form.update({'schedule_0_day_1_0_opens': '09:00', 'schedule_0_day_1_0_closes': '12:00'})
+        return {**form, **changes}
+
+    def test_an_unchanged_form_keeps_schedules_and_calendars(self):
+        """Nothing changed, nothing to save; calendar exceptions stay."""
+        self.assertEqual(edited_schedules(self.BASE, self.form(), []), (self.BASE['schedules'], self.BASE['calendar_links']))
+
+    def test_a_new_range_is_the_moderators_and_the_kept_one_keeps_its_source(self):
+        """A night range ends the next day; untouched ranges keep component and evidence."""
+        schedules, links = edited_schedules(self.BASE, self.form(schedule_0_day_1_1_opens='22:00', schedule_0_day_1_1_closes='02:00'), [])
+        monday = schedules[0]['days'][0]
+        self.assertEqual(monday['intervals'], [self.SCHEDULE['days'][0]['intervals'][0],
+                                               {'opens': '22:00', 'closes': '02:00', 'end_day_offset': 1, 'evidence': []}])
+        self.assertEqual((schedules[0]['evidence'], schedules[0]['component_id'], links), ([], 's1', self.BASE['calendar_links']))
+
+    def test_refusals(self):
+        """Overlapping audiences, contact hours without a saved contact, broken ranges; removal drops calendars."""
+        with self.assertRaisesRegex(Refused, 'schedule_overlap'):
+            edited_schedules(self.BASE, self.form(schedule_1_scope='service'), [])
+        seasonal = edited_schedules(self.BASE, self.form(schedule_0_until='2026-06-30', schedule_1_scope='service',
+                                                         schedule_1_from='2026-07-01'), [])[0]
+        self.assertEqual(len(seasonal), 2, 'seasonal schedules of one audience may follow each other')
+        with self.assertRaisesRegex(Refused, 'schedule_contact'):
+            edited_schedules(self.BASE, self.form(schedule_1_scope='contact', schedule_1_contact='x'), [{'component_id': 'c9'}])
+        with self.assertRaisesRegex(Refused, 'invalid_hours'):
+            edited_schedules(self.BASE, self.form(schedule_0_day_1_0_closes='25:00'), [])
+        with self.assertRaisesRegex(Refused, 'invalid_hours'):
+            edited_schedules(self.BASE, self.form(schedule_0_day_1_0_opens='', schedule_0_day_1_0_closes=''), [])
+        self.assertEqual(edited_schedules(self.BASE, self.form(schedule_0_remove='1'), []), ([], []))

@@ -2,6 +2,7 @@
 {% block body %}
 <section class="desk-card">
   <h1>{{ t('moderation.services.title') }}</h1>
+  <p><a href="/moderazione/servizi/nuovo">{{ t('moderation.services.new') }}</a></p>
   <form method="get" action="/moderazione/servizi" class="desk-filters" role="search">
     <label>{{ t('moderation.services.search') }}<input type="search" name="q" value="{{ q }}" /></label>
     <button type="submit">{{ t('moderation.services.find') }}</button>

@@ -209,8 +209,21 @@ comparison shows source, public and draft values side by side with the source re
 text; "Approva e pubblica" publishes exactly that draft with a change summary. A save
 or publication built on revisions that have since moved is refused and the person's
 unsaved values stay on the page. Contact protections are applied by the database on
-public reads, so an edit cannot release them. Place and hours are read-only here.
-Tests: `tests/test_moderation_workspace.py`.
+public reads, so an edit cannot release them.
+
+Hours (EGI-84) are edited in the same form as structured schedules: one per audience
+(the service, its intake desk or one saved contact line), each weekday open in time
+ranges, closed or unknown, a range ending at or before its start ending the next day.
+Two schedules of one audience may not be valid on a common day, because "aperto ora"
+reads one; shared calendar exceptions are kept as they are. The place section finds a
+location by name or address, or creates one (name, kind, address, optional point
+picked on an OpenStreetMap tile map or typed); moving a service saves a draft of that
+service only. `/moderazione/servizi/nuovo` creates a service at a chosen or new
+location, or without one. A created location or service cites what the person
+verified, recorded as a "Redazione EGI" observation (`editorial.record_observation`,
+egi_database 013); a new location is published together with the service. The
+moderation pages allow images from `tile.openstreetmap.org` for that map, sent with
+the origin only as referrer. Tests: `tests/test_moderation_workspace.py`.
 
 ### Visitor contributions (EGI-22)
 

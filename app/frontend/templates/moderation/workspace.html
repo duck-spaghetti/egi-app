@@ -1,5 +1,6 @@
 {% extends 'moderation/base.html' %}
 {% block title %}{{ shown.name or t('moderation.workspace.title') }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/vendor/leaflet-1.9.4/leaflet.css" />{% endblock %}
 {% block body %}
 {% set w = 'moderation.workspace.' %}
 <section class="desk-card">
@@ -29,6 +30,10 @@
     {% endfor %}
     </tbody>
   </table>
+  {% if missing %}
+  <div class="desk-error"><p>{{ t(w ~ 'missing_intro') }}</p>
+    <ul>{% for m in missing %}<li>{{ t(w ~ 'missing.' ~ m) }}</li>{% endfor %}</ul></div>
+  {% endif %}
   {% if draft %}
   <form method="post" action="/moderazione/servizio/{{ service_id }}/pubblica" class="desk-form publish">
     <input type="hidden" name="form_token" value="{{ form_token }}" />
@@ -96,20 +101,82 @@
       </div>
       {% endfor %}
     </fieldset>
+    <fieldset id="orari"><legend>{{ t(w ~ 'hours') }}</legend>
+      <p class="hint">{{ t(w ~ 'hours_hint') }}</p>
+      {% if calendars %}<p class="hint">{{ t(w ~ 'calendars', count=calendars) }}</p>{% endif %}
+      <input type="hidden" name="schedules" value="{{ schedules|length }}" />
+      {% for row in schedules %}{% set s = row.schedule %}{% set k = 'schedule_' ~ loop.index0 ~ '_' %}
+      <div class="desk-schedule">
+        <input type="hidden" name="{{ k }}component" value="{{ s.component_id or '' }}" />
+        <input type="hidden" name="{{ k }}slots" value="{{ row.slots }}" />
+        <div class="desk-row">
+          <label>{{ t(w ~ 'audience') }}<select name="{{ k }}scope">
+            {% if not s %}<option value="">{{ t(w ~ 'add_schedule') }}</option>{% endif %}
+            {% for v in scopes %}<option value="{{ v }}" {% if s.scope == v %}selected{% endif %}>{{ t(w ~ 'scopes.' ~ v) }}</option>{% endfor %}
+          </select></label>
+          <label>{{ t(w ~ 'contact_line') }}<select name="{{ k }}contact"><option value="">—</option>
+            {% for c in saved_contacts %}<option value="{{ c.component_id }}" {% if s.contact_component_id == c.component_id %}selected{% endif %}>{{ c.value }}</option>{% endfor %}
+          </select></label>
+          <label>{{ t(w ~ 'valid_from') }}<input type="date" name="{{ k }}from" value="{{ s.valid_from or '' }}" /></label>
+          <label>{{ t(w ~ 'valid_until') }}<input type="date" name="{{ k }}until" value="{{ s.valid_until or '' }}" /></label>
+          <label>{{ t(w ~ 'completeness') }}<select name="{{ k }}completeness">
+            {% for v in completeness %}<option value="{{ v }}" {% if (s.completeness or 'complete') == v %}selected{% endif %}>{{ t(w ~ 'completeness_values.' ~ v) }}</option>{% endfor %}
+          </select></label>
+          {% if s %}<label class="check"><input type="checkbox" name="{{ k }}remove" value="1" />{{ t(w ~ 'remove') }}</label>{% endif %}
+        </div>
+        <table class="desk-week">
+          <thead><tr><th scope="col">{{ t(w ~ 'day') }}</th><th scope="col">{{ t(w ~ 'day_state') }}</th><th scope="col" colspan="{{ row.slots }}">{{ t(w ~ 'ranges') }}</th></tr></thead>
+          <tbody>
+          {% for d in row.days %}{% set dk = k ~ 'day_' ~ d.weekday ~ '_' %}{% set day = t(w ~ 'weekdays.' ~ d.weekday) %}
+          <tr><th scope="row">{{ day }}</th>
+            <td><select name="{{ dk }}state" aria-label="{{ day }}">{% for v in day_states %}<option value="{{ v }}" {% if d.state == v %}selected{% endif %}>{{ t(w ~ 'day_states.' ~ v) }}</option>{% endfor %}</select></td>
+            {% for i in range(row.slots) %}{% set r = d.intervals[i] if i < (d.intervals or [])|length else {} %}
+            <td class="desk-range"><input type="time" name="{{ dk }}{{ i }}_opens" value="{{ r.opens or '' }}"{% if (r.opens or '')|length > 5 %} step="1"{% endif %} aria-label="{{ day }} {{ t(w ~ 'opens') }} {{ i + 1 }}" />–<input type="time" name="{{ dk }}{{ i }}_closes" value="{{ r.closes or '' }}"{% if (r.closes or '')|length > 5 %} step="1"{% endif %} aria-label="{{ day }} {{ t(w ~ 'closes') }} {{ i + 1 }}" /></td>
+            {% endfor %}</tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endfor %}
+    </fieldset>
     <div><button type="submit">{{ t(w ~ 'save') }}</button></div>
   </form>
 </section>
 
-<section class="desk-card">
-  <h2>{{ t(w ~ 'read_only') }}</h2>
-  <p class="hint">{{ t(w ~ 'read_only_hint') }}</p>
-  <h3>{{ t(w ~ 'place') }}</h3>
-  {% if place %}<p>{{ place.name or '—' }}{% if place.address %} · {{ place.address }}{% endif %}</p>{% else %}<p class="hint">{{ t(w ~ 'no_place') }}</p>{% endif %}
-  <h3>{{ t(w ~ 'hours') }}</h3>
-  {% for s in schedules %}
-  <ul class="desk-hours">{% for d in s.days %}<li><span>{{ t(w ~ 'weekdays.' ~ d.weekday) }}</span>
-    {% if d.state == 'intervals' %}{% for i in d.intervals %}{{ i.opens }}–{{ i.closes }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}{{ t(w ~ 'day_states.' ~ d.state) }}{% endif %}</li>{% endfor %}</ul>
-  {% else %}<p class="hint">{{ t(w ~ 'no_hours') }}</p>{% endfor %}
+<section class="desk-card" id="luogo">
+  <h2>{{ t(w ~ 'place') }}</h2>
+  {% if place %}<p>{{ place.name or '—' }}{% if place.address %} · {{ place.address }}{% endif %}{% if not place.public %} <span class="badge state-new">{{ t(w ~ 'place_unpublished') }}</span>{% endif %}</p>
+  {% else %}<p class="hint">{{ t(w ~ 'no_place') }}</p>{% endif %}
+  <p class="hint">{{ t(w ~ 'move_hint') }}</p>
+  <form method="get" action="/moderazione/servizio/{{ service_id }}#luogo" class="desk-filters" role="search">
+    <label>{{ t(w ~ 'find_place') }}<input type="search" name="luogo" value="{{ query }}" /></label>
+    <button type="submit">{{ t('moderation.services.find') }}</button>
+  </form>
+  {% if query %}
+  {% if found_locations %}
+  <ul class="queue-list">{% for l in found_locations %}
+    <li><form method="post" action="/moderazione/servizio/{{ service_id }}/luogo" class="desk-inline">
+      <input type="hidden" name="form_token" value="{{ form_token }}" />
+      <input type="hidden" name="working" value="{{ working or '' }}" />
+      <input type="hidden" name="public" value="{{ public_revision or '' }}" />
+      <input type="hidden" name="location" value="{{ l.location_id }}" />
+      <span>{{ l.name or '—' }}{% if l.address %} · {{ l.address }}{% endif %}</span>
+      <span class="hint">{{ t(w ~ 'services_here', count=l.services) }}</span>{% if not l.published %} <span class="badge state-new">{{ t(w ~ 'place_unpublished') }}</span>{% endif %}
+      <button type="submit">{{ t(w ~ 'use_place') }}</button>
+    </form></li>{% endfor %}</ul>
+  {% else %}<p class="hint">{{ t(w ~ 'no_places_found') }}</p>{% endif %}
+  {% endif %}
+  <details{% if posted.location == 'new' %} open{% endif %}><summary>{{ t(w ~ 'new_place') }}</summary>
+    <form method="post" action="/moderazione/servizio/{{ service_id }}/luogo" class="desk-form">
+      <input type="hidden" name="form_token" value="{{ form_token }}" />
+      <input type="hidden" name="working" value="{{ working or '' }}" />
+      <input type="hidden" name="public" value="{{ public_revision or '' }}" />
+      <input type="hidden" name="location" value="new" />
+      {% include 'moderation/location_fields.html' %}
+      {% include 'moderation/observation_fields.html' %}
+      <div><button type="submit">{{ t(w ~ 'create_place') }}</button></div>
+    </form>
+  </details>
 </section>
 
 <section class="desk-card">
@@ -119,4 +186,6 @@
 …{% endif %}</pre></details>
   {% else %}<p class="hint">{{ t(w ~ 'no_evidence') }}</p>{% endfor %}
 </section>
+<script src="/static/vendor/leaflet-1.9.4/leaflet.js"></script>
+<script src="/static/js/pages/place-picker.js"></script>
 {% endblock %}

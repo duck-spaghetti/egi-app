@@ -1,0 +1,47 @@
+{% extends 'moderation/base.html' %}
+{% block title %}{{ t('moderation.new_service.title') }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/vendor/leaflet-1.9.4/leaflet.css" />{% endblock %}
+{% block body %}
+{% set n = 'moderation.new_service.' %}{% set w = 'moderation.workspace.' %}
+<section class="desk-card">
+  <p class="hint"><a href="/moderazione/servizi">{{ t('moderation.services.back') }}</a></p>
+  <h1>{{ t(n ~ 'title') }}</h1>
+  <p class="hint">{{ t(n ~ 'intro') }}</p>
+  <form method="get" action="/moderazione/servizi/nuovo" class="desk-filters" role="search">
+    <label>{{ t(w ~ 'find_place') }}<input type="search" name="luogo" value="{{ query }}" /></label>
+    <button type="submit">{{ t('moderation.services.find') }}</button>
+  </form>
+</section>
+<section class="desk-card">
+  <form method="post" action="/moderazione/servizi/nuovo" class="desk-form">
+    <input type="hidden" name="form_token" value="{{ form_token }}" />
+    <input type="hidden" name="query" value="{{ query }}" />
+    <fieldset><legend>{{ t(n ~ 'step_place') }}</legend>
+      {% if query and not found_locations %}<p class="hint">{{ t(w ~ 'no_places_found') }}</p>{% endif %}
+      {% for l in found_locations %}
+      <label class="check"><input type="radio" name="location" value="{{ l.location_id }}" required {% if posted.location == l.location_id %}checked{% endif %} />
+        {{ l.name or '—' }}{% if l.address %} · {{ l.address }}{% endif %}
+        <span class="hint">{{ t(w ~ 'services_here', count=l.services) }}</span>{% if not l.published %} <span class="badge state-new">{{ t(w ~ 'place_unpublished') }}</span>{% endif %}</label>
+      {% endfor %}
+      <label class="check"><input type="radio" name="location" value="new" required {% if posted.location == 'new' or not found_locations and posted.location != 'none' %}checked{% endif %} />{{ t(w ~ 'new_place') }}</label>
+      <div class="desk-subform">{% include 'moderation/location_fields.html' %}</div>
+      <label class="check"><input type="radio" name="location" value="none" required {% if posted.location == 'none' %}checked{% endif %} />{{ t(n ~ 'no_place') }}</label>
+      {% if territories|length > 1 %}
+      <label>{{ t(n ~ 'territory') }}<select name="territory">{% for tr in territories %}<option value="{{ tr.territory_id }}" {% if posted.territory == tr.territory_id %}selected{% endif %}>{{ tr.name }}</option>{% endfor %}</select></label>
+      {% elif territories %}<input type="hidden" name="territory" value="{{ territories[0].territory_id }}" />{% endif %}
+    </fieldset>
+    <fieldset><legend>{{ t(n ~ 'step_service') }}</legend>
+      <label>{{ t(w ~ 'fields.name') }}<input name="name" value="{{ posted.name or '' }}" required /></label>
+      <label>{{ t(w ~ 'fields.delivery_mode') }}<select name="delivery_mode" required>
+        <option value="">—</option>
+        {% for v in modes %}<option value="{{ v }}" {% if posted.delivery_mode == v %}selected{% endif %}>{{ t(w ~ 'values.delivery_mode.' ~ v) }}</option>{% endfor %}
+      </select></label>
+    </fieldset>
+    <fieldset><legend>{{ t(n ~ 'step_check') }}</legend>{% include 'moderation/observation_fields.html' %}</fieldset>
+    <p class="hint">{{ t(n ~ 'after') }}</p>
+    <div><button type="submit">{{ t(n ~ 'create') }}</button></div>
+  </form>
+</section>
+<script src="/static/vendor/leaflet-1.9.4/leaflet.js"></script>
+<script src="/static/js/pages/place-picker.js"></script>
+{% endblock %}

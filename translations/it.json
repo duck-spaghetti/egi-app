@@ -346,7 +346,19 @@
       "stale": "Qualcuno ha salvato o pubblicato una versione più recente. Non è stato sovrascritto nulla: i tuoi valori sono qui sotto, non salvati. Ricarica la scheda per ripartire dalla versione attuale.",
       "no_changes": "Non hai modificato nulla.",
       "summary_required": "Scrivi un riepilogo delle modifiche.",
-      "publication_incomplete": "La bozza non si può pubblicare: mancano dati obbligatori (per esempio descrizione o contatti)."
+      "publication_incomplete": "La bozza non si può pubblicare: mancano dati obbligatori (per esempio descrizione o contatti).",
+      "invalid_hours": "Orari non validi: controlla le fasce (apertura e chiusura), i giorni aperti senza fasce e le date.",
+      "schedule_overlap": "Due orari per lo stesso pubblico valgono negli stessi giorni, e “aperto ora” non saprebbe quale usare. Cambia le date di validità o rimuovine uno.",
+      "schedule_contact": "Per gli orari di una linea di contatto scegli un contatto già salvato.",
+      "location_not_found": "Luogo non trovato.",
+      "location_required": "Scegli un luogo, creane uno o indica che il servizio non ha luogo.",
+      "location_incomplete": "Il nuovo luogo ha bisogno almeno di un nome o di un indirizzo.",
+      "territory_required": "Scegli il territorio.",
+      "method_required": "Indica come hai verificato i dati.",
+      "note_too_long": "La nota supera i 1000 caratteri.",
+      "invalid_point": "Coordinate non valide: servono latitudine e longitudine, in gradi decimali.",
+      "name_required": "Il nome del servizio è obbligatorio.",
+      "mode_required": "Scegli la modalità del servizio."
     },
     "queue": {
       "title": "Coda dei contributi",
@@ -418,7 +430,8 @@
       "empty": "Nessun servizio trovato.",
       "unpublished": "mai pubblicato",
       "draft": "bozza da pubblicare",
-      "back": "← Torna ai servizi"
+      "back": "← Torna ai servizi",
+      "new": "Nuovo servizio"
     },
     "workspace": {
       "title": "Scheda del servizio",
@@ -451,7 +464,9 @@
         "cost_note": "Nota sul costo",
         "needs": "Bisogni",
         "contacts": "Contatti",
-        "conditions": "Condizioni di accesso"
+        "conditions": "Condizioni di accesso",
+        "hours": "Orari",
+        "place": "Luogo"
       },
       "values": {
         "delivery_mode": {
@@ -508,12 +523,9 @@
       "requirement_state": "Requisito",
       "details": "Dettagli",
       "add_condition": "Aggiungi condizione…",
-      "read_only": "Luogo e orari",
-      "read_only_hint": "Qui sono in sola lettura; si modificano nel prossimo passo del lavoro.",
       "place": "Luogo",
       "no_place": "Nessun luogo.",
       "hours": "Orari",
-      "no_hours": "Nessun orario.",
       "weekdays": {
         "1": "Lunedì",
         "2": "Martedì",
@@ -529,7 +541,100 @@
         "intervals": "aperto"
       },
       "evidence": "Testo delle fonti",
-      "no_evidence": "Nessuna fonte collegata."
+      "no_evidence": "Nessuna fonte collegata.",
+      "weekdays_short": {
+        "1": "Lun",
+        "2": "Mar",
+        "3": "Mer",
+        "4": "Gio",
+        "5": "Ven",
+        "6": "Sab",
+        "7": "Dom"
+      },
+      "scopes": {
+        "service": "Apertura del servizio",
+        "intake": "Accesso e ricevimento",
+        "contact": "Linea di contatto"
+      },
+      "hours_hint": "Per ogni giorno: aperto con le sue fasce, chiuso o non noto. Una fascia che chiude prima di aprire finisce il giorno dopo. Per uno stesso pubblico vale un solo orario alla volta: per un orario stagionale indica le date.",
+      "calendars": "Segue {count} calendari di eccezioni (festività, chiusure confermate): restano come sono.",
+      "audience": "A chi si riferisce",
+      "add_schedule": "Aggiungi un orario…",
+      "contact_line": "Contatto (per una linea di contatto)",
+      "valid_from": "Valido dal",
+      "valid_until": "fino al",
+      "completeness": "Completezza",
+      "completeness_values": {
+        "complete": "completo",
+        "partial": "parziale",
+        "unknown": "non noto"
+      },
+      "day": "Giorno",
+      "day_state": "Stato",
+      "ranges": "Fasce orarie",
+      "opens": "apre",
+      "closes": "chiude",
+      "place_unpublished": "non ancora pubblicato",
+      "move_hint": "Cambiare luogo crea una bozza solo per questo servizio: il luogo e gli altri servizi che ci sono non cambiano. Salva prima le altre modifiche del modulo qui sopra.",
+      "find_place": "Cerca un luogo per nome o indirizzo",
+      "services_here": "{count} servizi pubblicati qui",
+      "use_place": "Usa questo luogo",
+      "no_places_found": "Nessun luogo trovato.",
+      "new_place": "Crea un nuovo luogo",
+      "create_place": "Crea il luogo e usalo",
+      "location": {
+        "name": "Nome del luogo",
+        "kind": "Tipo",
+        "kinds": {
+          "address": "Indirizzo",
+          "building": "Edificio",
+          "site": "Area o sito"
+        },
+        "street": "Via e numero civico",
+        "postal_code": "CAP",
+        "locality": "Comune",
+        "territory": "Territorio",
+        "point_hint": "Punto sulla mappa, facoltativo: clicca sulla mappa o scrivi le coordinate.",
+        "latitude": "Latitudine",
+        "longitude": "Longitudine"
+      },
+      "observation": {
+        "method": "Come l’hai verificato",
+        "methods": {
+          "phone_call": "Telefonata al servizio",
+          "official_website": "Sito ufficiale",
+          "site_visit": "Visita sul posto",
+          "document": "Documento",
+          "other": "Altro"
+        },
+        "note": "Nota sulla verifica (facoltativa)",
+        "hint": "Diventa la fonte “Redazione EGI” dei dati che inserisci, a tuo nome. Non scrivere dati personali di altre persone."
+      },
+      "missing_intro": "Per pubblicare manca:",
+      "missing": {
+        "missing_name": "il nome",
+        "missing_description": "la descrizione",
+        "missing_channel": "un contatto pubblico adatto alla modalità (telefono per i servizi al telefono, sito o email per quelli online)",
+        "missing_place": "un luogo, per un servizio di persona o itinerante",
+        "missing_evidence": "una fonte: i dati devono avere almeno una verifica o un record d’origine",
+        "missing_area_description": "la descrizione dell’area servita",
+        "unpublished_location": "il luogo non è pubblicato",
+        "unidentifiable_location": "il luogo non ha né nome né indirizzo",
+        "unpublished_organization": "un ente collegato non è pubblicato",
+        "invalid_shared_contact": "un contatto condiviso non è più pubblico"
+      },
+      "created_note": "Servizio creato dalla redazione"
+    },
+    "new_service": {
+      "title": "Nuovo servizio",
+      "intro": "Prima il luogo: cercalo tra quelli esistenti o crealo. Poi il servizio. Nasce come bozza, che completi e pubblichi dalla sua scheda.",
+      "step_place": "1. Luogo",
+      "no_place": "Nessun luogo: servizio solo al telefono o online",
+      "territory": "Territorio del servizio senza luogo",
+      "step_service": "2. Servizio",
+      "step_check": "3. Verifica",
+      "after": "Il servizio non è visibile al pubblico finché non lo pubblichi.",
+      "create": "Crea la bozza"
     }
   }
 }
