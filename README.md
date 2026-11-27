@@ -1,3 +1,37 @@
+# Current development checks — EGI-130
+
+The environment milestone adds one discovered check interface:
+
+```sh
+npm ci
+python3 scripts/check.py --profile quick --json
+python3 scripts/check.py --profile complete --json
+```
+
+Use the selected project Python environment with the existing runtime/dev lockfiles.
+ESLint10.15.0 is a pinned development dependency (Node20.19/22.13/24+ as supported
+by ESLint); no application bundler or runtime dependency changes. Setup:
+https://eslint.org/docs/latest/use/getting-started . The existing test-only httpx
+choice is preserved. Do not install a second Python lint/type toolchain.
+
+Quick discovers Python fixture tests, Node test*.cjs suites, syntax and focused ESLint
+checks. Explicit native/live suites are reported as Integration selections. The one
+optional sibling-importer drift case reports its test identity/reason if absent;
+other unexpected skips block the profile. Complete is the default delivery profile
+and stays blocked until the later browser/offline/generated-PDF tickets provide their
+required stages. Integration owns explicitly configured native/cross-repository
+checks and is also currently blocked until its owning integration stage exists.
+Exit codes:0 passed,1 failed,2 prerequisite-blocked. JSON schema1 includes source
+commit, observed per-check state, named Python outcomes, reasons and durations.
+Quick is not evidence of Complete success. Native desktop print remains separate.
+
+The approved workspace execution record is
+`project_egi/.scratch/agent-workflow-improvements/execution.md`. Saved-list and
+Community feature branches have not been integrated into this dev-based worktree;
+their product behavior is not claimed by these environment-only changes.
+
+## Earlier app setup and retained evidence
+
 # EGI app v0.2 — local preview
 
 ## B1 architectural completion
