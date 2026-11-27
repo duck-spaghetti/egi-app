@@ -1,3 +1,10 @@
+# Current preview lifecycle — EGI-134
+
+See [owned preview lifecycle](docs/preview-lifecycle.md) for the durable
+`python scripts/preview.py status|start|restart|stop` interface, isolation,
+prerequisites and bounded browser recovery. Existing origins 4328/4335 are preserved;
+synthetic milestone preview 4340 and automated checks 4341 are separate.
+
 # Current development checks — EGI-130
 
 The environment milestone adds one discovered check interface:
