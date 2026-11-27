@@ -97,7 +97,7 @@ backend and datasets, and test-owned controls. Only measurements inject the fixe
 clock and capture the native map for pan automation; product files do not include
 test hooks. Every timed reset checks594 results in the first updated animation
 frame (and594 actual DOM rows in list mode). Three warmups precede20 measurements
-per mode. A second animation frame records a paint opportunity, not GPU timing.
+per mode. Percentiles use nearest rank (ceil(p×n), one-based). A second animation frame records a paint opportunity, not GPU timing.
 
 The CPU/synchronous handler values include refresh/index work; frame measures
 include browser layout scheduling. Network is excluded from filter-reset timing.
@@ -122,11 +122,11 @@ GPU timings and total process/GPU memory are not established by these checks.
 | Metric | Accepted R2 base | Integrated C |
 | --- | ---: | ---: |
 | map: Synchronous reset median | 455.6 ms | 30.6 ms |
-| map: First updated frame p95 | 1123.7 ms | 38.3 ms |
-| map: Second-frame paint opportunity p95 | 1124.7 ms | 51.1 ms |
+| map: First updated frame p95 | 1078.4 ms | 36.8 ms |
+| map: Second-frame paint opportunity p95 | 1084.4 ms | 51.0 ms |
 | list: Synchronous reset median | 589.2 ms | 43.4 ms |
-| list: First updated frame p95 | 2108.6 ms | 89.8 ms |
-| list: Second-frame paint opportunity p95 | 2114.4 ms | 91.8 ms |
+| list: First updated frame p95 | 1970.5 ms | 63.9 ms |
+| list: Second-frame paint opportunity p95 | 1972.1 ms | 75.8 ms |
 | List opening through paint opportunity | 119.0 ms | 78.1 ms |
 | Initial list rows in map mode | 594 | 0 |
 | DOM elements, including test controls | 17112 | 605 |
@@ -160,3 +160,9 @@ Raw results, fixture inputs, fixed clock, proxy driver, browser journeys, Node
 outputs and review snapshots are retained under workspace `.local/c` (original
 fixtures under `.local/m2/evidence/audit-data`). The proxy is verification-only
 and is stopped after evidence collection; the separate C preview uses4327.
+
+Final evidence correction:20-sample p95 uses nearest rank rather than the maximum
+sample; raw samples remain unchanged. Local commits are7e7e8c9 (EGI-125),
+fbf32a5 (EGI-126),4fc61e0 (EGI-127); this documentation follow-up records the
+percentile convention. Both review axes checked the final code/test deltas;
+the final integrated RTL/LTR observations passed after the longer network wait.
