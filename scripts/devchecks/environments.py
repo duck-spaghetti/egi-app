@@ -73,7 +73,22 @@ class Inventory:
         try:
             if path.is_symlink() or path.stat().st_size > 65536:
                 raise ValueError('Untrusted metadata path or size')
-            return json.loads(path.read_text())
+            record = json.loads(path.read_text())
+            if not isinstance(record, dict):
+                raise ValueError('Metadata must be an object')
+            if path.name in ('run.json', 'resource.json') and record.get('schema_version') != 1:
+                raise ValueError('Unsupported resource metadata schema')
+            if path.name == 'run.json':
+                if (not isinstance(record.get('run_id'), str) or type(record.get('owner_pid')) is not int
+                        or not isinstance(record.get('owner_identity'), str)
+                        or not isinstance(record.get('repository'), str)):
+                    raise ValueError('Invalid run metadata fields')
+            if path.name == 'resource.json':
+                if any(not isinstance(record.get(key), str) for key in ('path', 'data', 'run_id', 'binary')):
+                    raise ValueError('Invalid resource metadata fields')
+            if path.name == 'runtime.json' and 'data' in record and not isinstance(record['data'], str):
+                raise ValueError('Invalid runtime data path')
+            return record
         except (OSError, ValueError) as error:
             self.error(path, 'metadata', error)
             return {}
@@ -107,6 +122,7 @@ class Inventory:
             entry.update(pid=observed['pid'], uid=observed['uid'])
         if run:
             entry.update(run_id=run.get('run_id'), repository=run.get('repository'),
+                         worktree=run.get('worktree'), source=run.get('source'),
                          created_at=run.get('created_at'))
             try:
                 owner = process_identity(run['owner_pid'])

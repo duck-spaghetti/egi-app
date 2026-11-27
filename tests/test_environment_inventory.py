@@ -49,7 +49,7 @@ class EnvironmentInventoryTests(unittest.TestCase):
         """An active owner is never called an orphan; an absent owner is review-only."""
         run_path = self.temporary / 'egi-resource-recorded'
         run_path.mkdir()
-        record = {'run_id': 'synthetic', 'repository': str(ROOT), 'owner_pid': os.getpid(),
+        record = {'schema_version': 1, 'run_id': 'synthetic', 'repository': str(ROOT), 'owner_pid': os.getpid(),
                   'owner_identity': 'controlled', 'created_at': 1}
         (run_path / 'run.json').write_text(json.dumps(record))
         with patch('devchecks.environments.process_identity', return_value='controlled'):
@@ -113,7 +113,7 @@ class EnvironmentInventoryTests(unittest.TestCase):
         self.patch.stop()
         candidate = self.temporary / 'egi-resource-private'
         candidate.mkdir()
-        record = {'run_id': 'synthetic', 'owner_pid': 900, 'owner_identity': 'x',
+        record = {'schema_version': 1, 'run_id': 'synthetic', 'owner_pid': 900, 'owner_identity': 'x',
                   'capability_hash': 'PRIVATE_SENTINEL', 'dsn': 'PRIVATE_SENTINEL'}
         (candidate / 'run.json').write_text(json.dumps(record))
         process = subprocess.CompletedProcess([], 0, f'123 {os.getuid()} /bin/postgres -D {candidate}/data --password=PRIVATE_SENTINEL\n')
@@ -143,3 +143,13 @@ class EnvironmentInventoryTests(unittest.TestCase):
         result=Inventory(self.workspace,self.temporary).collect()
         self.assertEqual(result['entries'],[])
         self.assertEqual(result['errors'],[])
+
+    def test_invalid_metadata_shapes_and_versions_remain_partial(self):
+        """Valid JSON with unsupported shape/schema never crashes the inspector."""
+        for value in ([1],None,{'schema_version':99}):
+            candidate=self.temporary/'egi-resource-invalid'
+            candidate.mkdir(exist_ok=True)
+            (candidate/'run.json').write_text(json.dumps(value))
+            result=Inventory(self.workspace,self.temporary).collect()
+            self.assertEqual(result['status'],'partial')
+            self.assertEqual(result['entries'][0]['category'],'unknown')
