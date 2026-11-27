@@ -227,6 +227,7 @@ function renderServiceHeader(poi) {
   const status=sourceOpeningStatus(raw.hours_display);
   const today=todayHours(raw.hours_display);
   const report=reportErrorAction(poi);
+  const stillValid=stillValidHref(poi);
   const distance=serviceDistance(poi);
   const organiser=serviceOrganiser(poi);
   return `<header class="service-head">
@@ -237,7 +238,7 @@ function renderServiceHeader(poi) {
     <p class="service-status ${status.kind}" data-opening-service="${escapeHtml(poi.id)}"><strong>${escapeHtml(status.label)}</strong>${today ? `<span class="service-today">${escapeHtml(today)}</span>` : ""}${hoursNeedReview(raw.hours_display) ? '<span class="flag-hours">orari da verificare</span>' : ""}${courseFlags(raw)}<small hidden></small></p>
     <div class="service-extra">
       ${organiser ? `<p class="service-line"><span class="service-key">Organizzato da</span> ${escapeHtml(organiser)}</p>` : ""}
-      <p class="service-line service-sources"><span class="service-key">Fonti</span> ${sourceNames(poi).map(n=>`<span class="source-chip">${escapeHtml(n)}</span>`).join("")}<button type="button" class="flag-data" data-jump="fonti">da verificare</button>${report ? `<a class="service-report" href="${escapeHtml(report.href)}" aria-label="Segnala un errore" title="Segnala un errore"><img src="/static/assets/icons/default/report.svg" alt="" aria-hidden="true"></a>` : ""}</p>
+      <p class="service-line service-sources"><span class="service-key">Fonti</span> ${sourceNames(poi).map(n=>`<span class="source-chip">${escapeHtml(n)}</span>`).join("")}<button type="button" class="flag-data" data-jump="fonti">da verificare</button>${report ? `<a class="service-report" href="${escapeHtml(report.href)}" aria-label="Segnala un errore" title="Segnala un errore"><img src="/static/assets/icons/default/report.svg" alt="" aria-hidden="true"></a>` : ""}${stillValid ? `<a class="service-still-valid" href="${escapeHtml(stillValid)}">${escapeHtml(t("map.still_valid_action", {}, "Ancora valido?"))}</a>` : ""}</p>
     </div>
   </header>
   <nav class="service-anchors" aria-label="Sezioni della scheda">${SERVICE_SECTIONS.map(([id,label],i)=>`<button type="button" data-jump="${id}" class="${i===0 ? "on" : ""}">${label}</button>`).join("")}</nav>`;
@@ -460,6 +461,15 @@ function directionsAction(poi) {
     external: true,
     priority: 0,
   };
+}
+
+function stillValidHref(poi) {
+  if (!poi?.id) return null;
+  const url = new URL("/contribuisci", window.location.origin);
+  url.searchParams.set("lang", normalizeLang(snapshot().lang));
+  url.searchParams.set("poi_id", String(poi.id));
+  url.searchParams.set("issue", "still_valid");
+  return url.pathname + url.search;
 }
 
 function reportErrorAction(poi) {

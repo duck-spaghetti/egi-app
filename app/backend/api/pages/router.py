@@ -20,8 +20,3 @@ def map_page(request: Request, city_id: int = 1, lang: str = 'it', module: Pages
 def health(module: Pages = Depends(owner)):
     """Report only the selected reader's health."""
     return module.health()
-
-@router.get('/contribuisci', response_class=HTMLResponse)
-def contribute():
-    """Retain the read-only explanation; do not invent a contribution journey."""
-    return '<h1>EGI v0.1 — preview locale</h1><p>La modifica dei dati non è ancora disponibile.</p><a href="/map">Torna alla mappa</a>'

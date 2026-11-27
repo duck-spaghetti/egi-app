@@ -1,0 +1,18 @@
+{# A new location: name, kind, street address, territory and an optional point. #}
+{% set w = 'moderation.workspace.' %}
+<label>{{ t(w ~ 'location.name') }}<input name="location_name" value="{{ posted.location_name or '' }}" /></label>
+<label>{{ t(w ~ 'location.kind') }}<select name="location_kind">{% for v in kinds %}<option value="{{ v }}" {% if posted.location_kind == v %}selected{% endif %}>{{ t(w ~ 'location.kinds.' ~ v) }}</option>{% endfor %}</select></label>
+<div class="desk-row">
+  <label>{{ t(w ~ 'location.street') }}<input name="location_street" value="{{ posted.location_street or '' }}" /></label>
+  <label>{{ t(w ~ 'location.postal_code') }}<input name="location_postal_code" value="{{ posted.location_postal_code or '' }}" size="6" /></label>
+  <label>{{ t(w ~ 'location.locality') }}<input name="location_locality" value="{{ posted.location_locality or 'Roma' }}" /></label>
+</div>
+{% if territories|length > 1 %}
+<label>{{ t(w ~ 'location.territory') }}<select name="location_territory">{% for tr in territories %}<option value="{{ tr.territory_id }}" {% if posted.location_territory == tr.territory_id %}selected{% endif %}>{{ tr.name }}</option>{% endfor %}</select></label>
+{% elif territories %}<input type="hidden" name="location_territory" value="{{ territories[0].territory_id }}" />{% endif %}
+<p class="hint">{{ t(w ~ 'location.point_hint') }}</p>
+<div class="desk-map" data-place-picker hidden></div>
+<div class="desk-row">
+  <label>{{ t(w ~ 'location.latitude') }}<input name="location_latitude" inputmode="decimal" value="{{ posted.location_latitude or '' }}" size="10" /></label>
+  <label>{{ t(w ~ 'location.longitude') }}<input name="location_longitude" inputmode="decimal" value="{{ posted.location_longitude or '' }}" size="10" /></label>
+</div>
