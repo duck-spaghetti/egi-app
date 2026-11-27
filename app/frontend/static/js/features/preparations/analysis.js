@@ -6,6 +6,7 @@ export function createAnalysis(host) {
   let workspaceId, job, pollTimer, pasteTimer, autoAttempted=false, requested=false;
   let pendingRequest, pendingApplication, loading=false, unavailable=false;
   const selected = new Set();
+  const extractionJobs = workspace => (workspace?.jobs || []).filter(item=>item.task===undefined || item.task==='extract_text');
   const writable = () => host.canEdit();
   const active = () => ['queued','leased','running'].includes(job?.state);
   const current = () => job?.input_id === host.workspace()?.current_input_id && !host.inputDirty();
@@ -94,13 +95,13 @@ export function createAnalysis(host) {
   return {
     load(workspace) {
       if(workspace.id!==workspaceId) {clearTimeout(pollTimer);clearTimeout(pasteTimer);workspaceId=workspace.id;job=null;autoAttempted=false;requested=false;unavailable=false;pendingRequest=null;pendingApplication=null;selected.clear();}
-      const latest=workspace.jobs?.at(-1);
+      const latest=extractionJobs(workspace).at(-1);
       if(latest && (!job || latest.job_id!==job.job_id)) {job=latest;selected.clear();poll();}
       render();
     },
     sourceChanged() {
       clearTimeout(pasteTimer);render();
-      if(!autoAttempted && !requested && !host.workspace()?.jobs?.length && writable() && $('public-material').checked && $('source-text').value.trim()) pasteTimer=setTimeout(()=>requestJob(true),800);
+      if(!autoAttempted && !requested && !extractionJobs(host.workspace()).length && writable() && $('public-material').checked && $('source-text').value.trim()) pasteTimer=setTimeout(()=>requestJob(true),800);
     },
     sourceSaved() {render();requestJob(true);},
     cardChanged() {renderActions();}

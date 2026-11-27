@@ -76,11 +76,18 @@ class OpenAIAdapter:
         if self.called:
             raise ConfigurationError('provider_already_called')
         self.called = True
-        schema = output_schema(request)
+        workbench = request.get('task') in ('classify_cards', 'group_labels')
+        if workbench:
+            from review import workbench as protocol
+            schema = protocol.output_schema(request)
+            instructions = protocol.instructions(request)
+        else:
+            schema = output_schema(request)
+            instructions = INSTRUCTIONS + '\nUse null for absent optional facts. Emit valid JSON matching the supplied schema.'
         payload = {'model':self.config['model'], 'store':False, 'stream':False,
-            'instructions':INSTRUCTIONS + '\nUse null for absent optional facts. Emit valid JSON matching the supplied schema.',
+            'instructions':instructions,
             'input':[{'role':'user','content':[{'type':'input_text','text':json.dumps(request,ensure_ascii=False,allow_nan=False)}]}],
-            'text':{'format':{'type':'json_schema','name':'egi_interpretation','strict':True,'schema':schema}},
+            'text':{'format':{'type':'json_schema','name':'egi_workbench' if workbench else 'egi_interpretation','strict':True,'schema':schema}},
             'max_output_tokens':self.max_output}
         if self.config.get('reasoning_effort'):
             payload['reasoning'] = {'effort':self.config['reasoning_effort']}
@@ -110,7 +117,7 @@ class OpenAIAdapter:
                             return self.response
                         raw.extend(chunk)
             data = json.loads(raw)
-            self.response = self.decode(data,request_id)
+            self.response = self.decode(data,request_id,clean_legacy=not workbench)
         except httpx.TimeoutException:
             self.response = self.failure('timeout')
         except httpx.HTTPError:
@@ -126,8 +133,8 @@ class OpenAIAdapter:
         return {'outcome':'known_failure' if known_zero else 'uncertain','provider_request_id':request_id,'structured_output':None,'usage':usage,'error_code':code}
 
     @staticmethod
-    def decode(data, request_id=None) -> dict:
-        """Extract safe accounting and a single structured assistant message."""
+    def decode(data, request_id=None, *, clean_legacy=True) -> dict:
+        """Extract accounting and one message, preserving closed workbench output verbatim."""
         if not isinstance(data,dict):
             return OpenAIAdapter.failure('invalid_response',request_id=request_id)
         usage = data.get('usage')
@@ -158,7 +165,9 @@ class OpenAIAdapter:
         if data.get('status') != 'completed' or len(contents) != 1 or not isinstance(contents[0],dict) or contents[0].get('type') != 'output_text':
             return result
         try:
-            value = clean_result(json.loads(contents[0]['text']))
+            value = json.loads(contents[0]['text'])
+            if clean_legacy:
+                value = clean_result(value)
         except (KeyError,TypeError,ValueError,RecursionError):
             return result
         return {**result,'outcome':'completed','structured_output':value,'error_code':None}

@@ -29,7 +29,7 @@ class WorkerSettings(BaseSettings):
 def load_settings() -> WorkerSettings:
     """Refuse missing settings or a wrong Reviewer build without echoing inputs."""
     try:
-        if version('egi-reviewer') != '0.2.0':
+        if version('egi-reviewer') != '0.5.0':
             raise ValueError('reviewer_version')
         return WorkerSettings()
     except (ValidationError,ValueError,PackageNotFoundError):

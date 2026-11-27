@@ -17,6 +17,12 @@ from .provider import ConfigurationError, OpenAIAdapter, validate_config
 def build_request(claim: dict) -> dict:
     """Select the frozen protocol and use only eligible text/metadata and its map."""
     config = validate_config(claim['provider_config'])
+    if claim['task'] in ('classify_cards', 'group_labels'):
+        from review import workbench
+        request = workbench.validate_request(claim['eligible_payload'])
+        if request['task'] != claim['task'] or request['config_version'] != claim['config_version']:
+            raise ConfigurationError('invalid_workbench_claim')
+        return request
     version = config.get('interpretation_version', 1)
     eligible = claim['eligible_payload']
     request = {'schema_version':version,'task':claim['task'],
@@ -84,7 +90,11 @@ class Worker:
             adapter = self.adapter_factory(dispatch['provider_config'],self.api_key,
                 dispatch['max_input_tokens'],dispatch['max_output_tokens'])
             with Heartbeat(self.queue,claim,dispatch['dispatch_id'],self.heartbeat_interval):
-                result = interpret(request,adapter)
+                if claim['task'] in ('classify_cards', 'group_labels'):
+                    from review import workbench
+                    result = workbench.interpret(request,adapter)
+                else:
+                    result = interpret(request,adapter)
             retained = adapter.response
             if not isinstance(retained,dict) or retained.get('usage') is None:
                 code = {'timeout':'provider_timeout','transport':'provider_transport'}.get(

@@ -2,13 +2,14 @@
 
 EGI_DATABASE_REPO selects the database worktree. With EGI_SQITCH the schema is
 deployed by Sqitch; without it the plan's deploy scripts run with psql in plan
-order (same SQL, without Sqitch's registry). Tests own and remove their cluster.
+order (same SQL, without Sqitch's registry). EGI_RESOURCE_TOOLS_REPO selects the
+reviewed resource checkout. The owning run supervises only its own clusters.
 """
 import os
 from pathlib import Path
-import shutil
 import subprocess
-import tempfile
+
+from scripts.cw1_checks import resources
 
 REPOSITORY = os.environ.get("EGI_DATABASE_REPO")
 PG = Path(os.environ.get("EGI_PG_BIN", "/Library/PostgreSQL/18/bin"))
@@ -19,24 +20,36 @@ class Cluster:
 
     def __init__(self, port: int, database: str):
         """Initialize, start and deploy; call `close` to stop and remove everything."""
+        if not REPOSITORY:
+            raise RuntimeError('EGI_DATABASE_REPO must select the disposable schema source')
         self.port, self.database = port, database
-        self.base = Path(tempfile.mkdtemp(prefix="egi-app-native-", dir="/private/tmp"))
-        self.environment = {**os.environ, "PGHOST": str(self.base), "PGPORT": str(port), "PGDATABASE": database}
-        subprocess.run([PG/"initdb", "-D", self.base/"data", "-A", "trust", "--no-locale", "--encoding=UTF8"],
-                       check=True, stdout=subprocess.DEVNULL)
-        with (self.base/"data/postgresql.conf").open("a") as stream:
-            stream.write(f"\nlisten_addresses=''\nunix_socket_directories='{self.base}'\nport={port}\n")
-        subprocess.run([PG/"pg_ctl", "-D", self.base/"data", "-l", self.base/"server.log", "-w", "start"],
-                       check=True, stdout=subprocess.DEVNULL)
-        subprocess.run([PG/"createdb", database], env=self.environment, check=True)
-        self.sql(f"REVOKE TEMPORARY ON DATABASE {database} FROM PUBLIC")
-        if os.environ.get("EGI_SQITCH"):
-            subprocess.run([os.environ["EGI_SQITCH"], "deploy", "--db-client", PG/"psql", f"db:pg:{database}"],
-                           cwd=REPOSITORY, env=self.environment, check=True, stdout=subprocess.DEVNULL)
-        else:
-            plan = (Path(REPOSITORY)/"sqitch.plan").read_text().splitlines()
-            for change in [line.split()[0] for line in plan if line[:3].isdigit()]:
-                self.file(Path(REPOSITORY)/"deploy"/f"{change}.sql")
+        self.tooling = resources()
+        self.resource = self.tooling.OwnedCluster(Path(__file__).resolve().parents[1], PG, port, database)
+        self.base, self.environment = self.resource.path, self.resource.environment
+        try:
+            self.sql(f"REVOKE TEMPORARY ON DATABASE {database} FROM PUBLIC")
+            through = os.environ.get('EGI_DATABASE_THROUGH')
+            if os.environ.get("EGI_SQITCH"):
+                command = [os.environ['EGI_SQITCH'], 'deploy', '--db-client', PG/'psql']
+                if through:
+                    command += ['--to', through]
+                subprocess.run([*command, f'db:pg:{database}'],
+                               cwd=REPOSITORY, env=self.environment, check=True, stdout=subprocess.DEVNULL, timeout=180)
+            else:
+                plan = (Path(REPOSITORY)/"sqitch.plan").read_text().splitlines()
+                changes = [line.split()[0] for line in plan if line[:3].isdigit()]
+                if through:
+                    changes = changes[:changes.index(through) + 1]
+                for change in changes:
+                    self.file(Path(REPOSITORY)/"deploy"/f"{change}.sql")
+        except BaseException as primary:
+            receipt = self.tooling.preserve_failure(self.resource.run, self.resource.path, primary)
+            primary.add_note('Evidence: ' + receipt)
+            try:
+                self.resource.close()
+            except BaseException as cleanup:
+                raise self.tooling.CleanupError(f'Primary {type(primary).__name__}; cleanup: {cleanup}') from primary
+            raise
 
     def dsn(self, user: str) -> str:
         """Return a libpq connection string for `user` on this cluster."""
@@ -45,20 +58,19 @@ class Cluster:
     def sql(self, statement: str):
         """Run one statement as the cluster owner."""
         subprocess.run([PG/"psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-c", statement],
-                       env=self.environment, check=True, stdout=subprocess.DEVNULL)
+                       env=self.environment, check=True, stdout=subprocess.DEVNULL, timeout=30)
 
     def file(self, *paths):
         """Run SQL files as the cluster owner, in order."""
         command = [PG/"psql", "-X", "-q", "-v", "ON_ERROR_STOP=1"]
         for path in paths:
             command += ["-f", path]
-        subprocess.run(command, env=self.environment, check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(command, env=self.environment, check=True, stdout=subprocess.DEVNULL, timeout=60)
 
     def close(self):
         """Stop the cluster and remove its directory."""
-        if (self.base/"data/postmaster.pid").exists():
-            subprocess.run([PG/"pg_ctl", "-D", self.base/"data", "-m", "immediate", "-w", "stop"], stdout=subprocess.DEVNULL)
-        shutil.rmtree(self.base)
+        if hasattr(self, 'resource'):
+            self.resource.close()
 
 
 def people(cluster: Cluster, desk_login: str) -> dict:

@@ -17,9 +17,9 @@ Install the normal runtime lock, then the approved reproducible Reviewer artifac
   -r requirements-community.lock.txt
 ```
 
-The internal extra is `community`, pinned to egi-reviewer 0.4.0. The separate hash
+The internal extra is `community`, pinned to egi-reviewer 0.5.0. The separate hash
 lock requires wheel SHA-256
-`226f7c9d88e3052e133cf37d41054330eb58d079f2e04075926f1dab477e3bf8`.
+`4c8d035e129790971cba6c5db610597f0ad748f19762a2bb3abf14eed467138a`.
 It must not import a mutable neighboring checkout. The ordinary web application
 can still run without the extra; local ranked suggestions return a safe unavailable response, while manual catalog browsing/selection remains available. Community worker/provider tests require it.
 
@@ -129,7 +129,7 @@ excludes canonical organization/classification components. Null cleaning preserv
 required fact metadata for independent Reviewer rejection; it cannot repair missing
 claims or turn model keys into canonical IDs. Existing pending v1 jobs stay compatible.
 
-EGI-116 verified the0.3.1 artifact offline. The current0.4.0 pin is listed above;
+EGI-116 verified the0.3.1 artifact offline. The current0.5.0 pin is listed above;
 no new dependency or live model/configuration is seeded. Native worker+HTTP tests use MockTransport
 only and prove extraction→server fact IDs→manual edit→selective moderation, known
 usage settlement and rejection of an old-client downgrade. Real model quality and
@@ -148,3 +148,42 @@ compatible. Missing context causes no hidden ranking call; local manual matching
 remains separate from billing. Expired context fails before reservation/dispatch.
 Returned suggestions materialize as proposed/unresolved stable-fact resolutions;
 manual/cleared values and confirmed/ignored decisions survive refresh.
+
+## Declared workbench plans — EGI-153
+
+Reviewer0.5.0 adds the separate `workbench.request.v1` profile for
+`classify_cards` and `group_labels`. Existing extraction jobs still select their
+original v1/v2 request, prompt, schema and nullable cleanup. Workbench jobs use the
+Reviewer's generated instructions, strict output schema and independent result
+validator; their output is never passed through the extraction cleaner.
+
+PostgreSQL constructs and freezes each eligible packet, including actual shared
+context, original field quotations, supplied catalog, required/reference coverage,
+configuration and digests. Python validates that exact envelope and its claimed
+task/configuration; it does not rebuild context from IDs or assume model memory.
+The existing worker, lease heartbeat, dispatch and monthly usage ledger are reused.
+No database transaction spans provider I/O. Each job makes at most one exchange;
+later comparison and permitted continuation jobs have separately declared manifests
+and must remain within the reviewed plan count/cost/output envelope.
+
+Input preflight checks the complete serialized Responses payload plus explicit
+framing allowance before transport. The Reviewer reports its own material sizes;
+SQL partitioning reserves the fixed profile ceiling and escaping overhead. These
+are conservative byte-based bounds, not measured model-token counts. Actual known
+usage remains the settlement authority. A local refusal has known zero usage;
+unknown dispatch/usage keeps the held reservation and requires an explicit retry.
+
+Known parseable unit outcomes can survive a malformed sibling with unresolved
+coverage retained. Truncated/unreadable JSON has no repair or salvage. Hypotheses
+remain unverified and category proposals remain unconfirmed until explicit exact-head
+operator actions. Analysis never confirms a card, submits it or publishes anything.
+
+Run the controlled transport suite with the pinned wheel installed:
+
+```sh
+python -B -m unittest tests.test_workbench_provider tests.test_community_provider -v
+```
+
+Use the [owned native runner](workbench-checks.md) for
+`tests.test_workbench_worker_native`; select the final CW1 database worktree.
+This verification uses synthetic data and MockTransport, never a key or real request.
