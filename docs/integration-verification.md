@@ -55,7 +55,9 @@ source mismatches and exit/report disagreements propagate to the app boundary.
 
 Commit-msg, pre-push and CI invoke the same canonical title policy. Shared check,
 configuration, workflow and contract changes require Integration as well as Complete
-before push. CI uses identified checkout revisions and preserves reports/artifacts.
+before push. The owning app command clears inherited `GIT_*` routing variables
+before checking its explicit root, so hooks cannot redirect disposable test repositories
+or the report source identity. CI uses identified checkout revisions and preserves reports/artifacts.
 Required-check settings and controlled negative/positive remote evidence are recorded
 in the workspace execution record. Native Save PDF remains separate acceptance;
 CI does not manufacture a native-dialog result or authorize final merge/deployment.

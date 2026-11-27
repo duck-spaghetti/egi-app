@@ -78,6 +78,10 @@ def main(argv=None):
                         help="Explicit repository/isolated fixture to check; never inferred from a DSN")
     args = parser.parse_args(argv)
     root = args.root.resolve()
+    # Hooks export Git routing variables; the explicit checked root owns all children.
+    for name in tuple(os.environ):
+        if name.startswith('GIT_'):
+            del os.environ[name]
     result = report("app", args.profile, root, checks(root, args.profile))
     print(json.dumps(result, ensure_ascii=False, indent=2) if args.json else
           "\n".join([f"{item['status']}: {item['name']}" + (f" — {item['reason']}" if item['reason'] else "")

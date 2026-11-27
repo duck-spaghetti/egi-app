@@ -67,3 +67,20 @@ class ProfileCommandTests(unittest.TestCase):
         python = next(item for item in result["checks"] if item["name"] == "python")
         self.assertEqual(python["status"], "blocked")
         self.assertEqual(python["tests"][0]["reason"], "missing fixture")
+
+    def test_hook_git_routing_cannot_redirect_checked_fixture(self):
+        """Inherited hook routing cannot redirect fixture Git operations or source identity."""
+        clean = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
+        subprocess.run(['git', 'init', '-q', self.root], env=clean, check=True)
+        subprocess.run(['git', '-C', self.root, '-c', 'user.name=Fixture', '-c',
+                        'user.email=fixture@example.invalid', 'commit', '--allow-empty',
+                        '-qm', 'EGI-140: Fixture'], env=clean, check=True)
+        source = subprocess.check_output(['git', '-C', self.root, 'rev-parse', 'HEAD'],
+                                         env=clean, text=True).strip()
+        (self.root / 'tests/test_profile_example.py').write_text(
+            "import subprocess, unittest\nfrom pathlib import Path\nclass Example(unittest.TestCase):\n"
+            " def test_ok(self): subprocess.run(['git','-C',str(Path(__file__).resolve().parents[1]),'status','--porcelain'],check=True,capture_output=True)\n")
+        code, result = self.command(environment={**os.environ, 'GIT_DIR': '/unavailable-foreign-git'})
+        self.assertEqual(code, 2, result)  # Fixture still lacks ESLint; Python must pass.
+        self.assertEqual(result['source'], source)
+        self.assertEqual(next(item for item in result['checks'] if item['name'] == 'python')['status'], 'passed')
