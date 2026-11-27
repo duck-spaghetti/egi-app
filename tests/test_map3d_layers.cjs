@@ -26,6 +26,8 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
    on(...args){this.handlers.push(args);},once(){},off(){},fitBounds(b){this.fitted=b;}};
  }
  // Transit: same viewport query as the current map, at the Leaflet-equivalent zoom.
+ assert.equal(TransportLayerGL.leafletZoom({getZoom:()=>19}),19,'maximum camera zoom stays within API bounds');
+ assert.equal(TransportLayer.pointDetail({transport_type:'metro'},18),true);assert.equal(TransportLayer.pointDetail({transport_type:'bus'},18),false);assert.equal(TransportLayer.pointDetail({transport_type:'tram'},18),false);assert.equal(TransportLayer.pointDetail({transport_type:'bus'},19),true);
  const map=fakeMap();const toggle=element();const status=element();
  const line={type:'Feature',geometry:{type:'LineString',coordinates:[[12.46,41.89],[12.5,41.9]]},properties:{transport_type:'metro',color:'#e27439',route_id:'MA',code:'A',name:'Metro A'}};
  const rail={type:'Feature',geometry:{type:'LineString',coordinates:[[12.46,41.89],[12.5,41.9]]},properties:{transport_type:'rail',route_id:'FL1',code:'FL1'}};
@@ -53,8 +55,10 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
  assert.equal(transit.focusedRoutes()[0],'MA');assert(map.fitted);
  transit.dispose();assert.equal(frames.size,0,"popup teardown with held data must not queue name work");assert.equal(map.layers.length,0);assert.equal(map.sources['egi-transport-lines'],undefined);
  assert.equal(created.markers.filter(m=>!m.removed).length,0);
- const second=TransportLayerGL.create(fakeMap(),{},maplibre);second.setVisible(true);await second.reload();
- created.markers.filter(m=>!m.removed).at(-1).options.element.click();await wait(20);second.dispose();assert.equal(frames.size,0,'popup teardown without held data must not queue name work');
+ const individual={...stop,id:'stop:platform-a',geometry:{type:'Point',coordinates:[12.4902,41.9001]},properties:{...stop.properties,kind:'stop',stop_id:'platform-a',stop_ids:undefined}};responses['/api/preview/transport']={...responses['/api/preview/transport'],features:[line,individual]};
+ const highMap=fakeMap();highMap.zoom=17.4;const second=TransportLayerGL.create(highMap,{},maplibre);second.setVisible(true);await second.reload();
+ const highStop=created.markers.filter(m=>!m.removed).at(-1);assert(highStop.options.element.innerHTML.includes('tl-ground'));assert(highStop.options.element.className.includes('tl-point-detail'));same(highStop.lngLat,individual.geometry.coordinates,'ground anchor keeps source coordinates');
+ created.markers.filter(m=>!m.removed).at(-1).options.element.click();await wait(20);assert(calls.filter(c=>c.url.startsWith('/api/preview/transit/departures?')).at(-1).url.includes('stops=platform-a'),'individual platform requests its own departures');second.dispose();assert.equal(frames.size,0,'popup teardown without held data must not queue name work');
  // Cycleways: same body as the current map's layer, features drawn, same status text.
  const cmap=fakeMap();cmap.zoom=13.2;const ctoggle=element(),cstatus=element();
  const way={type:'Feature',geometry:{type:'LineString',coordinates:[[12.46,41.89],[12.5,41.9]]},properties:{kind:'track',label:'Pista su carreggiata',name:'Tevere'}};

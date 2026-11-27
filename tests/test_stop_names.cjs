@@ -23,6 +23,11 @@ const assert=require('node:assert/strict');const {performance}=require('node:per
  const entry={element:button,props:{transport_type:'metro',name:'<img onerror=bad>',stop_ids:['a']}};
  const owner=createStopNames(root);owner.update([entry],16);assert.equal(entry.label.textContent,'<img onerror=bad>');assert.equal(entry.label.innerHTML,'');assert.equal(entry.label.hidden,false);
  owner.refresh(15);assert.equal(entry.label.hidden,true);owner.clear();
+ const zeroRoot=element(),glyph=element(),foot=element();
+ zeroRoot.getBoundingClientRect=()=>({left:200,right:200,top:200,bottom:200,width:0,height:0});
+ glyph.getBoundingClientRect=()=>({left:190,right:210,top:162,bottom:182,width:20,height:20});foot.getBoundingClientRect=()=>({left:197,right:203,top:197,bottom:203,width:6,height:6});
+ zeroRoot.querySelector=selector=>selector==='.tl-ground'?foot:glyph;
+ const detail={element:zeroRoot,props:{name:'Punto reale',transport_type:'metro',stop_id:'single'}};const detailNames=createStopNames(root);detailNames.update([detail],18);assert.equal(detail.label.hidden,false,'zero-size source anchor still supports names');detailNames.dispose();
  let offReads=0;const offRoot=element();offRoot.getBoundingClientRect=()=>{offReads++;return viewport;};offRoot.querySelectorAll=()=>[];const off=createStopNames(offRoot);off.update([],17);off.refresh(17);assert.equal(offReads,0,'inactive layer has no geometry work');off.dispose();
  let queued,reads=0;const delayed=environment({requestAnimationFrame:fn=>{queued=fn;return 1;},cancelAnimationFrame(){}});
  const {createStopNames:deferredOwner}=await delayed.load('features/transport/stop-names.js');

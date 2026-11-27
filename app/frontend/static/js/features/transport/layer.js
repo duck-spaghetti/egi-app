@@ -20,6 +20,8 @@ const TransportLayer = (() => {
   const LINE_PALETTE = ["#b2182b", "#2166ac", "#1b7837", "#762a83", "#b35806", "#01665e", "#8c510a", "#c51b7d", "#4d4d4d", "#35978f"];
   /** Zoom from which stations show their line codes next to the mode symbol. */
   const DETAIL_ZOOM = 16;
+  const STOP_POINT_ZOOM = 18; // Same settled-view boundary as the server metro projection.
+  const ROAD_STOP_POINT_ZOOM = 19;
   const TRAIN_GLYPH = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M5 1h6a3 3 0 0 1 3 3v6a2.5 2.5 0 0 1-1.6 2.33l1.3 1.94a.75.75 0 1 1-1.25.83L10.95 13h-5.9l-1.5 2.1a.75.75 0 1 1-1.25-.83l1.3-1.94A2.5 2.5 0 0 1 2 10V4a3 3 0 0 1 3-3Zm-1 3v3h8V4a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1Zm1 5.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm6 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/></svg>';
   const BUS_GLYPH = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M4 1.5h8a2 2 0 0 1 2 2V12a1 1 0 0 1-1 1v1.25a.75.75 0 0 1-1.5 0V13h-7v1.25a.75.75 0 0 1-1.5 0V13a1 1 0 0 1-1-1V3.5a2 2 0 0 1 2-2Zm0 2v4h8v-4Zm.75 6.25a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm6.5 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/></svg>';
 
@@ -79,17 +81,23 @@ const TransportLayer = (() => {
   }
 
   /** Marker HTML: one mode symbol per stop/station; line codes sit in .tl-codes,
-   * which CSS shows only at detail zoom (DETAIL_ZOOM), in focus or on hover/focus. */
-  function stopIconHtml(props, highlighted = false) {
+   * which CSS shows only at detail zoom (DETAIL_ZOOM), in focus or on hover/focus.
+   * A close-scale wrapper anchors the ground dot without altering source geometry. */
+  function stopIconHtml(props, highlighted = false, anchored = false) {
     const near = highlighted ? " tl-near" : "";
+    let symbol;
     if (props.transport_type === "rail") {
-      return `<span class="tl-station tl-rail${near}"><span class="tl-roundel tl-train">${TRAIN_GLYPH}</span>${props.untimed ? "" : `<span class="tl-codes">${lineChips((props.routes || []).slice(0,3))}</span>`}</span>`;
-    }
-    if (props.kind === "station" || props.transport_type === "metro") {
-      return `<span class="tl-station${near}"><span class="tl-roundel">M</span><span class="tl-codes">${lineChips(props.routes)}</span></span>`;
-    }
-    if (props.transport_type === "tram") return `<span class="tl-stop tl-tram${near}">T</span>`;
-    return `<span class="tl-stop tl-bus${near}">${BUS_GLYPH}</span>`;
+      symbol=`<span class="tl-station tl-rail${near}"><span class="tl-roundel tl-train">${TRAIN_GLYPH}</span>${props.untimed ? "" : `<span class="tl-codes">${lineChips((props.routes || []).slice(0,3))}</span>`}</span>`;
+    } else if (props.kind === "station" || props.transport_type === "metro") {
+      symbol=`<span class="tl-station${near}"><span class="tl-roundel">M</span><span class="tl-codes">${lineChips(props.routes)}</span></span>`;
+    } else if (props.transport_type === "tram") symbol=`<span class="tl-stop tl-tram${near}">T</span>`;
+    else symbol=`<span class="tl-stop tl-bus${near}">${BUS_GLYPH}</span>`;
+    return anchored?`<span class="tl-anchored">${symbol}<span class="tl-stem" aria-hidden="true"></span><span class="tl-ground" aria-hidden="true"></span></span>`:symbol;
+  }
+
+  /** Bus/tram ground anchors need one closer zoom than station points. */
+  function pointDetail(props,zoom){
+    return zoom >= (props.transport_type==='bus'||props.transport_type==='tram'?ROAD_STOP_POINT_ZOOM:STOP_POINT_ZOOM);
   }
 
   function wheelchairText(value) {
@@ -248,8 +256,9 @@ const TransportLayer = (() => {
           const station = props.kind === "station" || props.transport_type === "metro" || props.transport_type === "rail";
           const ids = props.stop_ids || [props.stop_id];
           const near = Boolean(focused && ids.some(id => focused.stopIds.has(id)));
+          const anchored=pointDetail(props,map.getZoom());
           const marker=L.marker([lat, lng], {
-            icon: L.divIcon({className: "tl-icon", html: stopIconHtml(props, near), iconSize: null}),
+            icon: L.divIcon({className: `tl-icon${anchored?" tl-point-detail":""}`, html: stopIconHtml(props, near, anchored), iconSize: null, ...(anchored?{iconAnchor:[0,0]}:{})}),
             keyboard: true,
             title: props.name,
             zIndexOffset: near ? 1000 : station ? 500 : 0,
@@ -404,7 +413,7 @@ const TransportLayer = (() => {
     return {setVisible, isVisible: () => visible, reload: load, focus, clearFocus, focusedRoutes: () => focused?.routeIds || null, dispose(){disposed=true;visible=false;listeners.abort();request?.abort();clearTimeout(timer);clearInterval(interval);for(const clean of cleanup)clean();names.dispose();layer.off?.();layer.remove?.();chip.remove?.();}};
   }
 
-  return {DETAIL_ZOOM, TRAIN_GLYPH, UNTIMED_NOTE, routePopupHtml, directionTimes, realtimeText, alertsHtml, realtimeNote, create, statusText, viewportQuery, lineStyle, focusLineStyle, lineLabelPoint, colorForLine, stopIconHtml, popupHtml, lineColor, departuresHtml, timeText, wheelchairText};
+  return {pointDetail,STOP_POINT_ZOOM,ROAD_STOP_POINT_ZOOM,DETAIL_ZOOM, TRAIN_GLYPH, UNTIMED_NOTE, routePopupHtml, directionTimes, realtimeText, alertsHtml, realtimeNote, create, statusText, viewportQuery, lineStyle, focusLineStyle, lineLabelPoint, colorForLine, stopIconHtml, popupHtml, lineColor, departuresHtml, timeText, wheelchairText};
 })();
 
 export {TransportLayer};

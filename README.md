@@ -828,3 +828,16 @@ existing accessible/title text and departure popup. Raster/canvas basemap text
 is outside this DOM collision planner. Labels update after settled camera changes,
 resize/data refresh, with one owned animation-frame callback for DOM positioning;
 there are no per-frame rebuilds or additional feed/network requests.
+
+
+Close transport points: at Leaflet-equivalent z18 (MapLibre z17), metro overview
+centroids give way to the original individual GTFS coordinates/IDs. A short stem
+and ground dot tie station symbols to the source position. Bus/tram keep their
+existing source coordinates and gain this ground-anchor detail only one zoom
+closer, at Leaflet19 / MapLibre18. Farther views keep the compact drawing. There
+is no artificial spiderfy/displacement; coincident source points remain coincident.
+The dot is a source position, not a verified entrance or platform-access point;
+NeTEx/OSM station-only data do not gain invented detail. Names avoid the combined
+symbol/stem/foot footprint. The 3D equivalent zoom is capped at the existing API
+maximum19, so maximum camera zoom remains usable. Timetables and nearby summaries
+keep their existing source-stop memberships. No importer/runtime format changes.

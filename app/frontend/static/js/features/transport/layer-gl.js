@@ -12,8 +12,8 @@ import {TransportLayer} from "./layer.js";
 export const LINES = "egi-transport-lines";
 const LINE_LAYERS = [`${LINES}-solid`, `${LINES}-dashed`];
 
-/** Leaflet-equivalent integer zoom of a MapLibre map. */
-export function leafletZoom(map) { return Math.floor(map.getZoom() + 1); }
+/** Leaflet-equivalent zoom, capped at the existing viewport API maximum. */
+export function leafletZoom(map) { return Math.min(19,Math.floor(map.getZoom() + 1)); }
 
 /** Viewport adapters for TransportLayer.viewportQuery. */
 export function viewport(map) {
@@ -114,9 +114,10 @@ function create(map, elements, maplibre) {
       const [lng, lat] = feature.geometry.coordinates;
       const ids = props.stop_ids || [props.stop_id];
       const near = Boolean(focused && ids.some(id => focused.stopIds.has(id)));
+      const anchored=TransportLayer.pointDetail(props,leafletZoom(map));
       const el = document.createElement("button");
-      el.type = "button"; el.className = "tl-icon tl-gl-stop"; el.title = props.name; el.setAttribute("aria-label", props.name);
-      el.innerHTML = TransportLayer.stopIconHtml(props, near);
+      el.type = "button"; el.className = `tl-icon tl-gl-stop${anchored?" tl-point-detail":""}`; el.title = props.name; el.setAttribute("aria-label", props.name);
+      el.innerHTML = TransportLayer.stopIconHtml(props, near, anchored);
       stops.push({element:el,props,near});
       el.addEventListener("click", event => {
         event.stopPropagation?.();
