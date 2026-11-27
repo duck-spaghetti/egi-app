@@ -9,7 +9,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 from devchecks.resources import CleanupError, OwnedCluster, PrerequisiteError, ResourceRun, run_check
-PG = Path('/Library/PostgreSQL/18/bin')
+PG = Path(os.environ.get('EGI_PG_BIN', '/Library/PostgreSQL/18/bin'))
 
 
 @contextmanager
@@ -137,7 +137,7 @@ import os, signal
 from devchecks.resources import OwnedCluster, ResourceRun
 with ResourceRun(Path.cwd()).activate() as run:
     print(run.path,flush=True)
-    c=OwnedCluster(Path.cwd(), '/Library/PostgreSQL/18/bin',65479)
+    c=OwnedCluster(Path.cwd(), os.environ.get('EGI_PG_BIN', '/Library/PostgreSQL/18/bin'),65479)
     os.kill(os.getpid(),signal.SIGTERM)
 '''
         with parent_runs() as allocated:
@@ -215,11 +215,11 @@ with ResourceRun(Path.cwd()).activate() as run:
         import select
         from devchecks.environments import Inventory
         code = '''from pathlib import Path
-import json,time
+import json,time,os
 from devchecks.resources import ResourceRun,OwnedCluster
 with ResourceRun(Path.cwd()).activate() as run:
     print(json.dumps({'path':str(run.path),'capability':run.token}),flush=True)
-    cluster=OwnedCluster(Path.cwd(),'/Library/PostgreSQL/18/bin',65479)
+    cluster=OwnedCluster(Path.cwd(),os.environ.get('EGI_PG_BIN', '/Library/PostgreSQL/18/bin'),65479)
     print('ready',flush=True)
     time.sleep(30)
 '''
