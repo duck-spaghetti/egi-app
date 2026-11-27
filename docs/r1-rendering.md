@@ -1,7 +1,7 @@
 # R1 rendering changes and verification
 
 > User-review correction, 2026-11-27: the initial compact-offset implementation
-> introduced intermediate-zoom overlaps. The adaptive-direction
+> introduced intermediate-zoom overlaps. The adaptive-direction/opaque-building
 > correction below supersedes the initial behavior and its acceptance evidence.
 > Earlier sections are retained as the record of the first candidate, not a
 > claim that its regression was already covered by the original tests.
@@ -129,3 +129,55 @@ screen projections, changing available directions, exact anchors, content/identi
 the map render lifecycle and 20 visibility cycles. The original f426e98 behavior
 reproduces the collision. The full-catalogue browser journey verifies all 594
 retained records, not just the seven records addressed on Via Giolitti.
+
+## EGI-121 review correction: opaque building volumes
+
+Ordinary building volumes and iconic landmark volumes now have opacity 1. Height
+growth supplies their gradual appearance. The ordinary-building palette is a
+lighter muted terracotta (`#dcb29d`); class-specific monument/tall and iconic
+colors remain distinct. Ordinary walls omit the extra vertical gradient while
+retaining MapLibre's existing directional light. The 2D building fill peaks at
+z14 and fades to zero at z15.5 instead of showing through the volumes. The roof
+layer remains removed. Source geometry, heights, dataset, transport layers,
+polling and the M2 preview are unchanged.
+
+### Corrected combined-state evidence
+
+Compared with frozen **f426e98**, including its original scripts and CSS, on
+2026-11-27. Desktop in-app browser, map viewport 1280 × 676, DPR 2, retained dataset
+20261126T140106Z. Benchmark artifacts/results live in the local correction-evidence
+collection; exploratory runs are retained separately from the final summary.
+
+- **Via Giolitti with all 594 records:** z15, 15.5, 16, 16.5, 17, 17.5 and 18,
+  each at four bearings. Previous R1 had overlaps in **17/28** static checks and
+  **73/109** rendered gesture samples. Corrected R1 had **0/28** static failures
+  and **0/109** rendered gesture failures; maximum leader in that gesture was
+  56.1px. Checks compare actual icon rectangles, not only a planner's estimates.
+  This establishes the tested street/scenarios, not arbitrary-density guarantees.
+- **100-marker zoom, three 1.8-second runs:** corrected layout CPU p95
+  **0.8 / 0.7 / 0.7 ms**, under the unchanged 1ms budget. The original simple
+  offset update cost 0.3ms; it did not solve collisions during gestures. The new
+  pass runs in the map render frame (110 observed callbacks/run), whereas the
+  previous extra RAF path produced 54 observed update callbacks/run.
+- Zoom frame p95: previous R1 **16.8 / 17.1 / 16.8 ms**; corrected
+  **17.4 / 16.8 / 16.8 ms**. Pan/rotation frame p95: previous
+  **16.8 / 17.4 / 17.3 ms**; corrected **16.9 / 17.0 / 17.2 ms**. No measured
+  gap exceeded 33.4ms. Corrected pan layout CPU p95 was **0.5 / 0.6 / 0.6 ms**;
+  the previous code had no continuous pan/rotation collision pass.
+- Stable button/body identity, body content, source coordinates and SVG endpoint
+  alignment passed mid-gesture checks. Peak observed JS heap in those corrected
+  100-marker runs was 48.9MiB, excluding GPU/process memory; no memory saving is
+  inferred. The new pass costs more CPU than the old transform-only path while
+  staying within the measured desktop budget and preserving observed frame rate.
+- An earlier adaptive prototype exceeded the update target (1.2/1.1ms in two
+  samples); its records are retained. Numeric spatial cells, reduced allocation
+  and avoiding unchanged DOM writes brought the final samples under the budget.
+  The target was not relaxed.
+- Real-renderer building checks covered z13–19. Recorded paint properties confirm
+  opacity 1 and removal of the underlying planar fill at detail zooms. Visual
+  checks covered Via Giolitti and the complex Repubblica/Termini volumes, with no
+  reported console errors. No GPU timing/buffer reduction has been established.
+
+Physical-phone acceptance remains pending. Neither synthetic marker fixtures nor
+desktop frame observations replace it. The complete R1 review preview remains on
+4324; the temporary comparison server uses 4325. R2 remains outside this work.

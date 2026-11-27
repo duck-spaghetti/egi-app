@@ -9,7 +9,7 @@
 export const COLORS = {
   land: "#f4f1ea", water: "#b8d4dd", waterLine: "#9cc3cf", hospital: "#f3dfdc", school: "#ece6d6",
   road: "#ffffff", roadCase: "#ddd4c2", major: "#fffaf0", majorCase: "#cdbf9f", highway: "#f6e7c4", highwayCase: "#c9ac70",
-  rail: "#a59f94", building: "#df9277", buildingLine: "#c5826b",
+  rail: "#a59f94", building: "#dcb29d", buildingLine: "#bf927d",
   park: "#c2dda0", wood: "#a9ca86", grass: "#d5e7bf", cemetery: "#cfdcbd", greenEdge: "#8fb064", greenLabel: "#3f6b2a",
   paving: "#ede4d2", pavingEdge: "#ddd0b8", label: "#4a4a4a", labelSoft: "#7a7366", halo: "#fbf9f3", waterLabel: "#4f7f8f",
   landmarkLabel: "#6b4f2a",
@@ -72,7 +72,8 @@ export function baseLayers(C = COLORS) {
       paint: {"line-color": ["match", ["get", "kind"], "highway", C.highway, C.major], "line-width": roadWidth(1.5, 20)}},
     {id: "buildings", type: "fill", source: src, "source-layer": "buildings", minzoom: 13,
       filter: ["==", ["get", "kind"], "building"],
-      paint: {"fill-color": C.building, "fill-outline-color": C.buildingLine, "fill-opacity": fade(1, 13, 14)}},
+      paint: {"fill-color": C.building, "fill-outline-color": C.buildingLine,
+        "fill-opacity": ["interpolate", ["linear"], ["zoom"], Z0-1, 0, Z0, 1, Z1, 0]}},
   ];
 }
 
@@ -160,14 +161,16 @@ export function layers3d(base, C = COLORS_3D) {
         filter: ["all", ["==", ["get", "p"], "crown"], ["<", ["get", "b"], 4]], paint: {"fill-color": C.tree2d, "fill-opacity": 0.9}},
       {id: "blocks-3d", type: "fill-extrusion", source: "buildings", "source-layer": "blocks", minzoom: Z0, maxzoom: M0,
         filter: ["!=", ["get", "class"], "replaced"],
-        paint: {"fill-extrusion-color": blockColor(["get", "class"]), "fill-extrusion-opacity": fade(0.6, Z0, Z1),
+        paint: {"fill-extrusion-color": blockColor(["get", "class"]), "fill-extrusion-opacity": 1,
+          "fill-extrusion-vertical-gradient": false,
           "fill-extrusion-height": grow(["get", "h"]), "fill-extrusion-base": 0}},
       {id: "parts-3d", type: "fill-extrusion", source: "buildings", "source-layer": "parts", minzoom: M0,
         filter: ["!=", ["get", "class"], "replaced"],
-        paint: {"fill-extrusion-color": morph(blockColor(["get", "cb"]), partColor), "fill-extrusion-opacity": 0.6,
+        paint: {"fill-extrusion-color": morph(blockColor(["get", "cb"]), partColor), "fill-extrusion-opacity": 1,
+          "fill-extrusion-vertical-gradient": false,
           "fill-extrusion-base": 0, "fill-extrusion-height": morph(["get", "hb"], ["get", "h"])}},
       {id: "landmarks-3d", type: "fill-extrusion", source: "landmarks", minzoom: 13,
-        paint: {"fill-extrusion-color": C.iconic, "fill-extrusion-opacity": fade(0.85, 13, 14.5),
+        paint: {"fill-extrusion-color": C.iconic, "fill-extrusion-opacity": 1,
           "fill-extrusion-base": grow(["get", "b"], 13, 14.5), "fill-extrusion-height": grow(["get", "t"], 13, 14.5),
           "fill-extrusion-vertical-gradient": true}},
       {id: "fountains-3d", type: "fill-extrusion", source: "fountains", "source-layer": "parts", minzoom: 16,

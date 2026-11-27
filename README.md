@@ -92,8 +92,11 @@ memory where the browser reports it); below 30 fps or above 150 MB over three mo
 control shows a warning and a one-time message, and stays usable.
 
 Ordinary buildings use the same muted terracotta family in plan, aggregate blocks
-and detailed parts. Monument/tall-building classifications retain their distinct
-colors. Detailed volumes no longer draw a second roof extrusion; the shared
+and detailed parts. Volumes are opaque, with their height providing the gradual
+appearance; the underlying 2D building fill fades away by z15.5. Ordinary walls
+omit the extra vertical gradient while retaining directional illumination.
+Monument/tall-building classifications retain their distinct colors.
+Detailed volumes no longer draw a second roof extrusion; the shared
 building vector source, geometry heights and loading contract are unchanged.
 See [R1 rendering verification](docs/r1-rendering.md) for measured costs and limits.
 
