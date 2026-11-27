@@ -20,3 +20,20 @@ class DiskPolicyTests(unittest.TestCase):
                                   (30 * GIB - 1, True), (30 * GIB, False), (30 * GIB + 1, False)):
                 with self.subTest(free=free):
                     self.assertEqual(preflight(root, free)['warning'], warning)
+
+    def test_run_metadata_records_revision_without_command_secrets(self):
+        """A receipt contains source identity and a fingerprint, never raw argv credentials."""
+        import json, os
+        from unittest.mock import patch
+        from devchecks.resources import ResourceRun
+        root=Path(__file__).resolve().parents[1]
+        details={'uid':os.getuid(),'birth':'controlled birth','command':'python --password=PRIVATE_SENTINEL'}
+        with patch('devchecks.resources.process_details',return_value=details):
+            run=ResourceRun(root)
+        try:
+            serialized=(run.path/'run.json').read_text()
+            self.assertNotIn('PRIVATE_SENTINEL',serialized)
+            self.assertEqual(run.record['worktree'],str(root))
+            self.assertGreaterEqual(len(run.record['source']),40)
+        finally:
+            run.close()

@@ -43,3 +43,14 @@ previously pinned report.py/python_tests.py files are unchanged for Reviewer.
 back deployment failures before returning an object to unittest. Full Integration
 still requires its existing live retained-pilot and cross-repository prerequisites;
 resource success never waives missing mandatory evidence.
+
+Run metadata records the selected Git revision/worktree and a hashed invocation
+fingerprint with process birth fields; raw argument strings and capabilities are
+not written to diagnostics. Failed acquisition, checked-child failure or shutdown
+failure preserves a bounded latest receipt at `.local/resource-last-failure.json`
+outside the disposable data directory, including a redacted server-log tail.
+This is latest-run operational diagnostics, not a replacement for retained acceptance
+evidence. A diagnostic write failure cannot prevent owned teardown.
+
+An inherited run measures its actual allocation filesystem. Parent reconciliation
+normalizes nonzero/timed-out shutdown to failed, preserving the live data directory.

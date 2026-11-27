@@ -9,6 +9,8 @@ import json
 import os
 from pathlib import Path
 import secrets
+import shlex
+import re
 import shutil
 import signal
 import subprocess
@@ -28,15 +30,85 @@ class CleanupError(RuntimeError):
     """An owned resource could not be safely stopped or removed."""
 
 
-def process_identity(pid):
-    """Read a process creation time, UID and invocation for internal comparisons."""
+def process_details(pid):
+    """Read birth fields and raw invocation only for internal identity validation."""
     result = subprocess.run(['ps', '-p', str(int(pid)), '-o', 'uid=', '-o', 'lstart=', '-o', 'command='],
                             text=True, capture_output=True, timeout=5)
     if result.returncode == 1 and not result.stdout.strip():
         return None
-    if result.returncode or not result.stdout.strip():
+    parts = result.stdout.strip().split(None, 6)
+    if result.returncode or len(parts) != 7:
         raise PrerequisiteError('Process identity unavailable')
-    return result.stdout.strip()
+    return {'uid': int(parts[0]), 'birth': ' '.join(parts[1:6]), 'command': parts[6]}
+
+
+def fingerprint(details):
+    """Keep process birth identity without persisting credential-bearing arguments."""
+    if details is None:
+        return None
+    digest = hashlib.sha256(details['command'].encode()).hexdigest()
+    return f"{details['uid']} {details['birth']} {digest}"
+
+
+def process_identity(pid):
+    """Return a non-reversible invocation fingerprint plus safe process birth fields."""
+    return fingerprint(process_details(pid))
+
+
+def source_identity(repository):
+    """Observe the selected worktree/revision without inheriting Git-hook redirection."""
+    result = subprocess.run(['git', '-C', str(repository), 'rev-parse', 'HEAD'],
+                            env={k: v for k, v in os.environ.items() if not k.startswith('GIT_')},
+                            text=True, capture_output=True, timeout=5)
+    revision = result.stdout.strip() if result.returncode == 0 else None
+    return {'worktree': str(Path(repository).resolve()), 'source': revision}
+
+
+def _write_failure(run, path, error):
+    """Preserve one bounded latest failure receipt outside disposable database files."""
+    def redacted(value):
+        """Remove credential assignments and connection URLs from diagnostic tails."""
+        value = re.sub(r'(?i)postgres(?:ql)?://[^\s]+', '<redacted-dsn>', value)
+        return re.sub(r'(?i)(password|api[_-]?key|token|secret)\s*[=:]\s*[^\s,;]+', r'\1=<redacted>', value)
+    repository = Path(run.record['repository'])
+    directory = repository / '.local'
+    if directory.is_symlink() or directory.exists() and directory.resolve() != directory:
+        raise CleanupError('Diagnostic directory is not canonical')
+    directory.mkdir(exist_ok=True)
+    target = directory / 'resource-last-failure.json'
+    if target.is_symlink():
+        raise CleanupError('Diagnostic receipt path substituted')
+    log = path / 'server.log'
+    tail = ''
+    if log.is_file() and not log.is_symlink():
+        with log.open('rb') as stream:
+            stream.seek(max(0, log.stat().st_size - 8192))
+            tail = stream.read(8192).decode(errors='replace')
+    detail = str(error)
+    if isinstance(error, subprocess.CalledProcessError):
+        detail = f'Process exit{error.returncode}; ' + str(error.stderr or '')
+    receipt = {'schema_version': 1, 'run_id': run.record['run_id'], 'observed_at': time.time(),
+               'resource': str(path), 'error_type': type(error).__name__,
+               'diagnostic': redacted(detail[-4000:]), 'server_log_tail': redacted(tail),
+               'source': run.record.get('source'), 'worktree': run.record.get('worktree')}
+    if target.exists() and target.stat().st_size < 32768:
+        try:
+            previous = json.loads(target.read_text())
+            if previous.get('run_id') == receipt['run_id'] and not receipt['server_log_tail']:
+                receipt['server_log_tail'] = previous.get('server_log_tail', '')[-8192:]
+                receipt['diagnostic'] = (receipt['diagnostic'] + '\nEarlier: ' + previous.get('diagnostic', ''))[-4000:]
+        except (OSError, ValueError, AttributeError):
+            pass
+    _write(target, receipt)
+    return str(target)
+
+
+def preserve_failure(run, path, error):
+    """Keep diagnostic write failure from preventing verified resource teardown."""
+    try:
+        return _write_failure(run, path, error)
+    except (OSError, ValueError, RuntimeError) as diagnostic:
+        return 'diagnostic unavailable: ' + type(diagnostic).__name__
 
 
 def preflight(root=DEFAULT_ROOT, available=None):
@@ -55,11 +127,14 @@ def preflight(root=DEFAULT_ROOT, available=None):
 
 def _write(path, value):
     """Atomically replace private metadata inside an already owned directory."""
-    temp = path.with_suffix('.writing')
-    with temp.open('w') as stream:
-        json.dump(value, stream, indent=2)
-    os.chmod(temp, 0o600)
-    temp.replace(path)
+    descriptor, name = tempfile.mkstemp(prefix=path.name + '.', suffix='.writing', dir=path.parent)
+    temp = Path(name)
+    try:
+        with os.fdopen(descriptor, 'w') as stream:
+            json.dump(value, stream, indent=2)
+        temp.replace(path)
+    finally:
+        temp.unlink(missing_ok=True)
 
 
 def _directory(path, inode, uid):
@@ -82,7 +157,8 @@ class ResourceRun:
                        'path': str(self.path), 'inode': self.path.stat().st_ino,
                        'uid': os.getuid(), 'repository': str(Path(repository).resolve()),
                        'owner_pid': os.getpid(), 'owner_identity': process_identity(os.getpid()),
-                       'created_at': time.time(), 'capability_hash': hashlib.sha256(self.token.encode()).hexdigest()}
+                       'created_at': time.time(), 'capability_hash': hashlib.sha256(self.token.encode()).hexdigest(),
+                       **source_identity(repository)}
         _write(self.path / 'run.json', self.record)
 
     @classmethod
@@ -116,7 +192,7 @@ class ResourceRun:
             try:
                 cluster = OwnedCluster.restore(self, path)
                 cluster.close()
-            except (OSError, ValueError, KeyError, RuntimeError) as error:
+            except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as error:
                 errors.append(f'{path}: {error}')
         if errors:
             raise CleanupError('; '.join(errors))
@@ -168,8 +244,8 @@ class OwnedCluster:
 
     def __init__(self, repository, binary, port=65432, database='postgres', root=DEFAULT_ROOT):
         """Acquire ownership before any fallible setup, rolling back failed startup."""
-        self.capacity = preflight(root)
         self.run = ResourceRun.inherited()
+        self.capacity = preflight(self.run.path if self.run is not None else root)
         self.own_run = self.run is None
         if self.own_run:
             self.run = ResourceRun(repository, root)
@@ -196,10 +272,14 @@ class OwnedCluster:
             if database != 'postgres':
                 self.command('createdb', database)
         except BaseException as primary:
+            receipt = preserve_failure(self.run, self.path, primary)
             try:
                 self.close()
             except BaseException as cleanup:
-                raise CleanupError(f'Primary {type(primary).__name__}: {primary}; cleanup: {cleanup}') from primary
+                raise CleanupError(f'Primary {type(primary).__name__}; cleanup: {cleanup}; evidence: {receipt}') from primary
+            primary.add_note('Evidence: ' + receipt)
+            if isinstance(primary, subprocess.CalledProcessError):
+                raise RuntimeError(f'Acquisition failed; evidence: {receipt}') from primary
             raise
 
     def save(self):
@@ -220,8 +300,11 @@ class OwnedCluster:
         if len(lines) < 3 or lines[1] != str(self.data) or int(lines[2]) < self.record['created_at'] - 2:
             raise CleanupError('PostgreSQL identity contradicts allocation')
         pid = int(lines[0])
-        identity = process_identity(pid)
-        if identity is None or not identity.startswith(str(os.getuid()) + ' ') or f'-D {self.data}' not in identity:
+        details = process_details(pid)
+        identity = fingerprint(details)
+        args = shlex.split(details['command']) if details else []
+        actual = args[args.index('-D') + 1] if '-D' in args and args.index('-D') + 1 < len(args) else None
+        if details is None or details['uid'] != os.getuid() or actual != str(self.data):
             raise CleanupError('Cannot identify allocated PostgreSQL server')
         if self.record['server_identity'] and (self.record['server_pid'] != pid or self.record['server_identity'] != identity):
             raise CleanupError('PostgreSQL process identity changed')
@@ -262,7 +345,11 @@ class OwnedCluster:
         pidfile = self.data / 'postmaster.pid'
         if pidfile.exists():
             self.capture_server()
-            self.command('pg_ctl', '-D', self.data, '-m', 'fast', '-w', '-t', '15', 'stop')
+            try:
+                self.command('pg_ctl', '-D', self.data, '-m', 'fast', '-w', '-t', '15', 'stop')
+            except (OSError, subprocess.SubprocessError) as error:
+                receipt = preserve_failure(self.run, self.path, error)
+                raise CleanupError(f'Owned shutdown failed; files preserved; evidence: {receipt}') from error
         pid = self.record['server_pid']
         if pid and process_identity(pid) == self.record['server_identity']:
             raise CleanupError('Owned PostgreSQL remains active')
@@ -284,10 +371,11 @@ class OwnedCluster:
 
     def __exit__(self, kind, primary, traceback):
         """Preserve both primary and cleanup diagnostics on an unsuccessful context."""
+        receipt = preserve_failure(self.run, self.path, primary) if primary is not None and self.path.exists() else None
         try:
             self.close()
         except BaseException as cleanup:
-            raise CleanupError(f'Primary {primary!s}; cleanup: {cleanup}') from primary
+            raise CleanupError(f'Primary {primary!s}; cleanup: {cleanup}; evidence: {receipt}') from primary
 
 
 def run_check(name, command, root, *, timeout=300, environment=None):
@@ -296,7 +384,7 @@ def run_check(name, command, root, *, timeout=300, environment=None):
     started = time.monotonic()
     output, state = '', 'passed'
     try:
-        with ResourceRun(root).activate():
+        with ResourceRun(root).activate() as scope:
             env = dict(os.environ) if environment is None else {**environment,
                 'EGI_RESOURCE_RUN': os.environ['EGI_RESOURCE_RUN'],
                 'EGI_RESOURCE_CAPABILITY': os.environ['EGI_RESOURCE_CAPABILITY']}
@@ -307,6 +395,9 @@ def run_check(name, command, root, *, timeout=300, environment=None):
                 stdout, stderr = process.communicate(timeout=timeout)
                 output = (stdout + stderr)[-4000:]
                 state = 'passed' if process.returncode == 0 else 'blocked' if process.returncode == 2 else 'failed'
+                if state != 'passed':
+                    receipt = preserve_failure(scope, scope.path, RuntimeError(output))
+                    output += '\nEvidence: ' + receipt
             except BaseException:
                 os.killpg(process.pid, signal.SIGKILL)
                 process.communicate()

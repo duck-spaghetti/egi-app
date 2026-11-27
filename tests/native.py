@@ -10,7 +10,7 @@ import subprocess
 
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
-from devchecks.resources import OwnedCluster, CleanupError
+from devchecks.resources import OwnedCluster, CleanupError, preserve_failure
 
 REPOSITORY = os.environ.get("EGI_DATABASE_REPO")
 PG = Path(os.environ.get("EGI_PG_BIN", "/Library/PostgreSQL/18/bin"))
@@ -35,6 +35,8 @@ class Cluster:
                 for change in [line.split()[0] for line in plan if line[:3].isdigit()]:
                     self.file(Path(REPOSITORY)/"deploy"/f"{change}.sql")
         except BaseException as primary:
+            receipt = preserve_failure(self.resource.run, self.resource.path, primary)
+            primary.add_note('Evidence: ' + receipt)
             try:
                 self.resource.close()
             except BaseException as cleanup:

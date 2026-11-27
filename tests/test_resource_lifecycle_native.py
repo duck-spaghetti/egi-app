@@ -47,7 +47,7 @@ class ResourceLifecycleTests(unittest.TestCase):
             return command(program, *args)
         try:
             with patch.object(cluster, 'command', side_effect=fail_stop):
-                with self.assertRaises(subprocess.CalledProcessError):
+                with self.assertRaises(CleanupError):
                     cluster.close()
             self.assertTrue((cluster.data / 'postmaster.pid').exists())
             self.assertTrue((cluster.data / 'PG_VERSION').exists())
@@ -141,3 +141,91 @@ with ResourceRun(Path.cwd()).activate():
                 with self.assertRaisesRegex(RuntimeError, 'controlled schema'):
                     fixture.Cluster(65479, 'egi_fixture_rollback')
             self.assertEqual([p.name for p in run.path.iterdir()], ['run.json'])
+
+    def test_inherited_run_checks_its_actual_allocation_root(self):
+        """An inherited custom root is checked rather than the constructor default."""
+        from devchecks.resources import preflight
+        with ResourceRun(ROOT).activate() as run:
+            with patch('devchecks.resources.preflight',wraps=preflight) as observed:
+                with OwnedCluster(ROOT,PG,65479):
+                    pass
+            observed.assert_called_once_with(run.path)
+
+    def test_parent_shutdown_errors_are_failed_and_preserve_evidence(self):
+        """Real parent reconciliation converts nonzero and timed-out stops into failed."""
+        original_init=ResourceRun.__init__
+        code=("from pathlib import Path; from devchecks.resources import OwnedCluster; "
+              f"c=OwnedCluster(Path.cwd(),{str(PG)!r},65479)")
+        for failure in (subprocess.CalledProcessError(1,'controlled'),subprocess.TimeoutExpired('controlled',.01)):
+            allocated=[]
+            def remember(run,*args,**kwargs):
+                """Retain the test's own capability for cleanup after the injected fault."""
+                original_init(run,*args,**kwargs);allocated.append(run)
+            original_command=OwnedCluster.command
+            def fail_stop(resource,program,*args):
+                """Inject shutdown failure only in the supervising parent process."""
+                if program=='pg_ctl' and args[-1]=='stop':
+                    raise failure
+                return original_command(resource,program,*args)
+            try:
+                with patch.object(ResourceRun,'__init__',remember),patch.object(OwnedCluster,'command',fail_stop):
+                    result=run_check('stop-fault',[sys.executable,'-c',code],ROOT,
+                                     environment={**os.environ,'PYTHONPATH':str(ROOT/'scripts')})
+                self.assertEqual(result.status,'failed',result.reason)
+                self.assertIn('files preserved',result.reason)
+                receipt=ROOT/'.local/resource-last-failure.json'
+                self.assertTrue(receipt.exists())
+                self.assertTrue(any(allocated[0].path.glob('pg-*/data/PG_VERSION')))
+            finally:
+                for run in allocated:
+                    run.close()
+
+    def test_initial_capture_rejects_data_path_prefix_collision(self):
+        """A foreign -D argument with the owned path as prefix is not an exact identity."""
+        with OwnedCluster(ROOT,PG,65479) as cluster:
+            from devchecks.resources import process_details
+            actual=process_details(cluster.record['server_pid'])
+            foreign={**actual,'command':str(PG/'postgres')+' -D '+str(cluster.data)+'-other'}
+            with patch('devchecks.resources.process_details',return_value=foreign):
+                with self.assertRaises(CleanupError):
+                    cluster.capture_server()
+
+    def test_forced_owner_death_is_discoverable_without_automatic_cleanup(self):
+        """SIGKILL leaves attributable resources; the inspector only reports them."""
+        import json
+        import select
+        from devchecks.environments import Inventory
+        code = '''from pathlib import Path
+import json,time
+from devchecks.resources import ResourceRun,OwnedCluster
+with ResourceRun(Path.cwd()).activate() as run:
+    print(json.dumps({'path':str(run.path),'capability':run.token}),flush=True)
+    cluster=OwnedCluster(Path.cwd(),'/Library/PostgreSQL/18/bin',65479)
+    print('ready',flush=True)
+    time.sleep(30)
+'''
+        child=subprocess.Popen([sys.executable,'-c',code],cwd=ROOT,
+                               env={**os.environ,'PYTHONPATH':str(ROOT/'scripts')},
+                               stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+        run=None
+        try:
+            self.assertTrue(select.select([child.stdout],[],[],10)[0])
+            receipt=json.loads(child.stdout.readline())
+            with patch.dict(os.environ,{'EGI_RESOURCE_RUN':receipt['path'],
+                                        'EGI_RESOURCE_CAPABILITY':receipt['capability']}):
+                run=ResourceRun.inherited()
+            self.assertTrue(select.select([child.stdout],[],[],10)[0])
+            self.assertEqual(child.stdout.readline().strip(),'ready')
+            child.kill();child.wait(timeout=5)
+            result=Inventory(ROOT).collect()
+            entries=[entry for entry in result['entries'] if entry.get('run_id')==run.record['run_id']]
+            self.assertEqual(len(entries),1)
+            self.assertEqual(entries[0]['disposition'],'residue-for-review')
+            self.assertEqual(entries[0]['state'],'running')
+            self.assertTrue(Path(entries[0]['path']).exists())
+        finally:
+            if child.poll() is None:
+                child.kill();child.wait(timeout=5)
+            child.stdout.close();child.stderr.close()
+            if run:
+                run.close()
