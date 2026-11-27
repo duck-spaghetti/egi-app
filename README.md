@@ -30,6 +30,27 @@ The approved workspace execution record is
 Community feature branches have not been integrated into this dev-based worktree;
 their product behavior is not claimed by these environment-only changes.
 
+## Commit and push validation — EGI-131
+
+`python3 scripts/commit_guard.py range BASE TIP` validates actual commit objects.
+`commit-msg FILE` validates a prospective title; `pre-push` reads Git's update stream
+and requires a clean worktree matching the pushed tip, passing Complete, and passing
+Integration when shared developer/product boundaries changed. Required report status,
+profile and source identity must agree with the process exit. Hook bypass cannot
+hide an invalid new commit from range validation. CI adoption is session3 work.
+
+Ordinary titles use `EGI-<positive number>: <summary>`. Git-generated merge messages
+require merge context/parents; automatic reverts identify an existing target. Exact
+historical SHAs are inventoried in the owning exception policy; they do not approve
+feature integration or history rewriting. Commit bodies allow additional references.
+
+Run `python3 scripts/install_hooks.py` only from the assigned worktree. It refuses
+an unrelated existing hook path, sets a worktree-specific hooksPath, and preserves
+other worktree hook configuration. Commit-msg allows a valid local checkpoint even
+when Complete is blocked; pre-push refuses delivery in that state. Activate the
+selected Python environment when using hooks. The standalone canonical utility has
+no web-runtime dependency; provider repositories consume its exact pinned revision.
+
 ## Earlier app setup and retained evidence
 
 # EGI app v0.2 — local preview
