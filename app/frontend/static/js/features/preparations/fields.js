@@ -1,5 +1,6 @@
 /** Render editable service/location facts with one dictionary in both visual views. */
 import {evidenceFor} from './evidence.js';
+import {createInterpretationControls} from './interpretations.js';
 export function node(tag, text, className) {
   const result = document.createElement(tag);
   if (text !== undefined) result.textContent = text;
@@ -164,4 +165,5 @@ export function renderFields(root, draft, context, canEdit, changed, redrawAll) 
     literals.append(group);
   }
   root.append(service, location, literals);
+  createInterpretationControls({node,button}).render(root,draft,context,canEdit,changed,context.rerender || redraw);
 }

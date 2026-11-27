@@ -5,17 +5,10 @@ import {decisionFor,createAcceptanceAttempt} from './acceptance.js';
 import {renderCard} from './card.js';
 import {createReferenceControls} from './references.js';
 import {evidenceMatches} from './evidence.js';
+import {reviewPayload,selectReviewInterpretation,clearReviewInterpretation} from './interpretations.js';
 const $=id=>document.getElementById(id), context=JSON.parse($('community-review-context').textContent), text=context.text;
 const writable=!context.resolution && !context.closed, proposed=context.snapshot.values;
-const payload={schema_version:proposed.schema_version || 1,service:structuredClone(!context.service_id || !writable ? proposed.service : context.baseline),
-  location:structuredClone(!context.service_id || !writable ? proposed.location : {kind:'none'}),
-  target:proposed.target,field_origins:structuredClone(!context.service_id || !writable ? proposed.field_origins || {} : {}),evidence:context.snapshot.evidence,outcome:'review'};
-if(proposed.schema_version===2){
-  payload.source_facts=structuredClone(proposed.source_facts);payload.resolutions=structuredClone(proposed.resolutions);
-  Object.assign(payload.field_origins,structuredClone(Object.fromEntries(Object.entries(proposed.field_origins || {}).filter(([path])=>path.startsWith('/source_facts/')))));
-}
-if(context.resolution){payload.service=structuredClone(context.accepted_service);payload.location=structuredClone(context.accepted_location || {kind:'none'});payload.field_origins={};payload.evidence=[];}
-if(context.resolution && payload.schema_version===2){payload.source_facts=[];payload.resolutions=[];}
+const payload=reviewPayload(context),interpretationSelections={};
 const draft=new PreparationDraft(context.snapshot.item_id,{id:context.snapshot.item_version_id,payload});
 let submission;
 const reconciliations={};
@@ -31,7 +24,7 @@ function summarize(value) {
 }
 function comparison() {
   if(!$('review-comparison'))return;
-  const decision=decisionFor(context,draft.payload,'preview',null,reconciliations),table=node('table',undefined,'desk-table compare');
+  const decision=decisionFor(context,draft.payload,'preview',null,reconciliations,interpretationSelections),table=node('table',undefined,'desk-table compare');
   for(const operation of decision.service_operations) {
     const key=operation.path.slice(1),row=node('tr'); row.className='changed';
     row.append(node('th',text.field_labels[key] || key),node('td',summarize(context.baseline[key])),node('td',summarize(operation.value)));
@@ -46,7 +39,10 @@ function comparison() {
   }
 }
 function render() {
-  const view={...context,renderResolution:referenceUI.render,rerender:render,referenceLabel:referenceUI.label,canEditFacts:false,sourceName:context.snapshot.source_metadata.name,text:{...text,input_origin:text.review_current_value},evidenceFilter:evidence=>evidenceMatches(draft.payload,proposed,evidence),onEvidence:(evidence)=>{
+  const view={...context,interpretationReview:true,interpretationSupport:proposed.interpretation_support || [],interpretationSelections,
+    selectInterpretation:(record,target,note)=>selectReviewInterpretation(draft.payload,interpretationSelections,record,target,note,context.baseline),
+    clearInterpretation:record=>clearReviewInterpretation(draft.payload,interpretationSelections,record.interpretation_id,context.baseline),
+    renderResolution:referenceUI.render,rerender:render,referenceLabel:referenceUI.label,canEditFacts:false,sourceName:context.snapshot.source_metadata.name,text:{...text,input_origin:text.review_current_value},evidenceFilter:evidence=>evidenceMatches(draft.payload,proposed,evidence),onEvidence:(evidence)=>{
     $('review-field-evidence').hidden=false;$('review-field-evidence').replaceChildren(node('strong',text.source_passage),node('blockquote',evidence.quote));
   }};
   ($('review-editor').classList.contains('preparation-fields')?renderFields:renderCard)($('review-editor'),draft,view,writable && !submission?.locked,comparison);comparison();
@@ -68,6 +64,7 @@ submission=createAcceptanceAttempt({key:()=>crypto.randomUUID(),
   }});
 if(writable && context.service_id) {
   for(const [key,value] of Object.entries(proposed.service)) {
+    if(key==='classifications' && proposed.schema_version>=3)continue;
     const label=node('label',undefined,'desk-inline'),check=node('input');check.type='checkbox';
     label.append(check,node('span',text.review_use_proposal+' '+(text.field_labels[key] || key)+': '+summarize(value)));
     check.addEventListener('change',()=>{
@@ -97,7 +94,7 @@ $('community-accept-form')?.addEventListener('submit',async event=>{
     const observed=$('review-observed').checked,method=$('review-method').value,reason=$('review-reason').value.trim();
     if(!reason || observed && !method || !draft.payload.service.delivery_mode){$('review-error').hidden=false;$('review-error').textContent=text.review_invalid;return;}
     if(context.service_id && draft.payload.resolutions?.some(item=>item.state==='confirmed' && !reconciliations[item.fact_id])){$('review-error').hidden=false;$('review-error').textContent=text.ref_reconcile_required;return;}
-    await submission.send(()=>decisionFor(context,draft.payload,reason,observed?{method,note:$('review-note').value}:null,reconciliations));
+    await submission.send(()=>decisionFor(context,draft.payload,reason,observed?{method,note:$('review-note').value}:null,reconciliations,interpretationSelections));
   } catch(error) {fail(error);}
 });
 for(const form of document.querySelectorAll('.community-admit-source'))form.addEventListener('submit',async event=>{
@@ -107,7 +104,7 @@ for(const form of document.querySelectorAll('.community-admit-source'))form.addE
 });
 referenceUI.loadNames(draft).then(render).catch(fail);
 
-if($('review-original-editor')){const original=new PreparationDraft(context.snapshot.item_id,{id:context.snapshot.item_version_id,payload:{...structuredClone(proposed),evidence:context.snapshot.evidence}});renderFields($('review-original-editor'),original,context,false,()=>{});}
+if($('review-original-editor')){const original=new PreparationDraft(context.snapshot.item_id,{id:context.snapshot.item_version_id,payload:{...structuredClone(proposed),evidence:context.snapshot.evidence}});renderFields($('review-original-editor'),original,{...context,interpretationSupport:proposed.interpretation_support || []},false,()=>{});}
 
 for(const form of document.querySelectorAll('.community-publish-organization'))form.addEventListener('submit',async event=>{
   event.preventDefault();const control=form.querySelector('button');control.disabled=true;

@@ -1,10 +1,11 @@
 /** Build exact-head decisions from a complete baseline; omit all canonical proof. */
+import {equalValue} from './draft.js';
 export function withoutEvidence(value) {
   if(Array.isArray(value))return value.map(withoutEvidence);
   if(value && typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([key])=>key!=='evidence').map(([key,child])=>[key,withoutEvidence(child)]));
   return value;
 }
-export function decisionFor(context,payload,reason,observation,reconciliations={}) {
+export function decisionFor(context,payload,reason,observation,reconciliations={},interpretationSelections={}) {
   const baseline=withoutEvidence(context.baseline), body=withoutEvidence(payload.service);
   const evidence_ids=context.snapshot.evidence.filter(item=>['stated','interpreted'].includes(item.kind) && item.span && typeof item.quote==='string').map(item=>item.id);
   const operations=[];
@@ -16,7 +17,7 @@ export function decisionFor(context,payload,reason,observation,reconciliations={
   const decision={schema_version:1,expected_service_work:context.working,expected_service_public:context.public,
     service_operations:operations,location:withoutEvidence(payload.location),reason,
     observations:observation?[{paths:['/service','/location/body'],method:observation.method,note:observation.note}]:[]};
-  if(payload.schema_version===2){
+  if(payload.schema_version>=2){
     decision.schema_version=2;
     decision.fact_actions=payload.source_facts.map(fact=>{
       const resolution=payload.resolutions.find(item=>item.fact_id===fact.fact_id);
@@ -24,6 +25,14 @@ export function decisionFor(context,payload,reason,observation,reconciliations={
       return {fact_id:fact.fact_id,action:resolution.selected.target.kind==='new_organization'?'create':'select',
         context:structuredClone(resolution.context),selected:structuredClone(resolution.selected),note:reason,reconcile:reconciliations[fact.fact_id] || 'retain'};
     });
+  }
+  for(const [id,choice]of Object.entries(interpretationSelections)){
+    const original=context.snapshot.values?.interpreted_classifications?.find(record=>record.interpretation_id===id);
+    if(!original || original.state==='stale' || !choice.note?.trim() || !original.candidates.some(candidate=>equalValue(candidate.target,choice.target)))throw new Error('invalid_interpretation_selection');
+    if((payload.service.classifications || []).some(value=>value.adoption_id===choice.target.adoption_id && value.term_id===choice.target.term_id)){
+      decision.observations.push({paths:['/service/classifications'],method:'other',note:choice.note.trim()});
+      for(const operation of operations)if(operation.path==='/classifications')operation.evidence_ids=[];
+    }
   }
   return decision;
 }

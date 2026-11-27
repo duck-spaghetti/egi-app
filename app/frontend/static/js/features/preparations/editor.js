@@ -1,6 +1,9 @@
 /** Community workbench: server-backed drafts, two editable views and explicit access. */
 import {createAnalysis} from './analysis.js';
 import {createPlans} from './plans.js';
+import {saveDraft} from './persistence.js';
+import {createGroups} from './groups.js';
+import {createProposals} from './proposals.js';
 import {PreparationDraft} from './draft.js';
 import {renderFields, node, button} from './fields.js';
 import {renderCard} from './card.js';
@@ -10,7 +13,7 @@ const $ = id => document.getElementById(id);
 const context = JSON.parse($('preparation-context').textContent), text = context.text;
 const API = '/moderazione/contribuisci/api', token = $('preparation-form-token').value;
 let workspace, draft, mode = 'card', timer, saving, remote, historyAfter = 0, lastOperation;
-let analysis, plans;
+let analysis, plans, groups, proposals;
 let pendingSubmission;
 let inspectedEvidence;
 let addingLiteral=false;
@@ -38,6 +41,7 @@ async function api(path, body, options = {}) {
 }
 function changed() {
   plans?.cardChanged();
+  proposals?.cardChanged();
   renderEvidence();
   renderChecks();updateCardLabels();
   if(inspectedEvidence && !draft.payload.evidence.some(item=>item.id===inspectedEvidence))$('source-evidence-panel').hidden=true;
@@ -51,16 +55,18 @@ async function save() {
   if (!draft || !draft.dirty && !draft.pending) return true;
   if (draft.conflicted) return false;
   $('save-state').textContent = text.saving;
-  const current = draft, attempt = current.attempt(uuid());
-  saving = api('/preparazioni/'+workspace.id+'/schede', attempt).then(receipt => {
-    current.acknowledge(receipt); lastOperation = receipt.operation_id;
+  const current = draft;
+  saving = saveDraft(current,api,workspace.id,uuid()).then(({receipt,conflicts,refreshView}) => {
+    lastOperation = receipt.operation_id;
+    if(conflicts.length){$('compare-card').hidden=false;$('retry-card').hidden=true;$('save-state').textContent=text.unsaved;return false;}
     $('undo-card').disabled = !canEdit();
     $('save-state').textContent = current.dirty ? text.unsaved : text.saved;
     $('retry-card').hidden = true;
+    if(refreshView && draft===current)refreshSavedView();
     return true;
   }).catch(error => {
     if (error.status === 409 && !referenceConflict(error)) { current.conflicted = true; $('compare-card').hidden = false; }
-    else if (error.status && error.status < 500) current.pending = null;
+    else if (error.status && error.status < 500 && !current.pending?.committedVersion) current.pending = null;
     $('retry-card').hidden = error.status === 409 && !referenceConflict(error);
     $('save-state').textContent = text.unsaved;
     throw error;
@@ -68,6 +74,21 @@ async function save() {
   const result = await saving;
   if (draft === current && current.dirty) changed();
   return result;
+}
+function refreshSavedView() {
+  const root=$('editable-fields'),active=document.activeElement,inside=active && root.contains(active);
+  const path=active?.dataset.path,fact=active?.closest('[data-fact-id]')?.dataset.factId;
+  const record=active?.closest('[data-interpretation-id],[data-hypothesis-id]');
+  const interpretation=record?.dataset.interpretationId,hypothesis=record?.dataset.hypothesisId;
+  const range=inside && typeof active.selectionStart==='number'?[active.selectionStart,active.selectionEnd,active.selectionDirection]:null;
+  render();
+  if(!inside)return;
+  let target;
+  if(path)target=[...root.querySelectorAll('[data-path]')].find(input=>input.dataset.path===path);
+  else if(fact)target=[...root.querySelectorAll('[data-fact-id]')].find(row=>row.dataset.factId===fact)?.querySelector('input,textarea,select');
+  else if(interpretation || hypothesis)target=[...root.querySelectorAll('[data-interpretation-id],[data-hypothesis-id]')].find(row=>interpretation?row.dataset.interpretationId===interpretation:row.dataset.hypothesisId===hypothesis)?.querySelector('textarea');
+  target?.focus({preventScroll:true});
+  if(range && target?.setSelectionRange)target.setSelectionRange(...range);
 }
 async function list() {
   const response = await api('/preparazioni?cestino='+$('show-trash').checked);
@@ -81,6 +102,8 @@ async function list() {
 async function loadWorkspace() {
   workspace = await api('/preparazioni/'+workspace.id);
   plans?.load(workspace);
+  groups?.load(workspace).catch(problem);
+  proposals?.render();
   $('workspace-title').textContent = workspace.title;
   $('workspace-source').textContent = context.sources.find(source => source.id === workspace.source_id)?.name || text.source;
   $('workspace-permission').textContent = workspace.permission === 'owner' ? text.owner : text[workspace.permission];
@@ -143,6 +166,7 @@ function render() {
   updateLiteralControls();renderEvidence();
   renderChecks();updateCardLabels();
   analysis?.cardChanged();
+  proposals?.cardChanged();
 }
 function updateCardLabels() {
   if(!draft)return;
@@ -194,6 +218,21 @@ async function openCard(id) {
   $('conflict-panel').hidden = true; $('compare-card').hidden = true; $('retry-card').hidden = true;
   $('card-history').replaceChildren(); $('save-state').textContent = text.saved;
   await referenceUI.loadNames(draft);render(); await cardHistory();
+}
+async function refreshWorkbenchItem(receipt, workspaceId) {
+  if(workspace?.id!==workspaceId)return;
+  if(saving)await saving;
+  const current=draft;
+  // An uncertain local save retains its exact attempt until explicitly reconciled.
+  if(current?.pending)throw new Error('pending_save_requires_reconciliation');
+  if(current){
+    const result=await api('/preparazioni/'+workspaceId+'/schede/'+current.item);
+    if(workspace?.id!==workspaceId || draft!==current)return;
+    const conflicts=current.rebase(result.version);
+    if(conflicts.length){current.conflicted=true;remote=result.version;$('compare-card').hidden=false;$('save-state').textContent=text.unsaved;}
+    else {render();$('save-state').textContent=current.dirty?text.unsaved:text.saved;}
+  }
+  if(workspace?.id===workspaceId)await loadWorkspace();
 }
 async function cardHistory() {
   const result = await api('/preparazioni/'+workspace.id+'/schede/'+draft.item+'/cronologia?after='+historyAfter);
@@ -294,7 +333,10 @@ $('add-literal-org').addEventListener('click',()=>addLiteral('organization_name'
 $('add-literal-category').addEventListener('click',()=>addLiteral('category_label'));
 analysis=createAnalysis({context,api,workspace:()=>workspace,draft:()=>draft,canEdit,inputDirty,persistInput,flush:save,reload:loadWorkspace,openCard,error:problem,caption});
 plans=createPlans({context,api,workspace:()=>workspace,draft:()=>draft,canEdit,inputDirty,flush:save,openCard,error:problem});
-window.addEventListener?.('pagehide',event=>event.persisted?plans.pause():plans.dispose());
+groups=createGroups({root:$('group-panel'),context,api,workspace:()=>workspace,selectedItems:()=>plans.selectedItems(),canEdit,flush:save,refresh:refreshWorkbenchItem,openCard,error:problem});
+proposals=createProposals({root:$('proposal-panel'),context,api,workspace:()=>workspace,draft:()=>draft,canEdit,inputDirty,flush:save,recordResults:(item,offset)=>plans.recordResults(item,offset),planState:()=>plans.current(),refreshItem:refreshWorkbenchItem,prepareGroup:value=>groups.prepareProposal(value),error:problem});
+plans.subscribe(()=>proposals.planChanged());
+window.addEventListener?.('pagehide',event=>{if(event.persisted)plans.pause();else{plans.dispose();groups.dispose();proposals.dispose();}});
 window.addEventListener?.('pageshow',event=>{if(event.persisted)plans.refresh();});
 $('source-text').addEventListener('input',()=>{analysis.sourceChanged();plans.sourceChanged();});
 $('public-material').addEventListener('change',()=>{analysis.sourceChanged();plans.sourceChanged();});

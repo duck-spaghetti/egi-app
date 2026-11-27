@@ -846,6 +846,11 @@ No real model, price, worker login or live dispatch is enabled automatically.
 
 Native Community verification uses the [controlled workbench check runner](docs/community/workbench-checks.md)
 with an explicit database worktree and a verified resource-tooling checkout.
+The [category plan guide](docs/community/workbench-plans.md),
+[proposal inspection guide](docs/community/workbench-proposals.md),
+[group review guide](docs/community/workbench-groups.md) and
+[interpretation/moderation guide](docs/community/workbench-interpretations.md)
+describe the shared CW1 workbench on existing private cards. CSV intake is a later milestone.
 
 [Interpretation selection](docs/community/interpretation-editor.md) connects first
 public insertion and explicit updates to durable jobs, with selected card creation

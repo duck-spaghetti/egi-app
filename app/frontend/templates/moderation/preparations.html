@@ -66,6 +66,8 @@
     <details><summary>Richieste e dipendenze</summary><p id="plan-packet-page" class="hint"></p><ul id="plan-packets" class="queue-list"></ul><div class="desk-actions"><button id="plan-packet-prev" type="button" disabled>Richieste precedenti</button><button id="plan-packet-next" type="button" disabled>Richieste successive</button></div></details>
     <details><summary>Eventi del piano</summary><ul id="plan-events" class="queue-list"></ul><button id="plan-events-more" type="button" disabled>Eventi successivi</button></details>
   </section>
+  <section id="proposal-panel" class="desk-card preparation-proposals" aria-label="Proposte da controllare"></section>
+  <section id="group-panel" class="desk-card preparation-groups" aria-label="Gruppi di categorie"></section>
   <article id="card-editor" class="desk-card" hidden>
     <div class="preparation-editor-heading"><div><h2>{{ t('community.service_card_title') }}</h2><p>{{ t('community.card_help') }}</p></div><div class="preparation-view-switch" role="group" aria-label="{{ t('community.fields_view') }}"><button type="button" id="view-card" aria-pressed="true">{{ t('community.card') }}</button><button type="button" id="view-fields" aria-pressed="false">{{ t('community.fields_view') }}</button></div></div>
     <div class="desk-actions preparation-save-actions"><button id="save-card" type="button">{{ t('community.save') }}</button><button id="retry-card" type="button" hidden>{{ t('community.retry') }}</button><button id="compare-card" type="button" hidden>{{ t('community.compare') }}</button></div>

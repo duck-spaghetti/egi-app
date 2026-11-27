@@ -44,3 +44,28 @@ environment is read without modifying another contributor's installed packages.
 Baseline evidence: the three suites above passed 17 tests in 8.873 seconds against
 database commit `19ca1ad`, before new workbench consumers were implemented. This
 baseline is distinct from the later final CW1 integrated checks.
+
+
+## Integrated CW1 checks
+
+With the same pinned tool and wheel selections, run:
+
+```sh
+python -B -m scripts.cw1_checks tests.test_workbench_worker_native \
+  tests.test_workbench_http_native tests.test_workbench_journey_native
+```
+
+These exercise bounded workers, HTTP plan/coverage controls, explicit unknown-cost
+replacement, residual-only continuation, group review/apply/compensating undo and
+selected moderation with an explicitly human-completed canonical publication.
+Fixture source, contact and service values are synthetic. A successful publication
+check describes only the disposable test transaction.
+
+`python -B -m tests.workbench_browser_fixture` starts an owned disposable cluster,
+loopback-only HTTP server and controlled worker. It prints a unique `*.localhost`
+URL with a test-only sign-in route on that fixture application. The unique hostname
+keeps its synthetic cookie separate from ordinary localhost sessions. No production
+route, account, provider key or live exchange is created. Add `--proposals` to return explicit synthetic category/group choices instead of
+abstentions; they remain subject to the normal human-review guards. Stop the process to close
+its worker/server and owned cluster. Use the printed URL for browser verification;
+no previous fixture URL or cluster is adopted.

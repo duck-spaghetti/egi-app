@@ -14,6 +14,7 @@ export function renderCard(root,draft,context,canEdit,changed) {
   header.append(metadata,service.querySelector('[data-field=name]'));
   for(const group of controls.querySelectorAll('[data-fact-kind=organization_name]'))header.append(group);
   for(const group of controls.querySelectorAll('[data-fact-kind=category_label]'))metadata.prepend(group);
+  for(const kind of ['interpreted_classifications','interpretation_hypotheses']){const group=controls.querySelector('[data-kind='+kind+']');if(group)metadata.append(group);}
   card.append(header);
   function section(title,content) {
     const part=node('section',undefined,'preparation-card-section');part.append(node('h3',title),content);card.append(part);return part;

@@ -166,3 +166,13 @@ button:disabled { cursor:default; opacity:.55; }
 .preparation-plan-limits { min-inline-size:0; }
 
 .preparation-plans .queue-list button { max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+
+/* Retained proposals and group decisions stay usable in the existing card column. */
+.preparation-proposals,.preparation-groups { min-width:0; overflow-wrap:anywhere; }
+.preparation-proposals section,.preparation-groups section { margin-top:16px; padding-top:12px; border-top:1px solid var(--line); }
+.preparation-proposals h3,.preparation-groups h3 { font-size:14px; margin:12px 0; }
+.preparation-proposals label,.preparation-groups label { display:flex; align-items:flex-start; gap:8px; margin:8px 0; }
+.preparation-proposals input[type=checkbox],.preparation-groups input[type=checkbox] { flex:0 0 auto; margin-top:3px; }
+.preparation-proposals button,.preparation-groups button { max-width:100%; white-space:normal; overflow-wrap:anywhere; margin:4px 6px 4px 0; }
+.preparation-proposals select,.preparation-groups select { max-width:100%; min-width:0; }
+.preparation-proposals blockquote,.preparation-groups blockquote { margin:10px 0; padding:10px 12px; border-left:2px solid var(--line); white-space:pre-wrap; }
