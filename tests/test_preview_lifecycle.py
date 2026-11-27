@@ -1,5 +1,7 @@
 """Exercise the public lifecycle command against isolated real web processes."""
 import importlib.util
+import contextlib
+import io
 import json
 from pathlib import Path
 import shutil
@@ -134,3 +136,28 @@ async def app(scope, receive, send):
         child.terminate.assert_called_once()
         child.kill.assert_called_once()
         self.assertEqual(child.wait.call_count, 2)
+
+    def test_source_initialization_failure_returns_blocked_json_and_reaps_child(self):
+        """A source lookup failure after launch preserves the public JSON contract and cleanup."""
+        module = self.load_command()
+        children = []
+        launch = subprocess.Popen
+        lookup = module.git
+        def remember(*args, **kwargs):
+            """Retain only the web process allocated by this invocation."""
+            child = launch(*args, **kwargs)
+            if '--serve' in args[0]:
+                children.append(child)
+            return child
+        def fail_source(*args):
+            """Fail source initialization only after the new child was acquired."""
+            if children and args == ('rev-parse', 'HEAD'):
+                raise subprocess.CalledProcessError(1, 'controlled source lookup')
+            return lookup(*args)
+        output = io.StringIO()
+        with patch.object(module.subprocess, 'Popen', side_effect=remember), patch.object(module, 'git', side_effect=fail_source), patch.object(sys, 'argv', ['preview', 'start', '--port', str(self.port), '--target', 'fixture:app']), contextlib.redirect_stdout(output):
+            self.assertEqual(module.main(), 2)
+        self.assertEqual(json.loads(output.getvalue())['status'], 'blocked')
+        self.assertTrue(children)
+        self.assertIsNotNone(children[0].poll())
+        self.assertTrue(module.available(self.port))

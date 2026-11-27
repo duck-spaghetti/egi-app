@@ -195,7 +195,7 @@ def main():
             observed['seconds'] = round(time.monotonic() - started, 3)
             print(json.dumps(observed))
             return 2 if observed['ownership'] == 'conflict' else 0
-        except (RuntimeError, OSError, ValueError, KeyError):
+        except (RuntimeError, OSError, ValueError, KeyError, subprocess.SubprocessError):
             print(json.dumps({'status': 'blocked', 'reason': 'Preview ownership, origin or startup check failed; inspect configuration and local server log', 'logs': str(RUNTIME / 'server.log')}))
             return 2
 
