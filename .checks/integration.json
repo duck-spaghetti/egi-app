@@ -5,14 +5,14 @@
     "name": "Community schema",
     "environment": "EGI_DATABASE_SCHEMA",
     "path": "../egi_database-consolidation",
-    "revision": "f5d619311a6fb0b5b3a07b48dfc4d81db614f533"
+    "revision": "c1c4495aa1d2416f9cf5757c70904530a0d36962"
   },
   "providers": [
     {
       "name": "database",
       "environment": "EGI_DATABASE_PROVIDER",
       "path": "../egi_database-consolidation",
-      "revision": "f5d619311a6fb0b5b3a07b48dfc4d81db614f533"
+      "revision": "c1c4495aa1d2416f9cf5757c70904530a0d36962"
     },
     {
       "name": "reviewer",
