@@ -8,7 +8,7 @@ const assert=require('node:assert/strict');const {performance}=require('node:per
  class Marker {constructor(o){this.o=o;markers.push(this);}setLngLat(){return this;}addTo(){return this;}remove(){this.removed=true;}getElement(){return this.o.element;} }
  const pois=Array.from({length:600},(_,i)=>({id:i,title:'Service '+i,longitude:12.2+i%30*.02,latitude:41.7+Math.floor(i/30)*.02}));
  const state={pois},sites=createSites({context:{canonical:true},snapshot:()=>state});
- const map=createMap3d({context:{longitude:12.5,latitude:41.9,map3d:{base:'/map3d/test'},boundsWest:12.2,boundsEast:12.9,boundsSouth:41.6,boundsNorth:42.2},sites,describe:p=>{described++;return {title:p.title,category:{slug:'a',label:'A'},status:p.status||{kind:'unknown',label:'Unknown'}};},emit(){},maplibre:{Map,Marker,NavigationControl:class{}},reduceMotion:true});
+ const map=createMap3d({context:{longitude:12.5,latitude:41.9,map3d:{base:'/map3d/test'},boundsWest:12.2,boundsEast:12.9,boundsSouth:41.6,boundsNorth:42.2},sites,describe:p=>{described++;return {title:p.title,kind:p.kind||'Service type',category:{slug:'a',label:'A'},status:p.status||{kind:'unknown',label:'Unknown'}};},emit(){},maplibre:{Map,Marker,NavigationControl:class{}},reduceMotion:true});
  map.mount();map.update(state,pois);described=0;const timings=[];
  for(let i=0;i<20;i++){const start=performance.now();gl.fire('moveend');timings.push(performance.now()-start);}
  const result={markers:map.markerCount(),describedOnPan:described,p50:timings.sort((a,b)=>a-b)[10]};console.log(JSON.stringify(result));
@@ -22,10 +22,10 @@ const assert=require('node:assert/strict');const {performance}=require('node:per
  state.pois=room;map.update(state,room);
  const narrow=markers.filter(m=>!m.removed).map(m=>m.getElement().children[0]).find(b=>b?.title?.startsWith('Centre:'));
  assert.equal(narrow.dataset.labelled,'true','a narrow head fits before information is suppressed');
- const shared=[{id:'a',title:'Matched A',longitude:12.5,latitude:41.9,status:{kind:'open',label:'Open A'}},{id:'b',title:'Selected B',longitude:12.5,latitude:41.9,status:{kind:'closed',label:'Closed B'}}];state.pois=shared;
+ const shared=[{id:'a',title:'Matched A',kind:'Kind A',longitude:12.5,latitude:41.9,status:{kind:'open',label:'Open A'}},{id:'b',title:'Selected B',kind:'Kind B',longitude:12.5,latitude:41.9,status:{kind:'closed',label:'Closed B'}}];state.pois=shared;
  map.update({pois:shared,selectedId:'b'},[shared[0]]);
  const chosen=markers.filter(m=>!m.removed).map(m=>m.getElement().children[0]).find(b=>b?.className==='map3d-pin');
- assert(chosen.innerHTML.includes('Closed B'));assert(!chosen.innerHTML.includes('Open A'),'selected filtered-out service keeps its own status');
+ assert(chosen.innerHTML.includes('Kind B'));assert(!chosen.innerHTML.includes('Kind A'));assert(chosen.innerHTML.includes('Closed B'));assert(!chosen.innerHTML.includes('Open A'),'selected filtered-out service keeps its own status');
  container.clientWidth=390;gl.project=([x,y])=>({x:195+(x-12.5)*30000,y:422+(y-41.9)*30000});
  state.pois=[shared[1]];map.update({pois:state.pois,selectedId:'b'},state.pois);
  const mobile=markers.filter(m=>!m.removed).map(m=>m.getElement().children[0]).find(b=>b?.className==='map3d-pin');

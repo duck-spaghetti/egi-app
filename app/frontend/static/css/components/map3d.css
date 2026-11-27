@@ -76,3 +76,5 @@ html[dir="rtl"] #map .maplibregl-ctrl-top-right { right:auto;left:calc(var(--map
 .map3d-site-label .map3d-site-status { white-space:normal;overflow:visible;text-overflow:clip; }
 
 html[dir="rtl"] .map3d-site-label { direction:rtl; }
+
+.map3d-site-kind { margin-block:3px;color:#49565c;font-size:12px; }

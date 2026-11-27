@@ -158,7 +158,9 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
      for(const width of new Set([maxWidth,Math.max(130,Math.floor(maxWidth*.7)),130])){
       const columns=Math.max(1,Math.floor((width-20)/23));
       const statusLines=Math.max(1,Math.ceil((statusLength*6+12)/(width-20)));
-      const labelHeight=detail?33+23*Math.ceil((site.allCategories||site.categories||[]).length/columns)+14*statusLines:44;
+      const categoryCount=(site.allCategories||site.categories||[]).length;
+      const secondaryHeight=categoryCount>1?23*Math.ceil(categoryCount/columns):site.kinds?.length?20:0;
+      const labelHeight=detail?33+secondaryHeight+14*statusLines:44;
       const preferred=point.x+30+width>screenWidth-140;
       for(const leftSide of [preferred,!preferred]){
        const left=leftSide?point.x-30-width:point.x-24,right=leftSide?point.x+24:point.x+30+width;
@@ -204,7 +206,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
    if(!site.serviceIds.includes(String(state.selectedId)))return site;
    const selected=site.choose().items.find(p=>String(p.id)===String(state.selectedId));
    if(!selected)return site;const view=describe(selected);
-   return {...site,name:view.title||site.name,statuses:[view.status]};
+   return {...site,name:view.title||site.name,kinds:[view.kind].filter(Boolean),statuses:[view.status]};
   });
   render();
  }

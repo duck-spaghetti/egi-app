@@ -10,7 +10,8 @@ const assert=require('node:assert/strict');const {environment}=require('./module
  assert(clusterAppearance(64).size>clusterAppearance(2).size);assert.notEqual(clusterAppearance(64).background,clusterAppearance(2).background);
  const t=(k,p,f)=>f,site={name:'<script>',label:'name',categories:[{label:'A&B'}],statuses:[{kind:'closing',label:'Chiude presto · da verificare',note:'<test>'}]};
  assert(!siteLabel(site,false,t).includes('A&amp;B'),'names before details');
- const html=siteLabel(site,true,t);assert(html.includes('&lt;script&gt;'));assert(html.includes('A&amp;B'));assert(html.includes('status closing'));assert(html.includes('da verificare'));assert(!html.includes('<test>'));
+ const html=siteLabel(site,true,t);assert(html.includes('&lt;script&gt;'));assert(!html.includes('map3d-category-row'),'single category icon is not repeated');assert(html.includes('status closing'));assert(html.includes('da verificare'));assert(!html.includes('<test>'));
+ const kind=siteLabel({...site,kinds:['Mensa & accoglienza']},true,t);assert(kind.includes('Mensa &amp; accoglienza'));assert(!kind.includes('map3d-category-row'));
  const all=siteLabel({...site,allCategories:[{slug:'first',label:'Visible'},{slug:'second',label:'Other service',matched:false}]},true,t);assert(all.includes('Other service'));assert(all.includes('outside-search'));assert(all.includes('fuori dai filtri'));
  const mixed=siteLabel({...site,statuses:[{kind:'closed',label:'Chiuso'},{kind:'unknown',label:'Non noto'}]},true,t);assert(mixed.includes('Orario da verificare'));assert(!mixed.includes('</i>Chiuso'));
  const unverified=siteLabel({...site,statuses:[1,2].map(()=>({kind:'open',label:'Aperto · da verificare',verificationLabel:'da verificare'}))},true,t);assert(unverified.includes('</i>da verificare · 2/2 servizi aperti'));

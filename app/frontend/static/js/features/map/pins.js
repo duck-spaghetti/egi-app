@@ -46,7 +46,7 @@ export function siteMarkers(list,{sites,describe}) {
     const allCategories=[...new Map(siblings.map(p=>{const c=presentation(p).category;return [c?.slug,c];})).values()].filter(Boolean)
       .map(c=>({...c,matched:categories.some(m=>m.slug===c.slug)}));
     return {lat:poi.latitude,lng:poi.longitude,html:pinHtml(poi,presentation),label,
-      name:presentation(items[0]).title||poi.raw?.facility_name||poi.title,items,serviceIds:siblings.map(p=>String(p.id)),categories,allCategories,
+      name:presentation(items[0]).title||poi.raw?.facility_name||poi.title,kinds:[...new Set(items.map(p=>presentation(p).kind).filter(Boolean))],items,serviceIds:siblings.map(p=>String(p.id)),categories,allCategories,
       statuses:items.map(p=>presentation(p).status),choose:()=>({items:siblings,matched})};
   });
 }

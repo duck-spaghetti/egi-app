@@ -7,8 +7,10 @@ const assert=require('node:assert/strict');const {performance}=require('node:per
  const a=stop('Termini',200,200,'metro'),b=stop('Volturno',500,200),empty=stop('',400,300);
  assert.equal(placeStopNames([a,b,empty],viewport,[],15).size,0);
  assert.equal(placeStopNames([a,b],viewport,[],16).size,1,'stations first');
- assert.equal(placeStopNames([a,b],viewport,[],17).size,2,'bus names at closer zoom');
- assert.equal(placeStopNames([{...b,near:true}],viewport,[],14).size,1,'focused nearby stop wins');
+ assert.equal(placeStopNames([a,b],viewport,[],19).size,1,'bus names remain click-only even at maximum zoom');
+ assert.equal(placeStopNames([stop('Tram',500,200,'tram',true)],viewport,[],19).size,0,'nearby tram names remain click-only');
+ assert.equal(placeStopNames([{...b,near:true}],viewport,[],14).size,0,'focused bus stays click-only');
+ assert.equal(placeStopNames([{...a,near:true}],viewport,[],14).size,1,'focused station name stays available');
  const obstacles=[{left:218,right:400,top:170,bottom:230}];
  const placed=placeStopNames([a],viewport,obstacles,17).get(a);assert(placed.right<a.box.left,'try the other side before hiding');
  assert.equal(placeStopNames([a],viewport,[viewport],17).size,0,'fully occupied view hides the optional name');

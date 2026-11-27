@@ -793,8 +793,9 @@ walking works on locally available basemap tiles and never calls an external rou
 clusters merge neighbours across cells, with translucent teal symbols sized and
 shaded by site count. At z14 service pins gain ground stems and an integrated label with name, category
 icons and existing opening-status text/dots, when space permits. Clusters end at z15.
-The label includes every category at the site; categories outside active filters are
-dimmed. Labels avoid one another and other service buttons, and can extend to either
+For sites with one category the label shows the card's service type below the
+name instead of repeating the category icon. Sites with multiple categories show
+every category; categories outside active filters are dimmed. Labels avoid one another and other service buttons, and can extend to either
 side of the anchor. Unknown, course and unverified hours
 retain their existing meaning. Category icons share a stroke style (plain shield,
 compass, graduation cap and briefcase); Orientation has a short UI label. Stored
@@ -819,9 +820,10 @@ on the existing 30-second timer and when the page becomes visible. Narrow labels
 wrap the status qualification, adapt their width and avoid the map toolbar.
 
 Transport stop/station names are optional annotations shared by flat and 3D maps.
-Stations start at Leaflet-equivalent z16, bus/tram stops at z17 (3D uses one zoom
-level less); highlighted nearby stops may be named earlier. Focused stops and
-stations take priority. Names try either side, above/below and a narrower width;
+Station names start at Leaflet-equivalent z16 (3D uses one zoom level less);
+highlighted nearby stations may be named earlier. Bus/tram names and extra
+information are click-only at every zoom, including nearby highlighted stops.
+Focused stations take priority. Names try either side, above/below and a narrower width;
 they are suppressed when they cannot fit around other stop symbols/line-code
 boxes, names, service heads, controls or open popups. Full names remain in the
 existing accessible/title text and departure popup. Raster/canvas basemap text

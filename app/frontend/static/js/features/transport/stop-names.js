@@ -1,5 +1,5 @@
-/** Progressive transit names shared by Leaflet and MapLibre; symbols and popup ownership stay in their layers. */
-export const STATION_NAME_ZOOM=16, STOP_NAME_ZOOM=17; // Leaflet-equivalent zooms.
+/** Progressive station names shared by Leaflet and MapLibre; symbols and popup ownership stay in their layers. */
+export const STATION_NAME_ZOOM=16; // Leaflet-equivalent zooms.
 const GAP=6, HEIGHT=24;
 const intersects=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
 const station=p=>p.kind==='station'||p.transport_type==='metro'||p.transport_type==='rail';
@@ -7,7 +7,7 @@ const station=p=>p.kind==='station'||p.transport_type==='metro'||p.transport_typ
 /** Place names beside real symbol boxes, preserving all symbols and preferring focused/station names. */
 export function placeStopNames(stops,viewport,reserved,zoom){
  const result=new Map(),occupied=[...reserved];
- const eligible=stops.filter(s=>s.name&&(s.near||zoom>=(station(s.props)?STATION_NAME_ZOOM:STOP_NAME_ZOOM)))
+ const eligible=stops.filter(s=>s.name&&station(s.props)&&(s.near||zoom>=STATION_NAME_ZOOM))
   .sort((a,b)=>Number(b.near)-Number(a.near)||Number(station(b.props))-Number(station(a.props))||a.key.localeCompare(b.key));
  for(const stop of eligible){
   const b=stop.box,cx=(b.left+b.right)/2,cy=(b.top+b.bottom)/2;
