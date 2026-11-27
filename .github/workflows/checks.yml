@@ -1,0 +1,141 @@
+name: EGI development checks
+on:
+  pull_request:
+    branches: [dev]
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  checks:
+    name: EGI / app
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Resolve identified Integration inputs
+        id: inputs
+        run: |
+          python - <<'PYCODE'
+          import json, os
+          policy = json.load(open('.checks/integration.json'))
+          pins = {entry['name']: entry['revision'] for entry in policy['providers']}
+          pins.update(schema=policy['native_schema']['revision'], consumer=policy['consumer_wheel']['source_revision'], consumer_epoch=policy['consumer_wheel']['source_date_epoch'], consumer_version=policy['consumer_wheel']['version'], importer=policy['importer_fixture']['revision'])
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              for name, revision in pins.items():
+                  output.write(name + '=' + revision + '\n')
+          PYCODE
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: duck-spaghetti/egi-db
+          ref: ${{ steps.inputs.outputs.database }}
+          path: .local/providers/database
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: duck-spaghetti/egi-reviewer
+          ref: ${{ steps.inputs.outputs.reviewer }}
+          path: .local/providers/reviewer
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: duck-spaghetti/egi-db
+          ref: ${{ steps.inputs.outputs.schema }}
+          path: .local/providers/schema
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: duck-spaghetti/egi-reviewer
+          ref: ${{ steps.inputs.outputs.consumer }}
+          path: .local/providers/consumer
+          persist-credentials: false
+      - name: Require explicitly configured private importer access
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          EGI_IMPORTER_READ_TOKEN: ${{ secrets.EGI_IMPORTER_READ_TOKEN }}
+        run: |
+          if [ -z "$EGI_IMPORTER_READ_TOKEN" ]; then
+            echo '::error::Configure EGI_IMPORTER_READ_TOKEN with Contents read access only to duck-spaghetti/egi-importer.'
+            exit 1
+          fi
+      - name: Check out the exact private importer fixture source
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: duck-spaghetti/egi-importer
+          ref: ${{ steps.inputs.outputs.importer }}
+          path: .local/providers/importer
+          token: ${{ secrets.EGI_IMPORTER_READ_TOKEN }}
+          persist-credentials: false
+      - name: Restore checksum-pinned private historical pilot inputs
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ secrets.EGI_IMPORTER_READ_TOKEN }}
+        run: |
+          mkdir -p .local/retained-preview
+          gh release download retained-preview-20261127 --repo duck-spaghetti/egi-importer --pattern retained-preview.tar.gz --dir .local
+          echo '37d018dbaf9b6d0c62512511281ea11dd0186f0d1af51165804484560a2c07f7  .local/retained-preview.tar.gz' | sha256sum --check --strict
+          python - <<'PYCODE'
+          import tarfile
+          with tarfile.open('.local/retained-preview.tar.gz') as bundle:
+              bundle.extractall('.local/retained-preview', filter='data')
+          PYCODE
+      - name: Install locked app and browser dependencies
+        run: |
+          python -m pip install -r requirements-dev.lock.txt setuptools==75.1.0 wheel==0.43.0
+          SOURCE_DATE_EPOCH=${{ steps.inputs.outputs.consumer_epoch }} python -m pip wheel --no-build-isolation --no-deps .local/providers/consumer --wheel-dir .local/artifacts/community
+          python -m pip install --require-hashes --find-links .local/artifacts/community -r requirements-community.lock.txt
+          npm ci
+          npx playwright install --with-deps chromium
+          echo "EGI_DATABASE_PROVIDER=$GITHUB_WORKSPACE/.local/providers/database" >> "$GITHUB_ENV"
+          echo "EGI_DATABASE_SCHEMA=$GITHUB_WORKSPACE/.local/providers/schema" >> "$GITHUB_ENV"
+          echo "EGI_REVIEWER_PROVIDER=$GITHUB_WORKSPACE/.local/providers/reviewer" >> "$GITHUB_ENV"
+          echo "EGI_IMPORTER_REPO=$GITHUB_WORKSPACE/.local/providers/importer" >> "$GITHUB_ENV"
+          echo "EGI_REVIEWER_PYTHON=$(command -v python)" >> "$GITHUB_ENV"
+          echo "EGI_COMMUNITY_WHEEL=$GITHUB_WORKSPACE/.local/artifacts/community/egi_reviewer-${{ steps.inputs.outputs.consumer_version }}-py3-none-any.whl" >> "$GITHUB_ENV"
+      - name: Install selected PostgreSQL18/PostGIS and Sqitch prerequisites
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl --fail --silent --show-error -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo 'deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main' | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-18 postgresql-18-postgis-3 sqitch libdbd-pg-perl ripgrep poppler-utils
+          sudo install -d -m 1777 /private/tmp
+          echo 'EGI_PG_BIN=/usr/lib/postgresql/18/bin' >> "$GITHUB_ENV"
+          echo 'EGI_SQITCH=/usr/bin/sqitch' >> "$GITHUB_ENV"
+          /usr/lib/postgresql/18/bin/postgres --version
+          sqitch --version
+          df -h /private/tmp
+      - name: Validate actual PR commit objects
+        env:
+          EGI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: python scripts/commit_guard.py range "$EGI_BASE_SHA" HEAD
+      - name: Run owning Complete profile
+        run: python scripts/check.py --profile complete --json > .local/ci-report.json
+      - name: Run composed Integration profile
+        run: python checks/pilot_integration.py --fixture-root .local/retained-preview
+      - name: Retain identified reports and artifacts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: app-${{ github.event.pull_request.head.sha }}
+          path: |
+            .local/ci-report.json
+            .local/ci-integration.json
+            .local/integration/
+            .local/browser/
+            .local/native-last.log
+            .local/resource-last-failure.json
+          if-no-files-found: error

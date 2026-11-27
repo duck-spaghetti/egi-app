@@ -5,6 +5,7 @@ The input is the vendored contract fixture `fixtures/transport-root`, a copy of
 """
 
 import json
+import os
 import shutil
 import tempfile
 import unittest
@@ -22,10 +23,9 @@ from app.backend.api.transport.network import (
 )
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "transport-root"
-PRODUCER = (
-    Path(__file__).resolve().parents[2]
-    / "egi-importer/tests/fixtures/transport-root"
-)
+PRODUCER = Path(os.environ.get('EGI_IMPORTER_REPO',
+    Path(__file__).resolve().parents[2] / 'egi-importer')) / 'tests/fixtures/transport-root'
+
 SERVICE_DAY = "2026-01-05"
 EXCEPTION_DAY = "2026-01-06"
 
@@ -139,7 +139,7 @@ class TransportViewTests(unittest.TestCase):
 
 
 class StationAndTramTests(unittest.TestCase):
-    """Metro platforms show as one station; tram lines appear from zoom 12."""
+    """Metro overview/detail points and tram visibility follow their zoom boundaries."""
 
     def setUp(self):
         """Copy the fixture, which has one metro, one tram and one bus route."""
@@ -181,6 +181,39 @@ class StationAndTramTests(unittest.TestCase):
             [r["route_id"] for r in merged[0]["properties"]["routes"]], ["MEA", "MEB"]
         )
         self.assertEqual(merged[0]["properties"]["kind"], "station")
+
+    def test_close_metro_points_preserve_source_coordinates(self):
+        """Overview merges platforms; close zoom keeps every original point and property."""
+        stops=[self.metro_stop('a','Termini',12.5,41.9,'MEA'),self.metro_stop('b','Termini',12.5002,41.9001,'MEB')]
+        stops[0]['properties']['wheelchair_boarding']='yes'
+        stops[1]['properties']['wheelchair_boarding']='no'
+        low=group_stations(stops,17)
+        self.assertEqual(len(low),1)
+        self.assertEqual(low[0]['properties']['stop_ids'],['a','b'])
+        high=group_stations(stops,18)
+        self.assertIs(high,stops)
+        self.assertEqual([s['geometry']['coordinates'] for s in high],[[12.5,41.9],[12.5002,41.9001]])
+        self.assertEqual([s['properties']['wheelchair_boarding'] for s in high],['yes','no'])
+        stops[1]['geometry']['coordinates']=stops[0]['geometry']['coordinates'][:]
+        self.assertEqual(group_stations(stops,19)[0]['geometry'],group_stations(stops,19)[1]['geometry'],'coincident source points are never artificially offset')
+
+    def test_view_switches_between_station_and_source_points(self):
+        """The actual viewport projection applies the split boundary, without a new schema."""
+        manifest=json.loads((self.root/'active.json').read_text())
+        path=self.root/'versions'/manifest['version']/'network.json'
+        network=json.loads(path.read_text())
+        original=next(f for f in network['features'] if f['geometry']['type']=='Point' and any(network['routes'][r]['mode']=='metro' for r in f['properties'].get('services_by_route',{})))
+        extra=json.loads(json.dumps(original));extra['id']='stop:extra-platform';extra['properties']['stop_id']='extra-platform'
+        lon,lat=extra['geometry']['coordinates'];extra['geometry']['coordinates']=[lon+.0002,lat+.0001];extra['bbox']=extra['geometry']['coordinates']*2
+        network['features'].append(extra);path.write_text(json.dumps(network))
+        low=transport_view([12,41,13,43],17,{'metro'},self.root,SERVICE_DAY)
+        high=transport_view([12,41,13,43],18,{'metro'},self.root,SERVICE_DAY)
+        def points(data):
+            """Keep only points for the station name exercised by this viewport case."""
+            return [f for f in data['features'] if f['geometry']['type']=='Point' and f['properties']['name']==original['properties']['name']]
+        self.assertEqual(len(points(low)),1)
+        self.assertEqual({f['id'] for f in points(high)},{original['id'],extra['id']})
+        self.assertEqual([f['geometry']['coordinates'] for f in points(high)],[original['geometry']['coordinates'],extra['geometry']['coordinates']])
 
     def test_tram_lines_from_zoom_12_and_metro_codes(self):
         """Tram is hidden at zoom 11 and shown at 12; route features carry display codes."""

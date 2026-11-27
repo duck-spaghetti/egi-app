@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Template only; replace APP_ROOT and PYTHON, review before installation. -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>local.egi.community-worker</string>
+  <key>WorkingDirectory</key><string>APP_ROOT</string>
+  <key>ProgramArguments</key><array><string>PYTHON</string><string>-m</string><string>app.backend.api.preparations.worker</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>30</integer>
+  <key>ProcessType</key><string>Background</string>
+</dict></plist>

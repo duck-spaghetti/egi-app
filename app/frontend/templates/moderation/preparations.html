@@ -1,0 +1,85 @@
+{% extends 'moderation/base.html' %}
+{% block title %}{{ t('community.insertion_title') }}{% endblock %}
+{% block breadcrumb %}{{ t('community.insertion_nav') }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="/static/css/moderation/preparations.css" />
+<script type="module" src="/static/js/features/preparations/editor.js"></script>
+{% endblock %}
+{% block body %}
+<header class="preparation-heading"><div><p class="preparation-step">Community / EGI</p><h1>{{ t('community.insertion_title') }}</h1><p>{{ t('community.intro') }}</p></div><span id="save-state" role="status" aria-live="polite"></span></header>
+<script id="preparation-context" type="application/json">{{ preparation_context|tojson }}</script>
+<input id="preparation-form-token" type="hidden" value="{{ form_token }}" />
+<p id="preparation-error" class="desk-error" role="alert" hidden></p>
+<div class="preparation-layout">
+<aside class="desk-card preparation-sidebar">
+  <details id="preparation-library"><summary>{{ t('community.preparations') }}</summary>
+  <label class="desk-inline"><input id="show-trash" type="checkbox" />{{ t('community.trash_list') }}</label>
+  <ul id="preparation-list" class="queue-list"></ul>
+  </details>
+  <details id="create-panel"><summary>{{ t('community.new') }}</summary>
+    <form id="create-preparation" class="desk-form">
+      <label>{{ t('community.title_label') }}<input name="title" maxlength="500" placeholder="{{ t('community.automatic_title') }}" /></label>
+      <label>{{ t('community.source') }}<select name="source"><option value="">{{ t('community.not_set') }}</option>{% for source in preparation_context.sources %}<option value="{{ source.id }}">{{ source.name }}</option>{% endfor %}</select></label>
+      <fieldset><legend>{{ t('community.new_source') }}</legend><label>{{ t('community.source_name') }}<input name="source_name" maxlength="200" /></label><label>{{ t('community.source_kind') }}<input name="source_kind" maxlength="80" /></label><p class="hint">{{ t('community.source_kind_hint') }}</p></fieldset>
+      <label class="preparation-initial-text">{{ t('community.input') }}<textarea name="initial_text" rows="6" maxlength="50000"></textarea></label>
+      <label class="check preparation-initial-text"><input type="checkbox" name="public_material" />{{ t('community.public_material') }}</label>
+      <button type="submit">{{ t('community.create') }}</button>
+    </form>
+  </details>
+</aside>
+<section id="preparation-workspace" hidden>
+  <div class="desk-card"><div class="desk-actions"><h2 id="workspace-title"></h2><span id="workspace-permission" class="badge"></span><button id="workspace-refresh" type="button">{{ t("community.refresh_state") }}</button><button id="workspace-trash" type="button">{{ t('community.trash') }}</button><button id="workspace-restore" type="button">{{ t('community.restore') }}</button></div></div>
+  <div class="preparation-workbench"><aside class="preparation-source-column"><p class="preparation-step">{{ t('community.material_step') }}</p><div class="desk-card">
+    <details open><summary>{{ t('community.input') }}</summary><p id="workspace-source" class="hint"></p>
+      <form id="input-form" class="desk-form"><label for="source-text">{{ t('community.original_text_label') }}</label><textarea id="source-text" rows="8" maxlength="50000"></textarea><label class="check"><input id="public-material" type="checkbox" />{{ t('community.public_material') }}</label><p class="hint">{{ t('community.input_hint') }}</p><div class="desk-actions"><button id="save-input" type="submit">{{ t('community.save_input') }}</button><a id="original-link" target="_blank" rel="noopener">{{ t('community.original') }}</a><button id="manual-card" type="button">{{ t('community.manual') }}</button></div></form>
+    <div class="preparation-literal-tools"><p class="hint">{{ t('community.add_literal_hint') }}</p><label>{{ t('community.add_literal_subject') }}<select id="literal-subject" disabled><option value="service">{{ t('community.service') }}</option><option value="location">{{ t('community.location') }}</option></select></label><button id="add-literal-org" type="button" disabled>{{ t('community.add_literal_org') }}</button><button id="add-literal-category" type="button" disabled>{{ t('community.add_literal_category') }}</button></div>
+    </details>
+  </div>
+  <section class="desk-card" id="analysis-panel" hidden>
+    <h2>{{ t('community.analysis_title') }}</h2><p id="analysis-status" role="status"></p>
+    <p id="analysis-stale" class="desk-notice" hidden>{{ t('community.analysis_stale') }}</p>
+    <p id="analysis-uncertain" class="hint" hidden>{{ t('community.analysis_uncertain') }}</p>
+    <div class="desk-actions"><button id="analysis-update" type="button">{{ t('community.analysis_update') }}</button><button id="analysis-cancel" type="button" hidden>{{ t('community.analysis_cancel') }}</button></div>
+    <ul id="analysis-candidates" class="queue-list"></ul>
+    <div class="desk-actions"><button id="analysis-create" type="button" disabled>{{ t('community.analysis_create') }}</button><button id="analysis-apply" type="button" disabled>{{ t('community.analysis_apply') }}</button></div>
+    <p id="analysis-kept" class="hint" role="status"></p>
+  </section>
+  <details class="desk-card" id="source-evidence-panel" hidden><summary id="source-evidence-title">{{ t('community.source_passage') }}</summary><p id="source-evidence-note" class="hint"></p><pre id="source-evidence-text" class="preparation-source-passage"></pre></details>
+  </aside><section class="preparation-card-column"><p class="preparation-step">{{ t('community.card_step') }}</p>
+  <div class="desk-card"><ul id="card-list" class="queue-list preparation-cards"></ul><p id="no-cards">{{ t('community.no_cards') }}</p></div>
+  <section id="plan-panel" class="desk-card preparation-plans" aria-label="Piano di analisi delle categorie" hidden>
+    <h2>Analisi delle categorie</h2>
+    <p>Seleziona le schede nell’elenco, controlla l’anteprima e avvia il piano una sola volta. Le proposte vanno controllate e non modificano automaticamente le schede.</p>
+    <label>Che cosa analizzare<select id="plan-task-mode"><option value="classify_cards,group_labels">Categorie delle schede e confronto</option><option value="group_labels">Solo confronto delle categorie</option><option value="classify_cards">Solo categorie delle schede</option></select></label>
+    <p id="plan-selection-count" role="status" aria-live="polite"></p>
+    <div class="desk-actions"><button id="plan-select-all" type="button">Seleziona tutte le schede, fino a 100</button><button id="plan-clear-selection" type="button">Deseleziona tutte</button></div>
+    <p id="plan-selection-note" class="hint" aria-live="polite"></p>
+    <details><summary>Limiti da autorizzare</summary><fieldset class="preparation-plan-limits"><legend>Richieste e costo massimo</legend>
+      <label>Richieste totali, massimo<input id="plan-max-requests" type="number" min="1" max="1000" value="8" /></label>
+      <label>Di cui ulteriori richieste, massimo<input id="plan-max-followups" type="number" min="0" max="999" value="3" /></label>
+      <label>Costo massimo del piano, USD<input id="plan-max-cost" type="number" min="0.01" max="10" step="0.01" value="1" /></label>
+    </fieldset></details>
+    <div class="desk-actions"><button id="plan-preview" type="button">Crea anteprima</button><button id="plan-amend" type="button" hidden>Nuova anteprima dalla selezione</button><button id="plan-start" type="button" hidden>Avvia questo piano</button><button id="plan-continue" type="button" hidden>Continua i passaggi mancanti</button><button id="plan-cancel" type="button" hidden>Annulla il piano</button><button id="plan-refresh" type="button" disabled>Aggiorna stato</button></div>
+    <p id="plan-feedback" role="status" class="desk-notice" aria-live="polite"></p>
+    <div id="plan-summary"></div><div id="plan-coverage"></div>
+    <details><summary>Esiti delle schede selezionate</summary><p id="plan-record-page" class="hint"></p><ul id="plan-records" class="queue-list"></ul><div class="desk-actions"><button id="plan-record-prev" type="button" disabled>Schede precedenti</button><button id="plan-record-next" type="button" disabled>Schede successive</button></div></details>
+    <details><summary>Richieste e dipendenze</summary><p id="plan-packet-page" class="hint"></p><ul id="plan-packets" class="queue-list"></ul><div class="desk-actions"><button id="plan-packet-prev" type="button" disabled>Richieste precedenti</button><button id="plan-packet-next" type="button" disabled>Richieste successive</button></div></details>
+    <details><summary>Eventi del piano</summary><ul id="plan-events" class="queue-list"></ul><button id="plan-events-more" type="button" disabled>Eventi successivi</button></details>
+  </section>
+  <section id="proposal-panel" class="desk-card preparation-proposals" aria-label="Proposte da controllare"></section>
+  <section id="group-panel" class="desk-card preparation-groups" aria-label="Gruppi di categorie"></section>
+  <article id="card-editor" class="desk-card" hidden>
+    <div class="preparation-editor-heading"><div><h2>{{ t('community.service_card_title') }}</h2><p>{{ t('community.card_help') }}</p></div><div class="preparation-view-switch" role="group" aria-label="{{ t('community.fields_view') }}"><button type="button" id="view-card" aria-pressed="true">{{ t('community.card') }}</button><button type="button" id="view-fields" aria-pressed="false">{{ t('community.fields_view') }}</button></div></div>
+    <div class="desk-actions preparation-save-actions"><button id="save-card" type="button">{{ t('community.save') }}</button><button id="retry-card" type="button" hidden>{{ t('community.retry') }}</button><button id="compare-card" type="button" hidden>{{ t('community.compare') }}</button></div>
+    <div id="conflict-panel" hidden><p class="desk-error">{{ t('community.conflict') }}</p><div id="conflict-fields"></div><button id="apply-comparison" type="button">{{ t('community.apply_comparison') }}</button></div>
+    <div id="editable-fields" class="preparation-preview"></div>
+    <aside id="card-checks" class="preparation-checks" aria-label="{{ t('community.preliminary_checks') }}" aria-live="polite"></aside>
+    <div class="desk-actions"><label>{{ t('community.outcome') }}<select id="card-outcome"><option value="review">{{ t('community.review') }}</option><option value="confirmed">{{ t('community.confirmed') }}</option></select></label><button id="submit-card" type="button">{{ t("community.submit") }}</button><a id="submission-link" hidden>{{ t("community.open_submission") }}</a><button id="trash-card" type="button">{{ t('community.discard_card') }}</button><button id="restore-card" type="button">{{ t('community.restore_card') }}</button></div>
+    <details><summary>{{ t('community.evidence') }}</summary><div id="card-evidence"></div></details>
+    <details id="history-panel"><summary>{{ t('community.history') }}</summary><ol id="card-history" class="desk-history"></ol><button id="history-more" type="button" hidden>{{ t('community.history_more') }}</button><button id="undo-card" type="button">{{ t('community.undo') }}</button></details>
+  </article>
+  </section></div>
+  <details class="desk-card" id="sharing-panel"><summary>{{ t('community.sharing') }}</summary><p id="sharing-note">{{ t('community.owner_only') }}</p><ul id="grant-list" class="queue-list"></ul><form id="sharing-form" class="desk-form"><label>{{ t('community.person') }}<select id="share-person" required></select></label><label>{{ t('community.permission') }}<select id="share-permission"><option value="read">{{ t('community.read') }}</option><option value="edit">{{ t('community.edit') }}</option><option value="">{{ t('community.revoke') }}</option></select></label><button type="submit">{{ t('community.share') }}</button></form></details>
+</section>
+</div>
+{% endblock %}

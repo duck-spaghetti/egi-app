@@ -1,0 +1,105 @@
+/** Transit and cycleways in 3D mode: same requests as the current map's layers, lines and stops drawn. */
+const assert=require('node:assert/strict');const {environment,element}=require('./module_fixture.cjs');
+const same=(a,b,m)=>assert.equal(JSON.stringify(a),JSON.stringify(b),m||`${JSON.stringify(a)} != ${JSON.stringify(b)}`);
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+(async()=>{
+ const calls=[];const responses={};
+ const fetch=async(url,options={})=>{calls.push({url,body:options.body?JSON.parse(options.body):null});
+  const key=Object.keys(responses).find(k=>url.startsWith(k));return {ok:true,json:async()=>responses[key]};};
+ const frames=new Map();let frameId=0;const env=environment({fetch,requestAnimationFrame:fn=>{frames.set(++frameId,fn);return frameId;},cancelAnimationFrame:id=>frames.delete(id)});
+ const {TransportLayerGL}=await env.load('features/transport/layer-gl.js');
+ const {TransportLayer}=await env.load('features/transport/layer.js');
+ const {CycleLayerGL}=await env.load('features/cycleways/layer-gl.js');
+ const {CycleLayer}=await env.load('features/cycleways/layer.js');
+ const created={markers:[],popups:[]};
+ class Marker{constructor(o){this.options=o;this.removed=false;created.markers.push(this);} setLngLat(l){this.lngLat=l;return this;} addTo(){return this;} remove(){this.removed=true;}}
+ class Popup{constructor(o){this.options=o;created.popups.push(this);} setLngLat(l){this.lngLat=l;return this;} setHTML(h){this.html=h;return this;} addTo(){return this;} on(name,fn){(this.handlers||={})[name]=fn;} remove(){if(this.removed)return;this.removed=true;this.handlers?.close?.();}}
+ const maplibre={Marker,Popup};
+ function fakeMap(){
+  const container=element();container.style.setProperty=function(k,v){this[k]=String(v);};container.clientWidth=800;container.clientHeight=600;
+  const bounds={getWest:()=>12.45,getSouth:()=>41.88,getEast:()=>12.52,getNorth:()=>41.92};
+  return {container,sources:{},layers:[],handlers:[],zoom:14.4,
+   getContainer(){return container;},getBounds(){return bounds;},getZoom(){return this.zoom;},isStyleLoaded:()=>true,
+   getStyle(){return {layers:[{id:'background',type:'background'},...this.layers,{id:'water-label',type:'symbol'}]};},queryRenderedFeatures(){return this.hits||[];},
+   addSource(id,s){this.sources[id]={...s,setData(d){this.data=d;this.updates=(this.updates||0)+1;}};},getSource(id){return this.sources[id];},removeSource(id){delete this.sources[id];},
+   addLayer(l,before){this.layers.push({...l,before});},getLayer(id){return this.layers.find(l=>l.id===id);},removeLayer(id){this.layers=this.layers.filter(l=>l.id!==id);},
+   on(...args){this.handlers.push(args);},once(){},off(){},fitBounds(b){this.fitted=b;}};
+ }
+ // Transit: same viewport query as the current map, at the Leaflet-equivalent zoom.
+ assert.equal(TransportLayerGL.leafletZoom({getZoom:()=>19}),19,'maximum camera zoom stays within API bounds');
+ assert.equal(TransportLayer.pointDetail({transport_type:'metro'},18),true);assert.equal(TransportLayer.pointDetail({transport_type:'bus'},18),false);assert.equal(TransportLayer.pointDetail({transport_type:'tram'},18),false);assert.equal(TransportLayer.pointDetail({transport_type:'bus'},19),true);
+ const map=fakeMap();const toggle=element();const status=element();
+ const line={type:'Feature',geometry:{type:'LineString',coordinates:[[12.46,41.89],[12.5,41.9]]},properties:{transport_type:'metro',color:'#e27439',route_id:'MA',code:'A',name:'Metro A'}};
+ const rail={type:'Feature',geometry:{type:'LineString',coordinates:[[12.46,41.89],[12.5,41.9]]},properties:{transport_type:'rail',route_id:'FL1',code:'FL1'}};
+ const stop={type:'Feature',geometry:{type:'Point',coordinates:[12.49,41.9]},properties:{kind:'station',transport_type:'metro',name:'Termini',stop_ids:['s1'],routes:[{route_id:'MA',display_code:'A',mode:'metro',color:'#e27439'}]}};
+ responses['/api/preview/transport']={availability:'available',features:[line,rail,stop],service_date:'2026-11-26',refresh:{},manifest:{}};
+ responses['/api/preview/transit/departures']={availability:'available',departures:[{code:'A',mode:'metro',color:'#e27439',route_id:'MA',headsign:'Battistini',times:[{time:'15:00',in_min:3}]}],alerts:[],now:'14:57'};
+ responses['/static/data/metro-entrances.geojson']={format:'egi-metro-entrances/1',features:[1,2].map(i=>({type:'Feature',id:`osm:entrance:${i}`,geometry:{type:'Point',coordinates:[12.4902+i*.0001,41.9001]},properties:{osm_id:i,areas:[{name:'Termini'}]}}))};
+ const transit=TransportLayerGL.create(map,{toggle,status},maplibre);
+ assert.equal(map.layers.length,4);assert(map.layers.every(l=>l.before==='water-label'),'lines under the labels');
+ toggle.click();await wait(250);
+ const request=calls.find(c=>c.url==='/api/preview/transport');
+ const expected=TransportLayer.viewportQuery({x:800,y:600},map.getBounds(),15,new Set(['metro','rail','tram','bus']));
+ same(request.body,{...Object.fromEntries(expected),west:12.45,south:41.88,east:12.52,north:41.92,zoom:15});
+ const drawn=map.sources['egi-transport-lines'].data.features;
+ assert.equal(drawn.length,2);assert.equal(drawn[0].properties._color,'#e27439');assert.equal(drawn[1].properties._dashed,true);
+ const stops=created.markers.filter(m=>!m.removed);assert.equal(stops.length,1);
+ assert(stops[0].options.element.innerHTML.includes(TransportLayer.stopIconHtml(stop.properties,false)));assert(stops[0].options.element.className.includes('maplibregl-marker'),'retain MapLibre positioning/stacking class after refreshing stop markup');assert(stops[0].options.element.className.includes('tl-native-stop'),'compact wrapper exists before fade so zoom needs no HTML swap');
+ same(stops[0].lngLat,[12.49,41.9]);assert.match(status.textContent,/Rete programmata per 2026-11-26/);
+ const stableStart=created.markers.length,sourceUpdates=map.sources['egi-transport-lines'].updates;
+ const started=performance.now();for(let i=0;i<10;i++)await transit.reload();
+ console.log(JSON.stringify({reloads:10,milliseconds:performance.now()-started,newMarkers:created.markers.length-stableStart,removedOriginal:stops[0].removed}));
+ assert.equal(stops[0].removed,false,'unchanged viewport data must not remove/reinsert visible stop (flicker)');assert.equal(map.sources['egi-transport-lines'].updates,sourceUpdates,'unchanged line data is not resent to the worker');
+ const changed={...stop,properties:{...stop.properties,name:'Updated station'}};responses['/api/preview/transport'].features=[line,rail,changed];await transit.reload();assert.equal(stops[0].removed,false);assert.equal(stops[0].options.element.title,'Updated station','reused stop receives current properties');
+
+ // A stop opens a popup with the same content, then its departures.
+ stops[0].options.element.click();await wait(20);
+ const popup=created.popups.at(-1);assert.match(popup.html,/Battistini/);assert.match(popup.html,/Updated station/);
+ assert(calls.some(c=>c.url.startsWith('/api/preview/transit/departures?stops=s1')));
+ // Focus on lines: chip, fit, label marker; dispose removes layers, source and markers.
+ await transit.reload(); // Hold a fresh response behind the open popup.
+ transit.focus({routeIds:['MA'],label:'Linea A',points:[[41.9,12.49],[41.91,12.5]]});
+ assert.equal(transit.focusedRoutes()[0],'MA');assert(map.fitted);
+ transit.dispose();assert.equal(frames.size,0,"popup teardown with held data must not queue name work");assert.equal(map.layers.length,0);assert.equal(map.sources['egi-transport-lines'],undefined);
+ assert.equal(created.markers.filter(m=>!m.removed).length,0);
+ const individual={...stop,id:'stop:platform-a',geometry:{type:'Point',coordinates:[12.4902,41.9001]},properties:{...stop.properties,kind:'stop',stop_id:'platform-a',stop_ids:undefined}};responses['/api/preview/transport']={...responses['/api/preview/transport'],features:[line,individual]};
+ const highMap=fakeMap();highMap.zoom=17.4;const second=TransportLayerGL.create(highMap,{},maplibre);second.setVisible(true);await second.reload();
+ const highStop=created.markers.filter(m=>!m.removed).at(-1);
+ const count=created.markers.length,requests=calls.length;highMap.zoom=17.75;highMap.handlers.filter(h=>h[0]==='zoom').forEach(h=>h[1]());assert(highStop.options.element.innerHTML.includes('<span class="tl-compact">'),'overlay is independent of native opacity at every zoom');assert.equal(created.markers.length,count,'continuous zoom does not rebuild markers');assert.equal(calls.length,requests,'continuous zoom does not fetch');
+ assert(!highStop.options.element.innerHTML.includes('tl-palina-metro'),'no HTML palina remains');assert(highStop.options.element.className.includes('tl-native-stop'));assert(highMap.sources['egi-transport-paline'].data.features.some(f=>f.properties.base===0));
+ let htmlWrites=0,heldHtml=highStop.options.element.innerHTML;Object.defineProperty(highStop.options.element,'innerHTML',{get:()=>heldHtml,set:value=>{htmlWrites++;heldHtml=value;}});highMap.zoom=16.4;await second.reload();highMap.zoom=18.4;await second.reload();assert.equal(htmlWrites,0,'crossing the fade and point thresholds does not restart compact markup');
+  assert(highStop.options.element.className.includes('tl-point-detail'));same(highStop.lngLat,individual.geometry.coordinates,'ground anchor keeps source coordinates');
+ created.markers.filter(m=>!m.removed).at(-1).options.element.click();await wait(20);assert(calls.filter(c=>c.url.startsWith('/api/preview/transit/departures?')).at(-1).url.includes('stops=platform-a'),'individual platform requests its own departures');
+ const sharedEvent={point:{x:100,y:100},features:[{properties:line.properties}],lngLat:[12.49,41.9]};highMap.hits=[{layer:{id:'egi-transport-paline-metro'},properties:{key:'osm:entrance:1',mode:'metro'}}];const popupCount=created.popups.length;
+ highMap.handlers.find(h=>h[0]==='click'&&h.length===2)[1](sharedEvent);highMap.handlers.find(h=>h[0]==='click'&&h[1]==='egi-transport-lines-solid')[2](sharedEvent);assert.equal(created.popups.length,popupCount+1,'native selection is not overwritten by the route hit');
+ const referenceEvent={...sharedEvent,egiStopPicked:false,egiReferencePicked:true};const beforeReference=created.popups.length;highMap.handlers.find(h=>h[0]==='click'&&h[1]==='egi-transport-lines-solid')[2](referenceEvent);assert.equal(created.popups.length,beforeReference,'route click respects reference selection');
+ second.dispose();assert.equal(frames.size,0,'popup teardown without held data must not queue name work');
+ const sibling={...individual,id:'stop:platform-b',geometry:{type:'Point',coordinates:[12.4904,41.9002]},properties:{...individual.properties,stop_id:'platform-b'}};
+ responses['/api/preview/transport'].features=[line,individual,sibling];const groupedMap=fakeMap();groupedMap.zoom=18;
+ const grouped=TransportLayerGL.create(groupedMap,{},maplibre);grouped.setVisible(true);await grouped.reload();
+ const summaries=created.markers.filter(m=>!m.removed);assert.equal(summaries.length,1,'two metro platforms retain only one overlay');
+ const nativeKeys=new Set(groupedMap.sources['egi-transport-paline'].data.features.map(f=>f.properties.key));assert.equal(nativeKeys.size,2,'both native signs survive overlay grouping');
+ summaries[0].options.element.click();await wait(20);assert(calls.at(-1).url.includes('stops=platform-a%2Cplatform-b'),'summary requests both platforms');
+ groupedMap.hits=[{layer:{id:'egi-transport-paline-metro'},properties:{key:'osm:entrance:2'}}];groupedMap.handlers.find(h=>h[0]==='click'&&h.length===2)[1]({point:{x:100,y:100}});await wait(20);assert(calls.at(-1).url.includes('stops=platform-a%2Cplatform-b'),'entrance requests its station platforms rather than pretending to be a platform');const beforeOff=created.popups.length;grouped.setVisible(false);groupedMap.handlers.find(h=>h[0]==='click'&&h.length===2)[1]({point:{x:100,y:100}});assert.equal(created.popups.length,beforeOff,'stale native worker hit cannot reopen a hidden layer');grouped.dispose();
+
+ // Shared-scene handoff preserves entrance selection, native recovery and independent ownership.
+ let sceneAvailable=false,sceneRecords=[];const sharedScene={setSigns(records){sceneRecords=records;return sceneAvailable;}};
+ const sceneMap=fakeMap();sceneMap.zoom=18;const custom=TransportLayerGL.create(sceneMap,{},maplibre,sharedScene);custom.setVisible(true);await custom.reload();
+ assert(sceneMap.sources['egi-transport-paline'],'native recovery while custom scene is pending');sceneAvailable=true;sceneMap.handlers.find(h=>h[0]==='egi:transport-scene')[1]();
+ assert(!sceneMap.sources['egi-transport-paline'],'no duplicate native geometry after custom readiness');assert.equal(sceneRecords.length,2,'real entrances remain separate custom instances');
+ const beforeCustom=created.popups.length;sceneMap.handlers.find(h=>h[0]==='egi:stopselect')[1]({key:sceneRecords[0].key});assert.equal(created.popups.length,beforeCustom+1,'custom pick uses existing station popup owner');
+ sceneAvailable=false;sceneMap.handlers.find(h=>h[0]==='egi:transport-scene')[1]();assert(sceneMap.sources['egi-transport-paline'],'failed scene restores native representation');custom.setVisible(false);assert.equal(sceneRecords.length,0);custom.dispose();
+ const lateMap=fakeMap();let styleReady=false;lateMap.isStyleLoaded=()=>styleReady;const late=TransportLayerGL.create(lateMap,{},maplibre);assert(!lateMap.sources['egi-transport-paline']);styleReady=true;lateMap.handlers.find(h=>h[0]==='idle')[1]();assert(lateMap.sources['egi-transport-paline'],'idle initializes late-composed layers without waiting forever for load');late.dispose();
+ // Cycleways: same body as the current map's layer, features drawn, same status text.
+ const cmap=fakeMap();cmap.zoom=13.2;const ctoggle=element(),cstatus=element();
+ const way={type:'Feature',geometry:{type:'LineString',coordinates:[[12.46,41.89],[12.5,41.9]]},properties:{kind:'track',label:'Pista su carreggiata',name:'Tevere'}};
+ responses['/api/preview/cycleways']={availability:'available',min_zoom:12,features:[way],osm_base:'2026-11-08T00:00:00Z'};
+ const cycle=CycleLayerGL.create(cmap,{toggle:ctoggle,status:cstatus},maplibre);
+ assert.equal(cmap.layers.length,5);same(cmap.layers.find(l=>l.id==='egi-cycleways-track').paint['line-dasharray'],[8/3.5,4/3.5]);
+ ctoggle.click();await wait(260);
+ same(calls.filter(c=>c.url==='/api/preview/cycleways').at(-1).body,{west:12.45,south:41.88,east:12.52,north:41.92,zoom:14});
+ same(cmap.sources['egi-cycleways'].data.features,[way]);
+ assert.equal(cstatus.textContent,CycleLayer.statusText(responses['/api/preview/cycleways'],14));
+ cycle.dispose();assert.equal(cmap.layers.length,0);
+ console.log('PASS: transit and cycleways on MapLibre: same requests, lines, stops, popups, departures, focus, dispose');
+})().catch(error=>{console.error(error);process.exitCode=1;});

@@ -17,7 +17,7 @@ const assert=require('node:assert/strict');const {environment}=require('./module
  assert(html.includes('Chiuso · da verificare'));assert(html.includes('Da verificare'));assert(html.includes('approved condition'));assert(!html.includes('Dati originali'));
  assert(env.get('detail-bar').innerHTML.includes('tel:0645460313'));
  snapshot.pois[0].raw.hours_display.verification.checks=[{scope:'field',field:'contact',outcome:'confirmed',checked_at:'2026-11-23'}];
- assert.equal(module.describe(snapshot.pois[0]).status.label,'Chiuso · da verificare');
+ assert.equal(module.describe(snapshot.pois[0]).status.label,'Chiuso');
  snapshot.pois[0].raw.hours_display.verification.checks.push({scope:'field',field:'hours',outcome:'confirmed',checked_at:'2026-11-23',warning:null});
  assert.equal(module.describe(snapshot.pois[0]).status.label,'Chiuso');
  snapshot.pois[0].raw.hours_display.canonical_opening={status:'open',next_transition_at:'2000-01-01T00:00:00Z'};

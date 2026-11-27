@@ -14,6 +14,21 @@ from .api.preview.subjects import PostgresSubjectSource, run_psql
 from .api.transport.service import Transport
 from .api.transport import network, osm_rail
 from .api.cycleways.service import Cycleways
+from .api.map3d.service import Map3d
+from .presentation.catalog import Catalog
+from .api.contribute.intake import Intake
+
+def moderation_for(settings, templates, overrides):
+    """Build the moderation resources only when the editorial database is configured."""
+    if settings is None:
+        return None
+    from .api.moderation.service import Moderation
+    from .api.moderation.oidc import Oidc
+    oidc = overrides.get('oidc')
+    if oidc is None and settings.google_client_id and settings.google_client_secret:
+        oidc = Oidc(settings.google_metadata_url, settings.google_client_id, settings.google_client_secret.get_secret_value())
+    return Moderation(settings, templates, Catalog(ROOT / 'translations'), oidc, overrides.get('desk'))
+
 
 @dataclass
 class Resources:
@@ -28,6 +43,9 @@ class Resources:
     address_search: object
     geocoder: object
     cycleways: object
+    map3d: object
+    moderation: object = None
+    intake: object = None
 
     @classmethod
     def create(cls, configuration, overrides=None):
@@ -43,9 +61,13 @@ class Resources:
             return resolved(reader.snapshot()['territory'] if cfg.canonical else None, cfg.policy)['country_code']
         geocoder = overrides.get('geocoder') or Geocoder(cfg.policy, country,
             cfg.geocoder_url, cfg.rate_file)
-        return cls(cfg, Jinja2Templates(directory=ROOT / 'app/frontend/templates'),
+        templates = Jinja2Templates(directory=ROOT / 'app/frontend/templates')
+        return cls(cfg, templates,
             overrides.get('diagnostics') or Diagnostics(cfg.error_dir), reader, source, directory, preview,
-            AddressSearch(geocoder), geocoder, Cycleways(cfg.policy, cfg.cycle_root))
+            AddressSearch(geocoder), geocoder, Cycleways(cfg.policy, cfg.cycle_root),
+            overrides.get('map3d') or Map3d(cfg.map3d_root),
+            moderation_for(cfg.editorial, templates, overrides),
+            overrides.get('intake') or (Intake(cfg.intake_url) if cfg.intake_url and cfg.canonical else None))
 
     def close(self):
         """Release only resources owned by this application's lifecycle."""
@@ -55,7 +77,7 @@ class Resources:
 
     def pages_for(self, source):
         """Prepare page behavior with the source selected at the request's real Seam."""
-        return Pages(self.configuration, self.reader, source)
+        return Pages(self.configuration, self.reader, source, self.map3d)
 
     def transport_for(self, source):
         """Construct local-layer behavior with the selected canonical/preview points."""

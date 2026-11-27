@@ -11,7 +11,8 @@ import os
 import unittest
 import uuid
 from urllib.error import HTTPError
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
+from urllib.parse import parse_qsl
 
 BASE = os.environ.get("EGI_APP_BASE_URL", "")
 
@@ -20,24 +21,33 @@ BASE = os.environ.get("EGI_APP_BASE_URL", "")
 class PreviewHttpTests(unittest.TestCase):
     """Check the recovered pages and read-only preview API through real HTTP."""
 
-    def get(self, path: str):
+    def get(self, path: str, body=None):
         """Request only the explicitly selected loopback application."""
         if not BASE.startswith(("http://127.0.0.1:", "http://localhost:")):
             raise RuntimeError("Preview checks require a loopback URL")
-        return urlopen(BASE + path, timeout=10)
+        request = Request(BASE + path, data=json.dumps(body).encode() if body is not None else None,
+                          headers={"Content-Type": "application/json"} if body is not None else {})
+        return urlopen(request, timeout=10)
 
-    def payload(self, path: str):
+    def payload(self, path: str, body=None):
         """Decode a successful JSON response from the real server."""
-        with self.get(path) as response:
+        with self.get(path, body) as response:
             self.assertEqual(
                 response.headers["X-EGI-Data-Status"], "unreviewed-source-preview"
             )
             return json.load(response)
 
+    def transport(self, query: str):
+        """Submit the approved bounded viewport in a POST body, never its URL."""
+        body = {"west":12.2, "south":41.7, "east":12.9, "north":42.2, "zoom":14}
+        for key, value in parse_qsl(query, keep_blank_values=True):
+            body[key] = int(value) if key == "zoom" else float(value) if key in {"west","south","east","north"} else value
+        return self.payload("/api/preview/transport", body)
+
     def test_database_health_and_all_services(self):
         """The app reads exactly the imported services, retaining UUIDs and unknowns."""
         self.assertEqual(self.payload("/health")["services"], 315)
-        records = self.payload("/api/preview/services?area_id=1")
+        records = self.payload("/api/preview/services?area_id=1&include_unplaced=true")
         self.assertEqual(len(records), 315)
         self.assertEqual(len({r["id"] for r in records}), 315)
         for record in records:
@@ -47,10 +57,13 @@ class PreviewHttpTests(unittest.TestCase):
             self.assertEqual(record["hours"], [])
             self.assertIsNone(record["original_retrieved_at"])
         self.assertEqual(sum(r["place"]["geometry"] is not None for r in records), 313)
+        placed = self.payload("/api/preview/services?area_id=1")
+        self.assertEqual(len(placed), 313)
+        self.assertTrue(all(row["place"]["geometry"] is not None for row in placed))
 
     def test_rich_service_fields_and_benchmark(self):
         """All source fields, provisional groups and derived summaries reach the preview."""
-        records = self.payload("/api/preview/services?area_id=1")
+        records = self.payload("/api/preview/services?area_id=1&include_unplaced=true")
         self.assertEqual(len({r["source_group"]["external_key"] for r in records}), 201)
         self.assertEqual(sum(bool(r["derived_summary"]["text"]) for r in records), 315)
         for record in records:
@@ -74,7 +87,9 @@ class PreviewHttpTests(unittest.TestCase):
                 body = response.read().decode()
                 self.assertIn("Dati delle fonti non revisionati e non sempre aggiornati", body)
                 self.assertEqual(response.headers["Cache-Control"], "no-store")
-        self.assertEqual(len(self.payload("/api/preview/categories")), 9)
+        self.assertEqual({row["slug"] for row in self.payload("/api/preview/categories")},
+                         {"mangiare","dormire","lavarsi","vestiti_coperte","multiservizi","salute",
+                          "violenza","orientamento","documenti_diritti","istruzione","lavoro"})
         self.assertEqual(len(self.payload("/api/preview/languages")), 4)
         self.assertEqual(len(self.payload("/api/preview/areas")), 1)
         self.assertEqual(self.payload("/api/preview/category-translations"), [])
@@ -93,6 +108,8 @@ class PreviewHttpTests(unittest.TestCase):
             ("/map?city_id=99", 404),
             ("/api/public/services", 404),
             ("/api/entities/services", 404),
+            ("/api/preview/transport", 405),
+            ("/api/preview/cycleways", 405),
         ]:
             with self.assertRaises(HTTPError) as error:
                 self.get(path)
@@ -100,8 +117,8 @@ class PreviewHttpTests(unittest.TestCase):
 
     def test_scheduled_transport_and_unchanged_services(self):
         """Actual active GTFS reaches the preview without changing Helpinet count."""
-        metro = self.payload(
-            "/api/preview/transport?modes=metro&zoom=14&west=12.2&south=41.7&east=12.9&north=42.2"
+        metro = self.transport(
+            "modes=metro&zoom=14&west=12.2&south=41.7&east=12.9&north=42.2"
         )
         self.assertEqual(metro["availability"], "available")
         routes = {
@@ -113,8 +130,8 @@ class PreviewHttpTests(unittest.TestCase):
         self.assertTrue(
             any(f["geometry"]["type"] == "Point" for f in metro["features"])
         )
-        bus = self.payload(
-            "/api/preview/transport?modes=bus&zoom=16&west=12.48&south=41.89&east=12.51&north=41.92"
+        bus = self.transport(
+            "modes=bus&zoom=16&west=12.48&south=41.89&east=12.51&north=41.92"
         )
         self.assertTrue(bus["features"])
         self.assertTrue(all(f["geometry"]["type"] == "Point" for f in bus["features"]))
@@ -122,17 +139,17 @@ class PreviewHttpTests(unittest.TestCase):
             all(f["properties"]["transport_type"] == "bus" for f in bus["features"])
         )
         self.assertEqual(
-            self.payload("/api/preview/transport?modes=bus&zoom=11")["features"], []
+            self.transport("modes=bus&zoom=11")["features"], []
         )
-        self.assertEqual(len(self.payload("/api/preview/services")), 315)
-        tram = self.payload(
-            "/api/preview/transport?modes=tram&zoom=12&west=12.44&south=41.86&east=12.52&north=41.92"
+        self.assertEqual(len(self.payload("/api/preview/services?include_unplaced=true")), 315)
+        tram = self.transport(
+            "modes=tram&zoom=12&west=12.44&south=41.86&east=12.52&north=41.92"
         )
         self.assertTrue(
             tram["features"]
             and all(f["properties"]["transport_type"] == "tram" for f in tram["features"])
         )
-        focus = self.payload("/api/preview/transport?routes=MEA&zoom=11&west=0&south=0&east=1&north=1")
+        focus = self.transport("routes=MEA&zoom=11&west=12.6&south=42.0&east=12.7&north=42.1")
         self.assertEqual(
             {f["properties"]["route_id"] for f in focus["features"] if f["properties"]["kind"] == "route"},
             {"MEA"},
@@ -141,11 +158,11 @@ class PreviewHttpTests(unittest.TestCase):
         self.assertEqual(termini["availability"], "available")
         self.assertTrue(all(d["route_id"] == "MEA" and d["code"] == "A" for d in termini["departures"]))
         self.assertTrue(all(len(d["times"]) <= 3 for d in termini["departures"]))
-        cycle = self.payload("/api/preview/cycleways?west=12.44&south=41.87&east=12.52&north=41.92&zoom=14")
+        cycle = self.payload("/api/preview/cycleways", {"west":12.44,"south":41.87,"east":12.52,"north":41.92,"zoom":14})
         self.assertEqual(cycle["availability"], "available")
         self.assertTrue(cycle["features"] and "OpenStreetMap" in cycle["attribution"])
         too_many = ",".join(str(i) for i in range(81))
         for query in ["modes=ferry", "west=13&east=12", "zoom=30", "west=nan", "routes=", "routes=" + too_many]:
             with self.assertRaises(HTTPError) as error:
-                self.get("/api/preview/transport?" + query)
+                self.transport(query)
             self.assertEqual(error.exception.code, 422)

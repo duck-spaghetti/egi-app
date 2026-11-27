@@ -16,15 +16,20 @@ const suggestions=document.getElementById("suggestions");
 const toast=document.getElementById("toast");
 const settingsBackHead=document.getElementById("settings-back-head");
 const t=i18n.t;
-const {refresh,renderFilters,renderSearchOptions,resetFilters,chooseReferencePoint,geocodeAddress,loadOriginTransit,locateUser}=actions;
+const {refresh,renderFilters,resetFilters,chooseReferencePoint,geocodeAddress,loadOriginTransit,locateUser}=actions;
 
 function bindUi() {
+  document.getElementById('open-favorites')?.addEventListener('click',()=>emit('showFavorites'),{signal:scope.signal});
+  document.getElementById('saved-map-back')?.addEventListener('click',()=>emit('showFavorites'),{signal:scope.signal});
+  document.getElementById('saved-list-back')?.addEventListener('click',()=>emit('showFavorites'),{signal:scope.signal});
+  document.getElementById('saved-map-exit')?.addEventListener('click',()=>emit('allServices'),{signal:scope.signal});
+  document.getElementById('favorites-menu-all')?.addEventListener('click',()=>emit('allServices'),{signal:scope.signal});
+  document.getElementById('favorites-show-all')?.addEventListener('click',()=>emit('allServices'),{signal:scope.signal});
   document.getElementById("open-now-filter").addEventListener("change",event=>{state.filters.openNow=event.target.checked; refresh();}, {signal: scope.signal});
   document.getElementById("service-query").addEventListener("input",event=>{state.filters.q=event.target.value; refresh();}, {signal: scope.signal});
   for (const [id,key] of [["source-filter","source"],["issue-filter","issue"],["access-filter","access"],["audience-filter","audience"],["section-filter","section"],["sort-services","order"]]) {
     document.getElementById(id).addEventListener("change",event=>{
       state.filters[key]=event.target.value;
-      if (key==="source") renderSearchOptions();
       if (key==="order" && event.target.value==="distance" && !state.userLoc) openSheet("sheet-location");
       refresh();
     }, {signal: scope.signal});
@@ -38,6 +43,7 @@ function bindUi() {
   document.getElementById("open-emergency").addEventListener("click", () => openSheet("sheet-sos"), {signal: scope.signal});
   document.getElementById("sos-directory")?.addEventListener("click", () => document.getElementById("open-directory").click(), {signal: scope.signal});
   document.getElementById("open-directory").addEventListener("click", () => {
+    state.filters.favoritesOnly=false;
     state.filters.section="directory";
     state.filters.q=""; state.filters.source=""; state.filters.issue=""; state.filters.access=""; state.filters.audience=""; state.filters.meal=""; state.filters.level="";
     state.filters.openNow=false; state.filters.cats=new Set(); state.filters.offersOff=new Set();
@@ -45,14 +51,14 @@ function bindUi() {
     document.getElementById("service-query").value="";
     document.getElementById("open-now-filter").checked=false;
     renderFilters(); closeSheets();
-    if (state.view!=="list") toggleView();
-    refresh();
+    if (state.view!=="list") toggleView();else refresh();
   }, {signal: scope.signal});
   document.getElementById("origin-transit").addEventListener("toggle", event => {
     if (event.target.open) void loadOriginTransit();
   }, {signal: scope.signal});
   document.addEventListener("keydown", event => {
-    if (event.key==="Escape") closeSheets();
+    if(document.querySelector('dialog[open]'))return;
+    if (event.key==="Escape") dismissSheets();
     if (event.key!=="Tab") return;
     const sheet=document.querySelector(".sheet.shown");
     if (!sheet) return;
@@ -78,11 +84,11 @@ function bindUi() {
     button.addEventListener("click", () => openSheet(`sheet-${button.dataset.sheetOpen}`), {signal: scope.signal});
   });
   document.querySelectorAll("[data-close]").forEach((button) => {
-    button.addEventListener("click", closeSheets, {signal: scope.signal});
+    button.addEventListener("click", dismissSheets, {signal: scope.signal});
   });
-  backdrop.addEventListener("click", closeSheets, {signal: scope.signal});
+  backdrop.addEventListener("click", dismissSheets, {signal: scope.signal});
 
-  viewToggle.addEventListener("click", toggleView, {signal: scope.signal});
+  viewToggle.addEventListener("click", ()=>{emit("cancelReference");toggleView();}, {signal: scope.signal});
   updateViewToggle();
   document.getElementById("reset-filters").addEventListener("click", resetFilters, {signal: scope.signal});
   document.getElementById("filters-search").addEventListener("click", () => {
@@ -100,11 +106,11 @@ function bindUi() {
 }
 
 function openSheet(id) {
-  sheetReturnFocus = document.activeElement;
-  document.querySelectorAll(".sheet").forEach((sheet) => sheet.classList.remove("shown"));
+  if (!document.activeElement?.closest?.('.sheet')) sheetReturnFocus = document.activeElement;
+  document.querySelectorAll(".sheet").forEach((sheet) => {sheet.classList.remove("shown");if(sheet.id==='sheet-saved'){sheet.inert=true;sheet.setAttribute('aria-hidden','true');}});
   const sheet = document.getElementById(id);
   if (sheet) {
-    sheet.classList.add("shown");
+    sheet.classList.add("shown");if(id==='sheet-saved'){sheet.inert=false;sheet.setAttribute('aria-hidden','false');}
     sheet.querySelector("button,input,select")?.focus();
   }
   backdrop.classList.add("shown");
@@ -115,8 +121,11 @@ function openSheet(id) {
   if (id === "sheet-settings") document.querySelector('[data-sheet="settings"]').classList.add("active");
 }
 
+/** User dismissal abandons reference selection; programmatic sheet changes keep it. */
+function dismissSheets() {emit('cancelReference');closeSheets();}
+
 function closeSheets() {
-  document.querySelectorAll(".sheet").forEach((sheet) => sheet.classList.remove("shown"));
+  document.querySelectorAll(".sheet").forEach((sheet) => {sheet.classList.remove("shown");if(sheet.id==='sheet-saved'){sheet.inert=true;sheet.setAttribute('aria-hidden','true');}});
   backdrop.classList.remove("shown");
   document.querySelectorAll(".nav-btn").forEach((button) => button.classList.remove("active"));
   showSettingsPage("main");
@@ -130,6 +139,7 @@ function toggleView() {
   updateViewToggle();
   syncFilterLayout();
   closeSheets();
+  emit("refresh");
   if (state.view === "map") requestAnimationFrame(() => emit("invalidateMap"));
 }
 
@@ -159,7 +169,6 @@ function renderLanguageList() {
     button.className = `pill${state.lang === code ? " active" : ""}`;
     button.textContent = code.toUpperCase();
     button.addEventListener("click", () => {
-      state.lang = code;
       emit("language",{language:code});
     }, {signal: scope.signal});
     wrap.append(button);
@@ -188,6 +197,20 @@ function renderCityList() {
 }
 
 function renderSettings() {
+  const title=document.getElementById('list-title');
+  if(title){title.textContent=state.filters.favoritesOnly ? state.savedListName || t('favorites.title') : t('map.nearby_places');
+    if(state.filters.savedCollection && state.filters.savedCollection!=='favorites')delete title.dataset.i18n;
+    else title.dataset.i18n=state.filters.favoritesOnly ? 'favorites.title' : 'map.nearby_places';}
+  const all=document.getElementById('favorites-show-all');if(all)all.hidden=!state.filters.favoritesOnly;
+  const mapNav=document.getElementById('saved-map-nav');if(mapNav)mapNav.hidden=!state.filters.favoritesOnly;
+  const mapName=document.getElementById('saved-map-name');if(mapName)mapName.textContent=state.savedListName || t('favorites.title');
+  const listBack=document.getElementById('saved-list-back');if(listBack)listBack.hidden=!state.filters.favoritesOnly;
+  const mapExit=document.getElementById('saved-map-exit');if(mapExit)mapExit.hidden=!state.filters.favoritesOnly;
+  const menuAll=document.getElementById('favorites-menu-all');if(menuAll)menuAll.hidden=!state.filters.favoritesOnly;
+  const menu=document.getElementById('open-favorites');if(menu){
+    menu.classList.toggle('selected',!!state.filters.favoritesOnly);
+    menu.setAttribute('aria-current',state.filters.favoritesOnly ? 'page' : 'false');}
+
   cityLabel.textContent = state.city;
   cityValue.textContent = state.city;
   langValue.textContent = state.lang.toUpperCase();

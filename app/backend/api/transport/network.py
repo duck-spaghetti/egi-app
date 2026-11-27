@@ -27,6 +27,7 @@ ROOTS = (ROOT, RAIL_ROOT)
 
 FORMAT = "egi-transport/6"
 FULL_DETAIL_ZOOM = 17
+STOP_POINT_ZOOM = 18
 # Twice the 6 h schedule plus slack: older means the poller stopped running.
 STALE_AFTER = timedelta(hours=24)
 VERSION = re.compile(r"[a-f0-9]{64}-" + re.escape(FORMAT.split("/")[1]))
@@ -115,12 +116,14 @@ def route_order(route: dict) -> tuple:
     return (MODE_ORDER.get(route["mode"], 9), natural)
 
 
-def group_stations(stops: list[dict]) -> list[dict]:
-    """Show same-named metro stops within STATION_RADIUS_M as one station marker.
+def group_stations(stops: list[dict], zoom: int = 0) -> list[dict]:
+    """Group nearby metro stops at overview zoom; retain source points at detail zoom.
 
     GTFS has one stop per platform/direction and no parent_station; this merge is
     for display only and keeps every source stop_id in the merged properties.
     """
+    if zoom >= STOP_POINT_ZOOM:
+        return stops
     clusters: list[list[dict]] = []
     others = []
     for stop in stops:
@@ -272,7 +275,7 @@ def transport_view(
                     "properties": public,
                 }
             )
-        result["features"].extend(group_stations(stops))
+        result["features"].extend(group_stations(stops, zoom))
         return result
     except (OSError, ValueError, KeyError, TypeError):
         result.update(availability="unavailable", features=[])

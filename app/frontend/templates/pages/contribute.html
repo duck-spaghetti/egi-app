@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>{{ t('contribute.intake.title') }} · EGI</title>
+    <link rel="stylesheet" href="/static/css/foundations/fonts.css" />
+    <link rel="stylesheet" href="/static/css/foundations/tokens.css" />
+    <link rel="stylesheet" href="/static/css/moderation/moderation.css" />
+  </head>
+  <body class="desk">
+    <header class="desk-header"><a class="desk-brand" href="/map?lang={{ lang }}">EGI</a></header>
+    <main class="desk-main">
+      <section class="desk-card narrow">
+      {% if mode == 'unavailable' %}
+        <h1>{{ t('contribute.intake.title') }}</h1>
+        <p>{{ t('contribute.intake.unavailable') }}</p>
+      {% elif mode == 'unknown_service' %}
+        <p>{{ t('contribute.intake.unknown_service') }}</p>
+      {% elif mode == 'received' %}
+        <h1>{{ t('contribute.intake.received_title') }}</h1>
+        <p>{{ t('contribute.intake.received_' ~ kind) }}</p>
+      {% elif mode == 'later' %}
+        <p role="alert">{{ t('contribute.intake.later') }}</p>
+      {% else %}
+        {% if mode == 'error' %}
+        <h1>{{ t('contribute.intake.report_title') }}</h1>
+        <p class="hint">{{ card.name }}</p>
+        {% elif mode == 'still_valid' %}
+        <h1>{{ t('contribute.intake.still_valid_title') }}</h1>
+        <p class="hint">{{ card.name }}</p>
+        <p>{{ t('contribute.intake.still_valid_hint') }}</p>
+        {% else %}
+        <h1>{{ t('contribute.intake.new_title') }}</h1>
+        <p>{{ t('contribute.intake.new_hint') }}</p>
+        {% endif %}
+        {% if error %}<p class="desk-error" role="alert">{{ t('contribute.intake.errors.' ~ error) }}</p>{% endif %}
+        <form method="post" action="/contribuisci" class="desk-form">
+          <input type="hidden" name="lang" value="{{ lang }}" />
+          {% if card %}<input type="hidden" name="poi_id" value="{{ card.id }}" /><input type="hidden" name="issue" value="{{ mode }}" />{% endif %}
+          {% if mode == 'error' %}
+          <label>{{ t('contribute.intake.category') }}
+            <select name="category" required>
+              <option value="">—</option>
+              {% for code in categories %}<option value="{{ code }}" {% if values.category == code %}selected{% endif %}>{{ t('contribute.intake.categories.' ~ code) }}</option>{% endfor %}
+            </select>
+          </label>
+          <label>{{ t('contribute.intake.message') }}<textarea name="message" maxlength="2000" rows="4">{{ values.message }}</textarea></label>
+          <label>{{ t('contribute.intake.value') }}<input name="value" maxlength="500" value="{{ values.value }}" /></label>
+          {% elif mode == 'new_service' %}
+          <label>{{ t('contribute.intake.name') }}<input name="name" maxlength="500" required value="{{ values.name }}" /></label>
+          <label>{{ t('contribute.intake.offer') }}<textarea name="offer" maxlength="500" rows="3" required>{{ values.offer }}</textarea></label>
+          <label>{{ t('contribute.intake.address') }}<input name="address" maxlength="500" value="{{ values.address }}" /></label>
+          <label class="check"><input type="checkbox" name="online" value="1" {% if values.online %}checked{% endif %} /> {{ t('contribute.intake.online') }}</label>
+          <label>{{ t('contribute.intake.link') }}<input name="link" maxlength="500" value="{{ values.link }}" /></label>
+          <label>{{ t('contribute.intake.note') }}<textarea name="message" maxlength="2000" rows="3">{{ values.message }}</textarea></label>
+          {% endif %}
+          {% if mode != 'still_valid' %}
+          <fieldset>
+            <legend>{{ t('contribute.intake.contact_title') }}</legend>
+            <label>{{ t('contribute.intake.contact') }}<input name="contact" maxlength="200" value="{{ values.contact }}" /></label>
+            <label class="check"><input type="checkbox" name="consent" value="1" {% if values.consent %}checked{% endif %} /> {{ t('contribute.intake.consent') }}</label>
+          </fieldset>
+          {% endif %}
+          <div class="trap" aria-hidden="true"><label>Website<input name="website" tabindex="-1" autocomplete="off" /></label></div>
+          <p class="hint">{{ t('contribute.intake.privacy') }}</p>
+          <button type="submit">{{ t('contribute.intake.still_valid_submit' if mode == 'still_valid' else 'contribute.intake.submit') }}</button>
+        </form>
+      {% endif %}
+        <p><a href="/map?lang={{ lang }}">{{ t('contribute.intake.back') }}</a></p>
+      </section>
+    </main>
+  </body>
+</html>

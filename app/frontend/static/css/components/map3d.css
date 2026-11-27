@@ -1,0 +1,118 @@
+/* 3D mode: the switch control, HTML service markers and the MapLibre controls. */
+.view3d-trigger { position:absolute;right:var(--map-edge-x);top:calc(150px + var(--safe-top));z-index:620; }
+.stage.list-mode .view3d-trigger { display:none; }
+.view3d-icon { font:800 13px/1 system-ui;letter-spacing:0; }
+.view3d-trigger .view3d-to-2d,.view3d-trigger[data-view="3d"] .view3d-to-3d { display:none; }
+.view3d-trigger[data-view="3d"] .view3d-to-2d { display:inline; }
+.view3d-trigger[data-view="3d"] .control-label.view3d-to-2d { display:block; }
+.view3d-trigger[aria-disabled="true"] { opacity:.55;cursor:not-allowed; }
+
+/* MapLibre positions the wrapper; the button inside keeps its own box (no position reset). */
+.map3d-marker { line-height:0; }
+.map3d-pin,.map3d-cluster { margin:0;padding:0;border:0;background:none;font:inherit;color:inherit;cursor:pointer; }
+.map3d-pin:focus-visible,.map3d-cluster:focus-visible { outline:3px solid #0570b5;outline-offset:3px;border-radius:50%; }
+.map3d-cluster { box-sizing:border-box;padding:0;border:2px solid #fffe;border-radius:50%;display:grid;place-items:center;
+  font:700 14px/1 system-ui;box-shadow:0 2px 8px #0003; }
+.map3d-ctrl { font-size:18px;line-height:1; }
+.map3d-ctrl[aria-pressed="true"] { background:#e8eef6; }
+#map.maplibregl-map { font:inherit; }
+/* MapLibre controls sit under the layers and view controls, clear of the city tag. */
+#map .maplibregl-ctrl-top-right { top:calc(278px + var(--safe-top));right:calc(var(--map-edge-x) + 19px); }
+.stage.list-mode #map .maplibregl-ctrl-top-right { display:none; }
+/* Below the performance budget: a warning badge; the control stays usable. */
+.view3d-trigger[data-warning="true"] .control-icon { position:relative; }
+.view3d-trigger[data-warning="true"] .control-icon::after { content:"!";position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;
+  background:#c43c1e;color:#fff;font:800 11px/16px system-ui;text-align:center; }
+/* Persistent, screen-reader-announced route summary, clear of map attribution. */
+.map3d-route-status { position:absolute;inset-inline:12px;bottom:calc(112px + var(--safe-bottom,0px));z-index:3;max-width:440px;margin-inline:auto;
+ background:var(--bg,#fff);color:var(--ink,#212121);padding:10px 14px;border-radius:12px;box-shadow:0 2px 12px #0003;font:600 14px/1.4 system-ui; }
+.map3d-route-status[hidden] { display:none; }
+.map3d-buses { position:absolute;inset-inline-start:12px;bottom:112px;z-index:3;max-width:min(280px,75%);padding:8px;
+ background:var(--bg,#fff);color:var(--ink,#212121);border-radius:12px;box-shadow:0 2px 12px #0003;font:12px/1.4 system-ui; }
+.map3d-buses label { display:block;margin-block:6px; }
+.map3d-buses label[hidden],.map3d-buses [hidden] { display:none; }
+.map3d-buses input { display:block;width:100%;box-sizing:border-box;min-height:36px; }
+
+/* Stack the bus panel above a visible route summary, clear of the Map/List switch. */
+.map3d-route-status:not([hidden]) ~ .map3d-buses { bottom:calc(174px + var(--safe-bottom,0px)); }
+
+/* One toolbar keeps view and layer buttons aligned in both writing directions. */
+.map-mode-tools { position:absolute;inset-inline-end:var(--map-edge-x);top:calc(82px + var(--safe-top));z-index:620;width:88px;display:flex;flex-direction:column;align-items:center;gap:16px; }
+.map-mode-tools .layers-trigger,.map-mode-tools .view3d-trigger { position:static; }
+.stage.list-mode .map-mode-tools { display:none; }
+html[dir="rtl"] #map .maplibregl-ctrl-top-right { right:auto;left:calc(var(--map-edge-x) + 19px); }
+.map3d-buses.in-layers { position:static;max-width:none;padding:12px 0;box-shadow:none;background:none; }
+/* An integrated head extends from the same ground anchor as the compact category pin. */
+.map3d-pin { direction:ltr;display:flex;flex-direction:column;align-items:center;width:44px;overflow:visible; }
+.map3d-pin-body { display:flex;align-items:center;align-self:flex-start;width:max-content;max-width:304px;height:44px; }
+.map3d-pin[data-labelled="true"] .map3d-pin-body::before { content:"";position:absolute;z-index:-1;left:0;right:0;top:50%;transform:translateY(-50%);height:var(--site-head-height,44px);background:rgb(255 255 255 / .8);border-radius:24px;box-shadow:0 2px 8px #0003;border:1px solid white; }
+.map3d-pin[data-label-colliding="true"] .map3d-pin-body::before { display:none; }
+.map3d-pin .site-pin { flex:none; }
+.map3d-pin[data-labelled="true"] .site-pin { box-shadow:none; }
+.map3d-pin[data-label-side="left"] .map3d-pin-body { flex-direction:row-reverse;align-self:flex-end; }
+.map3d-stem,.map3d-ground { display:none; }
+.map3d-pin[data-anchored="true"] .map3d-stem { display:block;width:2px;height:18px;background:#455a64b3; }
+.map3d-pin[data-anchored="true"] .map3d-ground { display:block;width:6px;height:6px;border-radius:50%;background:#455a64;box-shadow:0 0 0 2px #fff; }
+.map3d-site-label { display:block;max-width:var(--site-label-width,230px);padding:6px 10px 6px 8px;color:#243239;text-align:start;font:12px/1.35 system-ui;pointer-events:none; }
+.map3d-pin[data-label-colliding="true"] .map3d-site-label { display:none; }
+.map3d-site-label strong,.map3d-site-label small { display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.map3d-site-label strong { max-width:100%;font-size:13px; }
+.map3d-category-row { display:flex;flex-wrap:wrap;gap:3px;margin-block:3px;max-width:220px; }
+.map3d-category { display:inline-grid;place-items:center;min-width:20px;height:20px;border-radius:50%;font-size:10px;color:#fff; }
+.map3d-category img { width:14px;height:14px;filter:brightness(0) invert(1); }
+.map3d-category.outside-search { opacity:.5;outline:1px dashed #455a64;outline-offset:1px; }
+.map3d-site-status i { display:inline-block;width:7px;height:7px;border-radius:50%;margin-inline-end:5px;background:#6b7280; }
+.map3d-site-status.open i { background:#237443; }.map3d-site-status.closed i { background:#b83938; }.map3d-site-status.closing i { background:#ae7900; }
+
+/* Stack rotation/tilt controls vertically, sharing the zoom control rail. */
+#map .maplibregl-ctrl-top-right { width:90px;right:calc(var(--map-edge-x) - 1px);display:flex;flex-direction:column;align-items:center; }
+#map .maplibregl-ctrl-top-right .maplibregl-ctrl { margin:10px 0 0; }
+#map .map3d-controls { display:flex;flex-direction:column; }
+#map .map3d-controls button { border:0; }
+html[dir="rtl"] #map .maplibregl-ctrl-top-right { right:auto;left:calc(var(--map-edge-x) - 1px); }
+@media (max-height:700px) {
+ .map-mode-tools { top:calc(62px + var(--safe-top));gap:8px; }
+ #map .maplibregl-ctrl-top-right { top:calc(238px + var(--safe-top)); }
+}
+
+.map3d-site-label .map3d-site-status { white-space:normal;overflow:visible;text-overflow:clip; }
+
+html[dir="rtl"] .map3d-site-label { direction:rtl; }
+
+.map3d-site-kind { margin-block:3px;color:#49565c;font-size:12px; }
+
+/* Move only the head. The wrapper/ground anchor retain the source coordinate. */
+.map3d-pin { position:relative;pointer-events:none; }
+.map3d-pin-body { transform:translate(var(--site-head-x,0px),var(--site-head-y,0px));pointer-events:auto; }
+.map3d-ground { pointer-events:auto; }
+.map3d-pin[data-anchored="true"] .map3d-stem { background:transparent; }
+.map3d-leader { position:absolute;left:50%;bottom:3px;overflow:visible;pointer-events:none;fill:none;stroke:#455a64b3;stroke-width:1.5;stroke-linecap:round; }
+.map3d-pin[data-anchored="false"] .map3d-leader { display:none; }
+.map3d-pin:focus-visible { outline:none; }
+.map3d-pin:focus-visible .map3d-pin-body { outline:3px solid #0570b5;outline-offset:3px;border-radius:24px; }
+
+/* DOM stacking is explicit: transport < service heads < popups < navigation.
+   MapLibre creates a transform context for each marker, so priority belongs on the wrapper. */
+#map.maplibregl-map { --map-transit-z:10;--map-service-z:20;--map-popup-z:30;--map-controls-z:40; }
+#map .maplibregl-marker.tl-icon { z-index:var(--map-transit-z); }
+#map .map3d-marker { z-index:var(--map-service-z);pointer-events:none; }
+#map .map3d-cluster { pointer-events:auto; }
+#map .maplibregl-popup { z-index:var(--map-popup-z); }
+#map .map3d-route-status,#map .map3d-buses { z-index:var(--map-controls-z); }
+#map .maplibregl-ctrl-top-left,#map .maplibregl-ctrl-top-right,
+#map .maplibregl-ctrl-bottom-left,#map .maplibregl-ctrl-bottom-right { z-index:var(--map-controls-z); }
+
+/* Camera tools occupy the left rail; mode/layers and visitor actions stay right. */
+#map .maplibregl-ctrl-top-left { top:calc(112px + var(--safe-top,0px));left:var(--map-edge-x,16px);width:90px;display:flex;flex-direction:column;align-items:center; }
+#map .maplibregl-ctrl-top-left .maplibregl-ctrl { margin:10px 0 0; }
+.stage.list-mode #map .maplibregl-ctrl-top-left { display:none; }
+#map .maplibregl-popup-content { box-sizing:border-box;max-height:calc(100dvh - 180px);overflow-y:auto;overscroll-behavior:contain; }
+#map .tl-icon[data-collision-hidden="true"] { visibility:hidden;pointer-events:none; }
+
+@media (max-width:600px) {
+ /* Leave the camera/mode rails above the mobile timetable; the remaining content scrolls. */
+ #map .maplibregl-popup-content { max-height:max(48px,calc(100dvh - 510px)); }
+}
+
+/* Mirror the two distinct rails in RTL, preserving separation from mode/view controls. */
+html[dir="rtl"] #map .maplibregl-ctrl-top-left { left:auto;right:var(--map-edge-x,16px); }

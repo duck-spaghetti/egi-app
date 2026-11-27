@@ -1,0 +1,58 @@
+{% extends 'moderation/base.html' %}
+{% block body %}
+{% if link %}
+<section class="desk-card notice">
+  <h2>{{ t('moderation.accounts.link_title') }}</h2>
+  <p>{{ t('moderation.accounts.link_hint') }}</p>
+  <input class="desk-link" readonly value="{{ link }}" />
+</section>
+{% endif %}
+<section class="desk-card">
+  <h1>{{ t('moderation.accounts.title') }}</h1>
+  <table class="desk-table">
+    <thead><tr><th>{{ t('moderation.accounts.name') }}</th><th>{{ t('moderation.accounts.role') }}</th><th>{{ t('moderation.accounts.state') }}</th><th>{{ t('moderation.accounts.sessions') }}</th><th></th></tr></thead>
+    <tbody>
+    {% for account in accounts %}
+      <tr>
+        <td>{{ account.display_name }}<br /><code>{{ account.login_name }}</code></td>
+        <td>{{ t('moderation.roles.' ~ account.role) }}</td>
+        <td>{{ t('moderation.states.' ~ account.state) }}</td>
+        <td>
+          {% for session in account.sessions %}
+          <form method="post" action="/moderazione/sessione/{{ session.session_id }}/revoca" class="inline">
+            <input type="hidden" name="form_token" value="{{ form_token }}" />
+            {{ t('moderation.methods.' ~ session.method) }} · {{ session.last_seen_at.strftime('%d/%m %H:%M') }}
+            <button type="submit" class="link">{{ t('moderation.accounts.revoke') }}</button>
+          </form>
+          {% endfor %}
+        </td>
+        <td>
+          {% if account.state != 'deactivated' %}
+          <form method="post" action="/moderazione/account/{{ account.account_id }}/invito" class="inline">
+            <input type="hidden" name="form_token" value="{{ form_token }}" />
+            <button type="submit" class="link">{{ t('moderation.accounts.reissue') }}</button>
+          </form>
+          <form method="post" action="/moderazione/account/{{ account.account_id }}/disattiva" class="inline">
+            <input type="hidden" name="form_token" value="{{ form_token }}" />
+            <button type="submit" class="link danger">{{ t('moderation.accounts.deactivate') }}</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+<section class="desk-card narrow">
+  <h2>{{ t('moderation.accounts.new') }}</h2>
+  <form method="post" action="/moderazione/account" class="desk-form">
+    <input type="hidden" name="form_token" value="{{ form_token }}" />
+    <label>{{ t('moderation.accounts.display_name') }}<input name="display_name" required /></label>
+    <label>{{ t('moderation.sign_in.login') }}<input name="login" pattern="[a-z0-9][a-z0-9._\-]{2,39}" required /></label>
+    <label>{{ t('moderation.accounts.role') }}
+      <select name="role"><option value="moderator">{{ t('moderation.roles.moderator') }}</option><option value="admin">{{ t('moderation.roles.admin') }}</option></select>
+    </label>
+    <button type="submit">{{ t('moderation.accounts.create') }}</button>
+  </form>
+</section>
+{% endblock %}

@@ -6,6 +6,16 @@ const assert=require('node:assert/strict');const {environment}=require('./module
  assert(T.stopIconHtml({kind:'stop',transport_type:'tram',routes:[]}).includes('tl-tram'));
  assert(T.stopIconHtml({kind:'stop',transport_type:'bus',routes:[]}).includes('tl-bus'));
  assert(T.stopIconHtml({kind:'stop',transport_type:'rail',routes:[{mode:'rail',display_code:'REG'}]}).includes('REG'));
+ for(const mode of ['bus','tram','metro']){
+  const props={kind:'stop',transport_type:mode,routes:[]};
+  assert(!T.stopIconHtml(props).includes('tl-palina'),'compact symbols have no palina');
+  const close=T.stopIconHtml(props,true,true);assert(close.includes('tl-palina-'+mode));assert(close.includes('tl-near'));assert(close.includes('tl-ground'));
+  if(mode!=='metro')assert(!close.includes('tl-codes'),'road signs have no automatic extra information');
+ }
+ const start=T.palinaPresentation(19,19),middle=T.palinaPresentation(19.5,19),end=T.palinaPresentation(20,19);
+ assert.equal(T.palinaPresentation(19,19,19).progress,1,'Leaflet max19 shows road sign');assert.equal(T.palinaPresentation(18,19,19).progress,0);
+ assert.equal(start.progress,0);assert.equal(middle.progress,.5);assert.equal(end.progress,1);assert(middle.scale>start.scale);assert(end.scale<=.65);assert.equal(T.palinaPresentation(24,19).scale,.65);
+ assert(!T.stopIconHtml({transport_type:'rail'},false,true).includes('tl-palina'),'rail keeps its existing symbol');
  assert(T.lineStyle('rail','#00704A').dashArray);assert.equal(T.lineColor('rail',null),'#00704A');
  assert(T.focusLineStyle('bus',null,'49').weight>T.lineStyle('bus').weight);assert.equal(T.focusLineStyle('metro','#E27439','A').color,'#E27439');
  assert.equal(T.lineLabelPoint({type:'LineString',coordinates:[[12.4,41.8],[12.5,41.9],[12.6,42]]}).join(','),'41.9,12.5');

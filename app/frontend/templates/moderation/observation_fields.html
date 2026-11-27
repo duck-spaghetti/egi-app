@@ -1,0 +1,8 @@
+{# What the person verified, and how: it becomes the source the new data cites. #}
+{% set w = 'moderation.workspace.' %}
+<label>{{ t(w ~ 'observation.method') }}<select name="method" required>
+  <option value="">—</option>
+  {% for v in methods %}<option value="{{ v }}" {% if posted.method == v %}selected{% endif %}>{{ t(w ~ 'observation.methods.' ~ v) }}</option>{% endfor %}
+</select></label>
+<label>{{ t(w ~ 'observation.note') }}<textarea name="note" rows="2" maxlength="1000">{{ posted.note or '' }}</textarea></label>
+<p class="hint">{{ t(w ~ 'observation.hint') }}</p>

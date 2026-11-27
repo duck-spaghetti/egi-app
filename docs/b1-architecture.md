@@ -31,12 +31,14 @@ and exceptions responsibilities:
 
 | Family | Behavior hidden behind its Interface |
 | --- | --- |
-| pages | Entry/map context and selected-reader health, read-only contribution explanation. |
+| pages | Entry/map context and selected-reader health. |
 | directory | Public cards/detail, vocabulary and area projection over the configured Db. |
 | address_search | Explicit query, candidate normalization, safe upstream errors and per-instance bounded HMAC cache. |
 | transport | Viewport, public-place summaries/detail, origin and departures, timed and untimed source composition. |
 | cycleways | Bounded geographic infrastructure reads and availability. |
 | preview | Retained source cards, coverage, debug positions and overlap review; never mounted in canonical mode. |
+| moderation | `/moderazione`: sign-in (Google or password, admin TOTP), invitations, accounts; acts through the editorial login as the person of a database-verified session (ADR 0011). Queue and claims (EGI-24); service workspace with draft, comparison, evidence and publication (EGI-83); structured hours, locations and new services citing moderator observations (EGI-84). Mounted only when `EGI_EDITORIAL_DATABASE_URL` is set. |
+| contribute | `/contribuisci`: report, still-valid and new-service forms; submits through the intake login only (EGI-22). Without intake in canonical mode the page only explains. |
 
 Routers validate HTTP and delegate; behavior raises family errors derived from the
 global application error category. Central handlers return safe messages/opaque
@@ -71,14 +73,23 @@ specific page actions instead of importing other feature state or DOM.
 | services | `load`, `update`, `show`, `choose`, `refreshHours`, `describe`, `dispose`; normalization, list/detail rendering, contacts, hours and provenance are private. |
 | search | `select`, `matches`, `update`, `dispose`; matching/facets and controls only, no fetching or map/list rendering. |
 | map | `mount`, `update`, `attach`, `center`, `contains`, `invalidate`, `servicesVisible`, `dispose`; Leaflet and marker handles stay private. |
+| map3d | The same interface on MapLibre GL JS for the optional 3D mode (`features/map3d/`), chosen by `map-start.js` through the page's map factory; style (basemap plus buildings with block-to-part transition at z16–17.2, landmarks, bridges with lifted street names, fountains, trees, embankments; attributions always expanded; the canvas is decorative and hidden from screen readers), HTML markers with screen-space clustering, rotation/tilt controls and an optional `lookAt` that the page offers as "Guarda l'edificio" in the service sheet. Libraries are loaded only in 3D mode. |
 | origin | `update`, `locate`, `search`, `choose`, `set`, `dispose`; explicit reference interaction, temporary address candidates and request cancellation. |
 | transport | Layer mount/update, summaries/detail/origin, badge/shell rendering and disposal; references/data come from the page. `referenceChanged` resets its own origin panel, cancels obsolete requests and reloads an open panel. |
 | cycleways | Optional overlay mount/dispose. |
+| 3D layers | In 3D mode the map module's `attach` passes the factory `(map, {maplibre})`; transport and cycleways then build `TransportLayerGL`/`CycleLayerGL` (same endpoints, debounce, toggles, status, popups, focus), reusing the presentation helpers of their Leaflet layers. Requests use the Leaflet-equivalent zoom (MapLibre zoom + 1). |
 | preview | Existing debug panel and overlap-review behavior; selected only for preview. |
 
 `features/map/sites.js` owns exact-position grouping separately from Leaflet. A
 marker reflects filtered matches; the selector/detail can show all public siblings
 with out-of-filter labels. Each retains its own identity and attributes.
+`features/map/view.js` chooses the mode at startup (`?vista=3d|2d`, else the device
+choice in localStorage; 3D needs WebGL2 and an active data set) and carries filters,
+search text and reference point across the reload in sessionStorage, read once; the URL
+holds only view, language, city and selected service (ADR 0007).
+`features/map/pins.js` owns the site pin markup, its accessible label and the
+selection payload (`siteMarkers`), with no map library: every map module wraps the
+same markup in its own marker type.
 
 `http.js` is the concrete request Adapter. It checks the page lifecycle after both
 fetch and JSON completion. `lifecycle.js` owns cancellation/listeners/timers/cleanup and the actual

@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "base": "a75bd0ec726df817ac082a6b032b608c1aa38616",
+  "native_schema": {
+    "name": "Community schema",
+    "environment": "EGI_DATABASE_SCHEMA",
+    "path": "../egi_database-consolidation",
+    "revision": "c1c4495aa1d2416f9cf5757c70904530a0d36962"
+  },
+  "providers": [
+    {
+      "name": "database",
+      "environment": "EGI_DATABASE_PROVIDER",
+      "path": "../egi_database-consolidation",
+      "revision": "c1c4495aa1d2416f9cf5757c70904530a0d36962"
+    },
+    {
+      "name": "reviewer",
+      "environment": "EGI_REVIEWER_PROVIDER",
+      "path": "../egi-reviewer-consolidation",
+      "revision": "929b4dd4e61df9d15d45e9cdd549f209bfb5135f",
+      "wheel_sha256": "4846451fd899b586882ec0a7ce6180a9e866531bc516b645b399a5f49a0302ee",
+      "python_environment": "EGI_REVIEWER_PYTHON",
+      "python": "../egi-reviewer-community-text/.venv/bin/python"
+    }
+  ],
+  "consumer_wheel": {
+    "path": "../egi-reviewer-consolidation/.local/artifacts/egi_reviewer-0.5.1-py3-none-any.whl",
+    "version": "0.5.1",
+    "source_revision": "929b4dd4e61df9d15d45e9cdd549f209bfb5135f",
+    "sha256": "4846451fd899b586882ec0a7ce6180a9e866531bc516b645b399a5f49a0302ee",
+    "source_date_epoch": "1795797011"
+  },
+  "importer_fixture": {
+    "name": "importer transport fixture",
+    "environment": "EGI_IMPORTER_REPO",
+    "path": "../egi-importer-consolidation",
+    "revision": "76ba62415e2adc04f1ddcbef4288d685ad9bbdaf"
+  }
+}
