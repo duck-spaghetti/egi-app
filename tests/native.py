@@ -22,7 +22,7 @@ class Cluster:
     def __init__(self, port: int, database: str):
         """Initialize, start and deploy; call `close` to stop and remove everything."""
         self.port, self.database = port, database
-        self.resource = OwnedCluster(REPOSITORY or Path(__file__).resolve().parents[1], PG, port, database)
+        self.resource = OwnedCluster(Path(__file__).resolve().parents[1], PG, port, database)
         self.base = self.resource.path
         self.environment = self.resource.environment
         try:

@@ -1,5 +1,6 @@
 """Observe real PostgreSQL ownership, partial failures and runner reconciliation."""
 from pathlib import Path
+from contextlib import contextmanager
 import os
 import subprocess
 import sys
@@ -9,6 +10,19 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 from devchecks.resources import CleanupError, OwnedCluster, PrerequisiteError, ResourceRun, run_check
 PG = Path('/Library/PostgreSQL/18/bin')
+
+
+@contextmanager
+def parent_runs():
+    """Capture only runs allocated by this test parent, leaving concurrent work uncounted."""
+    allocated = []
+    original = ResourceRun.__init__
+    def remember(run, *args, **kwargs):
+        """Retain the parent-held capability solely for this test's cleanup assertions."""
+        original(run, *args, **kwargs)
+        allocated.append(run)
+    with patch.object(ResourceRun, '__init__', remember):
+        yield allocated
 
 
 class ResourceLifecycleTests(unittest.TestCase):
@@ -99,11 +113,12 @@ class ResourceLifecycleTests(unittest.TestCase):
         code = ("from pathlib import Path; from devchecks.resources import OwnedCluster; import time; "
                 f"c=OwnedCluster(Path.cwd(),{str(PG)!r},65479); "
                 "print(c.path,flush=True); time.sleep(30)")
-        before = set(Path('/private/tmp').glob('egi-resource-*'))
-        result = run_check('timeout', [sys.executable, '-c', code], ROOT, timeout=2,
-                           environment={**os.environ, 'PYTHONPATH': str(ROOT / 'scripts')})
+        with parent_runs() as allocated:
+            result = run_check('timeout', [sys.executable, '-c', code], ROOT, timeout=2,
+                               environment={**os.environ, 'PYTHONPATH': str(ROOT / 'scripts')})
         self.assertEqual(result.status, 'blocked')
-        self.assertEqual(set(Path('/private/tmp').glob('egi-resource-*')) - before, set())
+        self.assertTrue(allocated)
+        self.assertTrue(all(not run.path.exists() for run in allocated))
 
     def test_primary_and_cleanup_errors_are_both_reported(self):
         """Failed cleanup retains the original diagnostic."""
@@ -120,15 +135,19 @@ class ResourceLifecycleTests(unittest.TestCase):
         code = '''from pathlib import Path
 import os, signal
 from devchecks.resources import OwnedCluster, ResourceRun
-with ResourceRun(Path.cwd()).activate():
+with ResourceRun(Path.cwd()).activate() as run:
+    print(run.path,flush=True)
     c=OwnedCluster(Path.cwd(), '/Library/PostgreSQL/18/bin',65479)
     os.kill(os.getpid(),signal.SIGTERM)
 '''
-        before = set(Path('/private/tmp').glob('egi-resource-*'))
-        result = run_check('signal', [sys.executable, '-c', code], ROOT,
-                           environment={**os.environ, 'PYTHONPATH': str(ROOT / 'scripts')})
+        with parent_runs() as allocated:
+            result = run_check('signal', [sys.executable, '-c', code], ROOT,
+                               environment={**os.environ, 'PYTHONPATH': str(ROOT / 'scripts')})
         self.assertEqual(result.status, 'failed')
-        self.assertEqual(set(Path('/private/tmp').glob('egi-resource-*')) - before, set())
+        self.assertTrue(all(not run.path.exists() for run in allocated))
+        child_paths=[Path(line) for line in result.reason.splitlines() if line.startswith('/private/tmp/egi-resource-')]
+        self.assertEqual(len(child_paths),1)
+        self.assertFalse(child_paths[0].exists())
 
     def test_app_fixture_schema_failure_rolls_back(self):
         """The actual app fixture cleans even when schema deployment fails in its constructor."""
@@ -229,3 +248,15 @@ with ResourceRun(Path.cwd()).activate() as run:
             child.stdout.close();child.stderr.close()
             if run:
                 run.close()
+
+    def test_direct_app_fixture_records_app_not_schema_provider(self):
+        """Standalone fixture ownership refers to the app checkout, not the selected schema repo."""
+        import importlib.util
+        spec=importlib.util.spec_from_file_location('direct_app_fixture',ROOT/'tests/native.py')
+        fixture=importlib.util.module_from_spec(spec);spec.loader.exec_module(fixture)
+        with parent_runs() as allocated:
+            with patch.object(fixture,'REPOSITORY','/private/tmp/selected-schema-provider'),patch.object(fixture.Cluster,'sql',side_effect=RuntimeError('controlled schema failure')):
+                with self.assertRaisesRegex(RuntimeError,'controlled schema'):
+                    fixture.Cluster(65479,'egi_direct_fixture')
+        self.assertEqual(allocated[0].record['repository'],str(ROOT))
+        self.assertFalse(allocated[0].path.exists())
