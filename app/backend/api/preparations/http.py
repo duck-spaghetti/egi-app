@@ -46,6 +46,28 @@ SAFE_CODES = {
     'request_key_conflict': 409, 'stale_base': 409, 'stale_preparation': 409,
     'stale_item': 409, 'preparation_version_conflict': 409, 'undo_conflict': 409,
     'budget_unavailable': 429, 'ai_not_configured': 503, 'ai_configuration_unavailable': 503,
+    'configuration_unavailable': 503, 'analysis_plan_not_found': 404, 'plan_not_found': 404,
+    'analysis_record_not_found': 404, 'analysis_plan_not_started': 409,
+    'analysis_plan_has_pending_dispatch': 409, 'analysis_plan_cancelled': 409,
+    'analysis_packet_stale': 409, 'stale_workbench_packet': 409,
+    'workbench_selection_stale': 409, 'workbench_selection_basis_changed': 409,
+    'workbench_selection_record_mismatch': 422, 'invalid_workbench_selection': 422,
+    'invalid_plan_limits': 422, 'explicit_uncertain_packet_required': 409,
+    'plan_packet_limit': 413, 'plan_followup_limit': 413, 'plan_cost_limit': 429,
+    'plan_bounds_exceeded': 413, 'packet_input_bound_exceeded': 413,
+    'family_decomposition_needed': 413, 'comparison_decomposition_needed': 413,
+    'group_not_found': 404, 'group_operation_not_found': 404, 'group_member_not_found': 404,
+    'group_head_conflict': 409, 'group_parent_head_conflict': 409,
+    'group_member_head_conflict': 409, 'competing_group_mapping': 409,
+    'group_application_pending': 409, 'invalid_group_context': 409,
+    'group_not_accepted': 409, 'group_catalog_limit': 413,
+    'group_proposal_not_applicable': 422, 'group_proposal_not_retained': 422,
+    'group_proposal_mapping_mismatch': 422, 'group_lineage_membership_mismatch': 422,
+    'member_not_in_group': 422, 'mixed_group_context': 422,
+    'unsupported_group_member': 422, 'invalid_group_revision': 422,
+    'invalid_group_selection': 422, 'duplicate_group_member': 422,
+    'workbench_result_not_found': 404, 'workbench_proposal_not_found': 404,
+    'group_member_not_in_proposal': 422,
 }
 
 
@@ -77,11 +99,15 @@ class PreparationRoute(APIRoute):
                                           error.code if error.code in SAFE_CODES else 'invalid_request')
             except psycopg.Error as error:
                 state = error.sqlstate or ''
-                status = {'P0002': 404, '42501': 403, '40001': 409, '23505': 409}.get(state)
-                if status is None:
-                    status = 422 if state.startswith(('22', '23', '55')) else 503
-                response = error_response(status, {404: 'preparation_not_found', 403: 'forbidden',
-                    409: 'version_conflict', 422: 'invalid_request', 503: 'database_unavailable'}[status])
+                code = error.diag.message_primary
+                if code in SAFE_CODES:
+                    response = error_response(SAFE_CODES[code], code)
+                else:
+                    status = {'P0002': 404, '42501': 403, '40001': 409, '23505': 409}.get(state)
+                    if status is None:
+                        status = 422 if state.startswith(('22', '23', '55')) else 413 if state.startswith('54') else 503
+                    response = error_response(status, {404: 'preparation_not_found', 403: 'forbidden',
+                        409: 'version_conflict', 413: 'input_too_large', 422: 'invalid_request', 503: 'database_unavailable'}[status])
             except Exception as error:
                 identifier = request.app.state.resources.diagnostics.record('internal_error', error)
                 response = JSONResponse({'schema_version': 1, 'code': 'internal_error', 'request_id': identifier}, status_code=500)

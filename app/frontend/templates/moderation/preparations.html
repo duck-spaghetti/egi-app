@@ -47,6 +47,24 @@
   <details class="desk-card" id="source-evidence-panel" hidden><summary id="source-evidence-title">{{ t('community.source_passage') }}</summary><p id="source-evidence-note" class="hint"></p><pre id="source-evidence-text" class="preparation-source-passage"></pre></details>
   </aside><section class="preparation-card-column"><p class="preparation-step">{{ t('community.card_step') }}</p>
   <div class="desk-card"><ul id="card-list" class="queue-list preparation-cards"></ul><p id="no-cards">{{ t('community.no_cards') }}</p></div>
+  <section id="plan-panel" class="desk-card preparation-plans" aria-label="Piano di analisi delle categorie" hidden>
+    <h2>Analisi delle categorie</h2>
+    <p>Seleziona le schede nell’elenco, controlla l’anteprima e avvia il piano una sola volta. Le proposte vanno controllate e non modificano automaticamente le schede.</p>
+    <p id="plan-selection-count" role="status" aria-live="polite"></p>
+    <div class="desk-actions"><button id="plan-select-all" type="button">Seleziona tutte le schede, fino a 100</button><button id="plan-clear-selection" type="button">Deseleziona tutte</button></div>
+    <p id="plan-selection-note" class="hint" aria-live="polite"></p>
+    <details><summary>Limiti da autorizzare</summary><fieldset class="preparation-plan-limits"><legend>Richieste e costo massimo</legend>
+      <label>Richieste totali, massimo<input id="plan-max-requests" type="number" min="1" max="1000" value="8" /></label>
+      <label>Di cui ulteriori richieste, massimo<input id="plan-max-followups" type="number" min="0" max="999" value="3" /></label>
+      <label>Costo massimo del piano, USD<input id="plan-max-cost" type="number" min="0.01" max="10" step="0.01" value="1" /></label>
+    </fieldset></details>
+    <div class="desk-actions"><button id="plan-preview" type="button">Crea anteprima</button><button id="plan-amend" type="button" hidden>Nuova anteprima dalla selezione</button><button id="plan-start" type="button" hidden>Avvia questo piano</button><button id="plan-continue" type="button" hidden>Continua i passaggi mancanti</button><button id="plan-cancel" type="button" hidden>Annulla il piano</button><button id="plan-refresh" type="button" disabled>Aggiorna stato</button></div>
+    <p id="plan-feedback" role="status" class="desk-notice" aria-live="polite"></p>
+    <div id="plan-summary"></div><div id="plan-coverage"></div>
+    <details><summary>Esiti delle schede selezionate</summary><p id="plan-record-page" class="hint"></p><ul id="plan-records" class="queue-list"></ul><div class="desk-actions"><button id="plan-record-prev" type="button" disabled>Schede precedenti</button><button id="plan-record-next" type="button" disabled>Schede successive</button></div></details>
+    <details><summary>Richieste e dipendenze</summary><p id="plan-packet-page" class="hint"></p><ul id="plan-packets" class="queue-list"></ul><div class="desk-actions"><button id="plan-packet-prev" type="button" disabled>Richieste precedenti</button><button id="plan-packet-next" type="button" disabled>Richieste successive</button></div></details>
+    <details><summary>Eventi del piano</summary><ul id="plan-events" class="queue-list"></ul><button id="plan-events-more" type="button" disabled>Eventi successivi</button></details>
+  </section>
   <article id="card-editor" class="desk-card" hidden>
     <div class="preparation-editor-heading"><div><h2>{{ t('community.service_card_title') }}</h2><p>{{ t('community.card_help') }}</p></div><div class="preparation-view-switch" role="group" aria-label="{{ t('community.fields_view') }}"><button type="button" id="view-card" aria-pressed="true">{{ t('community.card') }}</button><button type="button" id="view-fields" aria-pressed="false">{{ t('community.fields_view') }}</button></div></div>
     <div class="desk-actions preparation-save-actions"><button id="save-card" type="button">{{ t('community.save') }}</button><button id="retry-card" type="button" hidden>{{ t('community.retry') }}</button><button id="compare-card" type="button" hidden>{{ t('community.compare') }}</button></div>

@@ -145,3 +145,24 @@ button:disabled { cursor:default; opacity:.55; }
 .preparation-literal-tools label { display:grid; gap:4px; font-size:11px; }
 .community-desk .preparation-service-card .preparation-resolution .hint { font-size:11px; }
 .community-organization-publication { padding:14px 0; border-bottom:1px solid var(--line); }
+
+/* The plan reads and selects the existing cards; it never creates a second editor. */
+.preparation-cards>li { display:flex; align-items:flex-start; gap:10px; }
+.preparation-plan-checkbox { flex:0 0 auto; width:18px; height:18px; margin:12px 0; accent-color:var(--accent); }
+.preparation-plans { min-width:0; overflow-wrap:anywhere; }
+.preparation-plans h3 { margin-top:18px; font-size:14px; }
+.preparation-plans>details { margin-top:12px; }
+.preparation-plan-limits { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; min-width:0; }
+.preparation-plan-limits label { display:grid; gap:6px; min-width:0; font-size:12px; }
+.preparation-plan-limits input { min-width:0; width:100%; box-sizing:border-box; }
+.preparation-plans .desk-actions { flex-wrap:wrap; }
+.preparation-plans .desk-actions button { white-space:normal; max-width:100%; }
+.preparation-plans .queue-list>li { min-width:0; padding:10px 0; }
+.preparation-plans .queue-list label { display:flex; align-items:flex-start; gap:8px; }
+.preparation-plans .queue-list label input { flex:0 0 auto; margin-top:4px; }
+@media(max-width:600px) { .preparation-plan-limits { grid-template-columns:1fr; } .preparation-plans .desk-actions { align-items:stretch; } }
+
+.preparation-cards>li>button { min-width:0; flex:1 1 auto; }
+.preparation-plan-limits { min-inline-size:0; }
+
+.preparation-plans .queue-list button { max-width:100%; white-space:normal; overflow-wrap:anywhere; }

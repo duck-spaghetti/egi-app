@@ -104,3 +104,21 @@ class EventLoopTests(unittest.IsolatedAsyncioTestCase):
             app=SimpleNamespace(state=SimpleNamespace(resources=SimpleNamespace(configuration=SimpleNamespace(canonical=True),intake=intake))))
         with patch('app.backend.api.contribute.router.page',return_value=SimpleNamespace()):
             await self.assert_offloaded(lambda:submit(request), (intake,'submit'),'stored')
+
+    async def test_workbench_preview_transaction_runs_away_from_the_loop(self):
+        """Freezing a plan can wait for PostgreSQL without blocking the ASGI loop."""
+        from contextlib import nullcontext
+        from app.backend.api.preparations import http, workbench
+
+        connection = SimpleNamespace(execute=Mock(return_value=SimpleNamespace(
+            fetchone=Mock(return_value={'result': {'plan_id': str(uuid4())}}))))
+        desk = SimpleNamespace(acting=Mock())
+        module = SimpleNamespace(desk=desk)
+        body = {'item_ids': [str(uuid4())], 'configuration_version': None,
+            'limits': {'max_total_packets': 2}, 'request_key': str(uuid4())}
+        with patch.object(workbench, 'read_json', AsyncMock(return_value=body)), \
+             patch.object(http, 'session', return_value='synthetic-session'), \
+             patch.object(http, 'moderation', return_value=module):
+            await self.assert_offloaded(lambda: workbench.preview(SimpleNamespace(), uuid4()),
+                (desk, 'acting'), lambda *args: nullcontext((connection, {})))
+        connection.execute.assert_called_once()

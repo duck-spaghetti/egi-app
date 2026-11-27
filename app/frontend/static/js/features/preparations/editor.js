@@ -1,5 +1,6 @@
 /** Community workbench: server-backed drafts, two editable views and explicit access. */
 import {createAnalysis} from './analysis.js';
+import {createPlans} from './plans.js';
 import {PreparationDraft} from './draft.js';
 import {renderFields, node, button} from './fields.js';
 import {renderCard} from './card.js';
@@ -9,7 +10,7 @@ const $ = id => document.getElementById(id);
 const context = JSON.parse($('preparation-context').textContent), text = context.text;
 const API = '/moderazione/contribuisci/api', token = $('preparation-form-token').value;
 let workspace, draft, mode = 'card', timer, saving, remote, historyAfter = 0, lastOperation;
-let analysis;
+let analysis, plans;
 let pendingSubmission;
 let inspectedEvidence;
 let addingLiteral=false;
@@ -36,6 +37,7 @@ async function api(path, body, options = {}) {
   return value;
 }
 function changed() {
+  plans?.cardChanged();
   renderEvidence();
   renderChecks();updateCardLabels();
   if(inspectedEvidence && !draft.payload.evidence.some(item=>item.id===inspectedEvidence))$('source-evidence-panel').hidden=true;
@@ -78,6 +80,7 @@ async function list() {
 }
 async function loadWorkspace() {
   workspace = await api('/preparazioni/'+workspace.id);
+  plans?.load(workspace);
   $('workspace-title').textContent = workspace.title;
   $('workspace-source').textContent = context.sources.find(source => source.id === workspace.source_id)?.name || text.source;
   $('workspace-permission').textContent = workspace.permission === 'owner' ? text.owner : text[workspace.permission];
@@ -96,6 +99,7 @@ async function loadWorkspace() {
     const li = node('li'), control = button((text[item.outcome] || item.outcome)+' · '+(name?.slice(0,160) || text.card+' '+(workspace.items.indexOf(item)+1)), () => openCard(item.item_id).catch(problem));
     control.dataset.item=item.item_id;
     control.setAttribute('aria-current', String(draft?.item === item.item_id));
+    if(plans)li.append(plans.selectionControl(item));
     li.append(control); $('card-list').append(li);
   }
   const people = await api('/persone'); $('share-person').replaceChildren();
@@ -118,7 +122,7 @@ async function openWorkspace(id) {
     if (!response.ok) throw Object.assign(new Error(),{status:response.status});
     $('source-text').value = await response.text();
   }
-  inputBase = $('source-text').value; publicBase = $('public-material').checked; analysis?.load(workspace);
+  inputBase = $('source-text').value; publicBase = $('public-material').checked; analysis?.load(workspace);plans?.sourceChanged();
   $('source-evidence-panel').hidden=true;
   history.replaceState(null,'','/moderazione/contribuisci?id='+encodeURIComponent(id)); clearProblem();
 }
@@ -289,6 +293,9 @@ async function addLiteral(kind) {
 $('add-literal-org').addEventListener('click',()=>addLiteral('organization_name'));
 $('add-literal-category').addEventListener('click',()=>addLiteral('category_label'));
 analysis=createAnalysis({context,api,workspace:()=>workspace,draft:()=>draft,canEdit,inputDirty,persistInput,flush:save,reload:loadWorkspace,openCard,error:problem,caption});
-$('source-text').addEventListener('input',()=>analysis.sourceChanged());
-$('public-material').addEventListener('change',()=>analysis.sourceChanged());
+plans=createPlans({context,api,workspace:()=>workspace,draft:()=>draft,canEdit,inputDirty,flush:save,openCard,error:problem});
+window.addEventListener?.('pagehide',event=>event.persisted?plans.pause():plans.dispose());
+window.addEventListener?.('pageshow',event=>{if(event.persisted)plans.refresh();});
+$('source-text').addEventListener('input',()=>{analysis.sourceChanged();plans.sourceChanged();});
+$('public-material').addEventListener('change',()=>{analysis.sourceChanged();plans.sourceChanged();});
 list().then(() => {const id=new URLSearchParams(location.search).get('id');if(id)return openWorkspace(id);$('create-panel').open=true;}).catch(problem);
