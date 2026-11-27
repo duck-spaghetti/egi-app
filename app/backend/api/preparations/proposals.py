@@ -96,4 +96,3 @@ async def select_hypotheses(request: Request, workspace: UUID, job: UUID, item: 
     body = await read_json(request, ('expected_version', 'hypothesis_keys', 'request_key'))
     return reply(await execute(request, 'SELECT preparation.select_workbench_hypotheses(%s,%s,%s,%s,%s,%s) AS result',
         (workspace, job, item, identifier(body['expected_version']), Jsonb(result_keys(body['hypothesis_keys'])), identifier(body['request_key'])), True))
-
