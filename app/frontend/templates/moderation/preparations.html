@@ -1,19 +1,21 @@
 {% extends 'moderation/base.html' %}
-{% block title %}{{ t('community.title') }}{% endblock %}
+{% block title %}{{ t('community.insertion_title') }}{% endblock %}
+{% block breadcrumb %}{{ t('community.insertion_nav') }}{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="/static/css/moderation/preparations.css" />
 <script type="module" src="/static/js/features/preparations/editor.js"></script>
 {% endblock %}
 {% block body %}
-<header class="preparation-heading"><div><h1>{{ t('community.title') }}</h1><p>{{ t('community.intro') }}</p></div><span id="save-state" role="status" aria-live="polite"></span></header>
+<header class="preparation-heading"><div><p class="preparation-step">Community / EGI</p><h1>{{ t('community.insertion_title') }}</h1><p>{{ t('community.intro') }}</p></div><span id="save-state" role="status" aria-live="polite"></span></header>
 <script id="preparation-context" type="application/json">{{ preparation_context|tojson }}</script>
 <input id="preparation-form-token" type="hidden" value="{{ form_token }}" />
 <p id="preparation-error" class="desk-error" role="alert" hidden></p>
 <div class="preparation-layout">
 <aside class="desk-card preparation-sidebar">
-  <h2>{{ t('community.preparations') }}</h2>
+  <details id="preparation-library"><summary>{{ t('community.preparations') }}</summary>
   <label class="desk-inline"><input id="show-trash" type="checkbox" />{{ t('community.trash_list') }}</label>
   <ul id="preparation-list" class="queue-list"></ul>
+  </details>
   <details id="create-panel"><summary>{{ t('community.new') }}</summary>
     <form id="create-preparation" class="desk-form">
       <label>{{ t('community.title_label') }}<input name="title" maxlength="500" placeholder="{{ t('community.automatic_title') }}" /></label>
@@ -27,9 +29,9 @@
 </aside>
 <section id="preparation-workspace" hidden>
   <div class="desk-card"><div class="desk-actions"><h2 id="workspace-title"></h2><span id="workspace-permission" class="badge"></span><button id="workspace-refresh" type="button">{{ t("community.refresh_state") }}</button><button id="workspace-trash" type="button">{{ t('community.trash') }}</button><button id="workspace-restore" type="button">{{ t('community.restore') }}</button></div></div>
-  <div class="preparation-workbench"><aside class="preparation-source-column"><div class="desk-card">
-    <details open><summary>{{ t('community.input') }} · <span id="workspace-source"></span></summary>
-      <form id="input-form" class="desk-form"><label for="source-text">{{ t('community.input') }}</label><textarea id="source-text" rows="8" maxlength="50000"></textarea><label class="check"><input id="public-material" type="checkbox" />{{ t('community.public_material') }}</label><p class="hint">{{ t('community.input_hint') }}</p><div class="desk-actions"><button id="save-input" type="submit">{{ t('community.save_input') }}</button><a id="original-link" target="_blank" rel="noopener">{{ t('community.original') }}</a><button id="manual-card" type="button">{{ t('community.manual') }}</button></div></form>
+  <div class="preparation-workbench"><aside class="preparation-source-column"><p class="preparation-step">{{ t('community.material_step') }}</p><div class="desk-card">
+    <details open><summary>{{ t('community.input') }}</summary><p id="workspace-source" class="hint"></p>
+      <form id="input-form" class="desk-form"><label for="source-text">{{ t('community.original_text_label') }}</label><textarea id="source-text" rows="8" maxlength="50000"></textarea><label class="check"><input id="public-material" type="checkbox" />{{ t('community.public_material') }}</label><p class="hint">{{ t('community.input_hint') }}</p><div class="desk-actions"><button id="save-input" type="submit">{{ t('community.save_input') }}</button><a id="original-link" target="_blank" rel="noopener">{{ t('community.original') }}</a><button id="manual-card" type="button">{{ t('community.manual') }}</button></div></form>
     </details>
   </div>
   <section class="desk-card" id="analysis-panel" hidden>
@@ -42,10 +44,11 @@
     <p id="analysis-kept" class="hint" role="status"></p>
   </section>
   <details class="desk-card" id="source-evidence-panel" hidden><summary id="source-evidence-title">{{ t('community.source_passage') }}</summary><p id="source-evidence-note" class="hint"></p><pre id="source-evidence-text" class="preparation-source-passage"></pre></details>
-  </aside><section class="preparation-card-column">
+  </aside><section class="preparation-card-column"><p class="preparation-step">{{ t('community.card_step') }}</p>
   <div class="desk-card"><ul id="card-list" class="queue-list preparation-cards"></ul><p id="no-cards">{{ t('community.no_cards') }}</p></div>
   <article id="card-editor" class="desk-card" hidden>
-    <div class="desk-actions"><div class="preparation-view-switch" role="group" aria-label="{{ t('community.fields_view') }}"><button type="button" id="view-card" aria-pressed="true">{{ t('community.card') }}</button><button type="button" id="view-fields" aria-pressed="false">{{ t('community.fields_view') }}</button></div><button id="save-card" type="button">{{ t('community.save') }}</button><button id="retry-card" type="button" hidden>{{ t('community.retry') }}</button><button id="compare-card" type="button" hidden>{{ t('community.compare') }}</button></div>
+    <div class="preparation-editor-heading"><div><h2>{{ t('community.service_card_title') }}</h2><p>{{ t('community.card_help') }}</p></div><div class="preparation-view-switch" role="group" aria-label="{{ t('community.fields_view') }}"><button type="button" id="view-card" aria-pressed="true">{{ t('community.card') }}</button><button type="button" id="view-fields" aria-pressed="false">{{ t('community.fields_view') }}</button></div></div>
+    <div class="desk-actions preparation-save-actions"><button id="save-card" type="button">{{ t('community.save') }}</button><button id="retry-card" type="button" hidden>{{ t('community.retry') }}</button><button id="compare-card" type="button" hidden>{{ t('community.compare') }}</button></div>
     <div id="conflict-panel" hidden><p class="desk-error">{{ t('community.conflict') }}</p><div id="conflict-fields"></div><button id="apply-comparison" type="button">{{ t('community.apply_comparison') }}</button></div>
     <div id="editable-fields" class="preparation-preview"></div>
     <aside id="card-checks" class="preparation-checks" aria-label="{{ t('community.preliminary_checks') }}" aria-live="polite"></aside>

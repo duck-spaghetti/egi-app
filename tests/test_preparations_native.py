@@ -1,4 +1,6 @@
 """Real HTTP/session/private preparation contracts on disposable PostgreSQL; no AI calls."""
+import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -129,6 +131,27 @@ class PreparationHttpTests(unittest.TestCase):
         self.assertNotIn("unsafe-inline", page.headers['content-security-policy'])
         self.assertEqual(page.headers['cache-control'], 'no-store')
         self.assertEqual(self.browser().get('/moderazione/contribuisci').status_code, 401)
+
+    def test_readable_category_selection_survives_private_save(self):
+        """Use an adopted term advertised to the operator without inventing references."""
+        owner = self.browser('mod1')
+        page = owner.get('/moderazione/contribuisci')
+        context = json.loads(re.search(r'<script id="preparation-context"[^>]*>(.*?)</script>', page.text, re.S).group(1))
+        choice = context['references']['classifications'][0]
+        self.assertTrue(choice['name'])
+        workspace = self.prepare(owner)
+        uploaded = self.upload(owner, workspace).json()
+        path = f'{BASE}/preparazioni/{workspace}'
+        created = owner.post(path+'/schede/crea', json={'input_id': uploaded['input_id'], 'job_id': None,
+            'selections': [{'creation_key': str(uuid4())}], 'request_key': str(uuid4())}, headers=self.headers()).json()['items'][0]
+        card_path = path+'/schede/'+created['item_id']
+        payload = owner.get(card_path).json()['version']['payload']
+        selected = {key: choice[key] for key in ('adoption_id', 'term_id')}
+        payload['service'] = {'name': 'Selected category', 'classifications': [selected]}
+        saved = owner.post(path+'/schede', json={'changes': [{'item_id': created['item_id'],
+            'expected_version': created['version_id'], 'payload': payload}], 'request_key': str(uuid4())}, headers=self.headers())
+        self.assertEqual(saved.status_code, 200, saved.text)
+        self.assertEqual(owner.get(card_path).json()['version']['payload']['service']['classifications'], [selected])
 
     def test_people_sources_and_invalid_sessions(self):
         """Existing people listing and separate source admission keep their role boundary."""

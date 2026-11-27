@@ -1,0 +1,30 @@
+/* Community's prototype frame, applied to authenticated editorial pages only. */
+.community-desk *, .community-desk *::before, .community-desk *::after { box-sizing:border-box; }
+.community-sidebar { position:fixed; inset:0 auto 0 0; width:204px; display:flex; flex-direction:column; padding:26px 12px; background:var(--paper); border-right:1px solid var(--line); z-index:20; }
+.community-brand { display:flex; gap:10px; align-items:center; margin:0 8px 28px; color:var(--ink); text-decoration:none; font:800 25px/1.15 Fraunces,Georgia,serif; letter-spacing:-.8px; }
+.community-brand small { display:block; margin-top:7px; font:8px "IBM Plex Mono",monospace; letter-spacing:3px; text-transform:uppercase; }
+.community-brand-mark { display:grid; place-items:center; width:32px; height:32px; flex-shrink:0; border:1px solid var(--line); border-radius:50%; color:var(--accent); font-size:26px; }
+.community-nav-label { padding:0 12px; margin:14px 0 9px; font:8px "IBM Plex Mono",monospace; text-transform:uppercase; letter-spacing:1.3px; color:var(--ink-faint); }
+.community-sidebar nav { display:grid; gap:5px; }
+.community-sidebar nav a { display:flex; gap:12px; align-items:center; min-height:42px; padding:10px 12px; color:var(--ink-soft); text-decoration:none; font-size:12px; border-left:3px solid transparent; border-radius:5px; }
+.community-sidebar nav a>span { width:15px; text-align:center; font-size:18px; line-height:1; }
+.community-sidebar nav a:hover { background:var(--bg); }
+.community-sidebar nav a[aria-current=page] { background:#eee9dd; color:var(--ink); border-left-color:var(--accent); font-weight:600; }
+.community-sidebar-footer { margin:auto 10px 0; padding-top:20px; border-top:1px solid var(--line); color:var(--ink-soft); font-size:10px; line-height:1.8; }
+.community-topbar { margin-left:204px; min-height:68px; padding:14px 30px; display:flex; align-items:center; justify-content:space-between; gap:16px; background:var(--paper); border-bottom:1px solid var(--line); font-size:12px; color:var(--ink-soft); }
+.community-topbar>span>span { margin:0 18px; color:var(--ink-faint); }
+.community-topbar strong { color:var(--ink); font-weight:600; }
+.community-person { display:flex; align-items:center; gap:12px; font-size:11px; }
+.community-avatar { display:grid; place-items:center; width:30px; height:30px; border-radius:50%; background:#eee9dd; font-size:10px; font-weight:700; }
+.desk-main.community-main { max-width:1460px; margin:0 0 0 204px; padding:30px; gap:24px; }
+.community-desk .desk-card { border-radius:12px; padding:22px; }
+.community-desk button, .community-desk .button { font-size:12px; border:1px solid var(--line); border-radius:7px; background:var(--paper); color:var(--ink); padding:10px 14px; }
+.community-desk button:hover, .community-desk .button:hover { border-color:var(--ink-faint); background:#eee9dd; }
+.community-desk button.link { border:0; background:transparent; padding:0; color:var(--ink-soft); font-size:11px; }
+.community-desk #submit-card, .community-desk .publish button, .community-desk #community-accept-form>button { background:var(--accent); border-color:var(--accent); color:var(--paper); }
+.community-desk .desk-form { font-size:12px; }
+.community-desk .desk-form input, .community-desk .desk-form select, .community-desk .desk-form textarea { font-size:12px; }
+.community-desk .hint { font-size:11px; line-height:1.7; }
+.community-desk .desk-table { font-size:12px; }
+@media(max-width:1050px) { .community-sidebar { width:180px; } .community-topbar { margin-left:180px; padding-inline:24px; } .desk-main.community-main { margin-left:180px; padding:24px; } }
+@media(max-width:760px) { .community-sidebar { position:static; width:auto; height:auto; padding:15px 18px; border-right:0; border-bottom:1px solid var(--line); } .community-brand { margin:0 0 12px; font-size:23px; } .community-nav-label,.community-sidebar-footer { display:none; } .community-sidebar nav { display:flex; flex-wrap:wrap; gap:4px; } .community-sidebar nav a { min-height:36px; padding:6px 9px; } .community-topbar { margin-left:0; padding:12px 18px; } .community-topbar>span { display:none; } .community-person { margin-left:auto; } .desk-main.community-main { margin-left:0; padding:18px; } }

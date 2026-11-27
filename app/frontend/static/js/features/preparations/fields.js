@@ -35,8 +35,8 @@ export function renderFields(root, draft, context, canEdit, changed, redrawAll) 
       if (value !== undefined && !dictionary.choices[key].includes(value)) input.append(new Option(String(value), String(value)));
       input.value = value === undefined ? '' : String(value);
     } else {
-      input = node(['description', 'details', 'cost_note', 'note', 'closure_reason'].includes(key) || context.cardView && key==='name' ? 'textarea' : 'input');
-      if(context.cardView && key==='name')input.rows=2;
+      input = node(['description', 'details', 'cost_note', 'note', 'closure_reason'].includes(key) || context.cardView && ['name','formatted'].includes(key) ? 'textarea' : 'input');
+      if(context.cardView && ['name','formatted'].includes(key))input.rows=1;
       if(context.cardView && ['name','description'].includes(key))input.placeholder=label(key);
       if (input.tagName === 'INPUT') input.type = key === 'is_public' ? 'checkbox' : dictionary.numbers.includes(key) ? 'number' : dictionary.dates.includes(key) ? 'date' : dictionary.times.includes(key) ? 'time' : 'text';
       if (key === 'is_public') { input.checked = value === true; input.indeterminate = value === undefined; }
@@ -68,6 +68,31 @@ export function renderFields(root, draft, context, canEdit, changed, redrawAll) 
     section.dataset.field=key;
     section.append(node('h3', label(key)));
     const values = body[key] || [];
+    if(key==='classifications' && context.references?.classifications) {
+      const choices=context.references.classifications;
+      function category(value,index) {
+        const row=node('div',undefined,'preparation-category-choice'),select=node('select');
+        select.setAttribute('aria-label',text.category);select.disabled=!canEdit;
+        select.append(new Option(text.choose_category,''));
+        for(const choice of choices)select.append(new Option(choice.name,choice.adoption_id+'/'+choice.term_id));
+        if(value) {
+          const selected=value.adoption_id+'/'+value.term_id;
+          if(!choices.some(choice=>choice.adoption_id+'/'+choice.term_id===selected))select.append(new Option(text.unresolved_category,selected));
+          select.value=selected;
+        }
+        select.addEventListener('change',()=>{
+          const next=structuredClone(values);
+          if(!select.value){if(index!==null)next.splice(index,1);else return;}
+          else {const chosen=choices.find(choice=>choice.adoption_id+'/'+choice.term_id===select.value),entry={adoption_id:chosen.adoption_id,term_id:chosen.term_id};if(index===null)next.push(entry);else next[index]=entry;}
+          edit(path,next);redraw();
+        });
+        row.append(select);section.append(row);
+      }
+      values.forEach((value,index)=>category(value,index));
+      if(!values.length)category(null,null);
+      else if(canEdit)section.append(button(text.add_category,()=>category(null,null)));
+      parent.append(section);return;
+    }
     values.forEach((value, index) => {
       const group = node('fieldset'); group.append(node('legend', label(key) + ' · ' + (index + 1)));
       if (key === 'territories') {

@@ -9,7 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Request
 from psycopg.types.json import Jsonb
 
-from .fields import dictionary
+from .fields import dictionary, references
 from .http import Failure, PreparationRoute, execute, identifier, read_json, reply
 from ..moderation import decisions, places
 from ..moderation.workspace import Workspace
@@ -41,7 +41,7 @@ def review_context(connection, item: dict, module, query='') -> dict:
     shared = decisions.context(connection,proxy,query)
     shared['community'] = {'snapshot':snapshot,'diagnostics':copied['diagnostics'],
         'resolution':copied.get('resolution'),'service_id':service,'baseline':without_evidence(baseline),
-        'working':working,'public':public,'fields':dictionary(),'references':{'territories':places.territories(connection)},'text':module.catalog.languages['it']['community'],
+        'working':working,'public':public,'fields':dictionary(),'references':references(connection),'text':module.catalog.languages['it']['community'],
         'methods':places.METHODS,'closed':item['state']=='closed'}
     resolution = copied.get('resolution')
     if resolution:

@@ -1,9 +1,9 @@
-"""Describe the frozen private field grammar for both card and field editors.
+"""Describe the frozen private field grammar and authorized presentation references.
 
 Reuse the canonical workspace's selected vocabularies. This presentation dictionary
 never validates or writes canonical data; PostgreSQL remains authoritative.
 """
-from ..moderation import hours, workspace
+from ..moderation import hours, workspace, places
 
 SCALARS = {
     'service': ('name', 'description', 'original_language', 'delivery_mode', 'operational_status', 'cost_state', 'cost_note', 'valid_from', 'valid_until', 'closure_date', 'closure_reason'),
@@ -40,3 +40,10 @@ def dictionary():
     return {'scalars': SCALARS, 'components': COMPONENTS, 'arrays': ARRAYS, 'choices': CHOICES,
             'numbers': ('latitude', 'longitude', 'weekday', 'end_day_offset', 'sort_order'),
             'dates': ('valid_from', 'valid_until', 'closure_date'), 'times': ('opens', 'closes')}
+
+
+def references(connection):
+    """Reuse canonical territory/term reads for explicit operator classification."""
+    areas = places.territories(connection)
+    terms = connection.execute(workspace.TERMS, ([area['territory_id'] for area in areas],)).fetchall() if areas else []
+    return {'territories': areas, 'classifications': terms}

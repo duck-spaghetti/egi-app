@@ -67,3 +67,57 @@
 button:disabled { cursor:default; opacity:.55; }
 @media(max-width:640px) { .preparation-workbench { grid-template-columns:1fr; } .preparation-source-column { position:static; max-height:none; overflow:visible; } }
 @media(max-width:800px) { .preparation-layout { grid-template-columns:1fr; } .preparation-sidebar #create-preparation { grid-template-columns:1fr; } .preparation-heading { display:block; } .preparation-fields .preparation-control { grid-template-columns:1fr; } .preparation-fields .preparation-control .hint { grid-column:1; } }
+/* Insertion follows the prototype's hierarchy while retaining real draft controls. */
+.community-desk .preparation-heading h1 { font:800 32px/1.2 Fraunces,Georgia,serif; letter-spacing:-.8px; margin:0 0 10px; }
+.community-desk .preparation-heading p { font-size:13px; line-height:1.7; color:var(--ink-soft); }
+.preparation-step { margin:0; color:var(--ink-faint); text-transform:uppercase; letter-spacing:1.6px; font:9px "IBM Plex Mono",monospace; }
+.community-desk .preparation-heading .preparation-step { font:9px "IBM Plex Mono",monospace; margin-bottom:12px; }
+.community-desk .preparation-sidebar { display:flex; flex-wrap:wrap; gap:20px; border:0; background:transparent; padding:0 0 14px; border-radius:0; border-bottom:1px solid var(--line); }
+.community-desk .preparation-sidebar details { border:0; padding:0; margin:0; min-width:0; }
+.community-desk .preparation-sidebar details[open] { flex-basis:100%; }
+.community-desk .preparation-sidebar summary { font-size:12px; cursor:pointer; padding:9px 12px; border:1px solid var(--line); border-radius:7px; background:var(--paper); }
+.community-desk .preparation-sidebar details[open]>summary { margin-bottom:16px; }
+.community-desk #preparation-workspace>.desk-card:first-child { border:0; background:transparent; padding:0; }
+.community-desk #workspace-title { font:500 12px "IBM Plex Sans",sans-serif; margin:0; }
+.community-desk #workspace-refresh,.community-desk #workspace-trash,.community-desk #workspace-restore { font-size:10px; padding:5px 8px; }
+.community-desk .preparation-workbench { grid-template-columns:minmax(280px,.47fr) minmax(0,1fr); gap:28px; }
+.community-desk .preparation-source-column { position:static; max-height:none; overflow:visible; gap:16px; }
+.community-desk .preparation-card-column { gap:16px; }
+.community-desk .preparation-source-column>.desk-card>details>summary { font:700 18px Fraunces,serif; margin-bottom:14px; }
+.community-desk .preparation-source-column textarea { min-height:245px; font-size:11px; line-height:1.8; background:var(--bg); }
+.community-desk .preparation-source-column .desk-actions { gap:10px; }
+.community-desk .preparation-source-column .desk-actions button,.community-desk .preparation-source-column .desk-actions a { font-size:10px; }
+.community-desk #card-editor { border:0; background:transparent; padding:0; }
+.community-desk .preparation-card-column>.desk-card:first-of-type { padding:0; border:0; background:transparent; }
+.preparation-editor-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+.preparation-editor-heading h2 { font:700 23px Fraunces,serif; margin:0 0 10px; }
+.preparation-editor-heading p { font-size:12px; line-height:1.7; margin:0; color:var(--ink-soft); }
+.community-desk .preparation-view-switch { border:1px solid var(--line); border-radius:8px; padding:4px; gap:2px; background:#eee9dd; }
+.community-desk .preparation-view-switch button { padding:8px 12px; font-size:11px; }
+.community-desk .preparation-view-switch button[aria-pressed=false] { background:transparent; border-color:transparent; }
+.community-desk .preparation-save-actions { margin:10px 0; }
+.community-desk .preparation-preview { margin:22px 0; }
+.community-desk .preparation-card-header { padding:26px 32px 20px; }
+.community-desk .preparation-card-section { padding:18px 32px; border-top:0; }
+.community-desk .preparation-card-section h3 { font:600 10px "IBM Plex Sans",sans-serif; letter-spacing:.8px; text-transform:uppercase; }
+.community-desk .preparation-card-source { padding:22px 32px; background:#eee9dd; }
+.community-desk .preparation-card-metadata { align-items:flex-start; justify-content:space-between; gap:12px; }
+.community-desk .preparation-card-metadata .preparation-repeat { flex:1; min-width:0; }
+.community-desk .preparation-card-metadata>.preparation-control { max-width:120px; margin:0; }
+.community-desk .preparation-service-card .preparation-control:not(:focus-within):not(:hover) .hint>button:not([data-evidence]) { display:none; }
+.community-desk .preparation-card-metadata .hint { gap:3px 8px; }
+.community-desk .preparation-category-choice select { max-width:100%; width:100%; border:0; color:var(--accent); background:transparent; font-size:11px; padding:8px 0; }
+.community-desk .preparation-service-card .preparation-control input:not([type=checkbox]),.community-desk .preparation-service-card .preparation-control textarea,.community-desk .preparation-service-card .preparation-control select { border:1px solid transparent; padding:3px 0; font-size:13px; line-height:1.7; }
+.community-desk .preparation-service-card .preparation-control input:hover,.community-desk .preparation-service-card .preparation-control textarea:hover,.community-desk .preparation-service-card .preparation-control select:hover { border-color:var(--line); }
+.community-desk .preparation-service-card .preparation-control[data-field=name] textarea { font:800 32px/1.15 Fraunces,serif; letter-spacing:-.5px; min-height:38px; }
+.community-desk .preparation-service-card .preparation-control[data-field=description] textarea { min-height:38px; }
+.community-desk .preparation-service-card .preparation-control .hint { font-size:9px; line-height:1.6; }
+.community-desk .preparation-service-card .hint button[data-evidence] { border:0; padding:0; color:var(--accent); background:transparent; font-size:9px; }
+.community-desk .preparation-card-place { margin-top:12px; }
+.community-desk .preparation-card-place .preparation-repeat>fieldset { border:0; padding:0; }
+.community-desk .preparation-card-place .preparation-repeat>fieldset>legend { display:none; }
+.community-desk .preparation-card-place .preparation-control>span:first-child { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.community-desk .preparation-card-place details { font-size:10px; color:var(--ink-soft); margin-top:8px; }
+.community-desk .preparation-card-extra { padding:16px 32px; font-size:11px; }
+@media(max-width:1100px) { .community-desk .preparation-workbench { grid-template-columns:1fr; } }
+@media(max-width:760px) { .community-desk .preparation-card-header,.community-desk .preparation-card-section,.community-desk .preparation-card-source,.community-desk .preparation-card-extra { padding-inline:20px; } .preparation-editor-heading { flex-wrap:wrap; } }

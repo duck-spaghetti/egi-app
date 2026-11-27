@@ -15,11 +15,11 @@ still retain/revise text separately and create blank cards. The card and field l
 service and location bodies, structured contacts/conditions/hours and disclosed
 advanced fields. The shared field dictionary reuses existing editorial vocabularies;
 PostgreSQL still validates all writes. Territories use the existing named options;
-other advanced reference fields use canonical UUIDs. Broader
+classifications reuse the adopted terms with readable names and actual adoption/term references. Other advanced reference fields use canonical UUIDs. Broader
 catalogue search is not supplied by this editor. A contact's publishability remains
 unset until the operator chooses it.
 
-Source/interpretation and card occupy adjacent columns above 640px; smaller widths
+Source/interpretation and card occupy adjacent columns above 1100px; smaller widths
 stack them. The preparation library sits above the workbench. Card view composes a
 service heading, description, hours, access, contacts and source footer using the
 same control instances/dictionary as field view. Inline text grows to show content;
@@ -84,3 +84,20 @@ Four actual-module Node checks pass, including Unicode/BOM/CRLF and prevention o
 borrowing proposal citations for baseline values. Small-screen behavior below 640px
 is not established by a browser measurement. Independent milestone review and the
 human corpus/live-provider gates remain pending.
+
+Prototype-alignment follow-up (2026-11-27): authenticated editorial pages now use a
+204px desktop sidebar and 68px topbar, with only functional insertion/catalog/queue
+links and the actual signed-in person. Login and public-map surfaces retain their
+own layouts. Preparation creation/library controls close when a workspace opens.
+The desktop workbench uses the prototype's approximately 316px/672px proportions
+at 1280px, and the card presents classification, heading, place/address, description,
+hours, access and contacts with expandable structural details. No flat prototype
+payload or simulated authorization is used.
+
+Browser verification on the owned 4326 demo at actual 1280px: no page overflow;
+manual adopted-category selection survives save/reload/reopen and both views; exact
+source passage remains inspectable; no console errors observed. Native HTTP test
+also verifies advertised adopted references survive private save/reopen. This is
+manual classification only: unresolved organization names, raw source categories,
+automatic matching and clustering require the pending reviewed contract amendment.
+Visual fidelity, narrow-screen behavior and whole-milestone acceptance remain open.

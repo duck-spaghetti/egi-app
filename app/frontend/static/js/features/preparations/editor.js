@@ -104,6 +104,7 @@ async function openWorkspace(id) {
   draft = null; workspace = {id}; lastOperation = null; pendingInput = null; manualAttempt = null;
   inputBase = ''; publicBase = false; $('source-text').value = ''; $('public-material').checked = false;
   await loadWorkspace();
+  $('create-panel').open=false; $('preparation-library').open=false;
   $('preparation-workspace').hidden = false; $('card-editor').hidden = true;
   $('source-text').value = '';
   if (workspace.current_input_id) {

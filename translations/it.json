@@ -968,6 +968,25 @@
     "check_contact": "Prima della pubblicazione serve un contatto pubblicabile adatto alla modalità.",
     "basic_checks_present": "I campi principali sono presenti.",
     "checks_hint": "Una scheda con il nome può essere inviata anche se incompleta. Gli altri requisiti vengono verificati in moderazione.",
-    "automatic_title": "Titolo automatico dalla fonte, se lasci vuoto"
+    "automatic_title": "Titolo automatico dalla fonte, se lasci vuoto",
+    "brand": "Community",
+    "workspace_label": "Spazio di lavoro",
+    "insertion_nav": "Inserimento",
+    "catalog_nav": "Catalogo dati",
+    "moderation_nav": "Moderazione",
+    "workspace_footer": "Inserimento, revisione e gestione dei servizi.",
+    "insertion_title": "Inserimento servizi",
+    "material_step": "01 / Materiale di partenza",
+    "card_step": "02 / Modifica scheda",
+    "service_card_title": "Scheda servizio",
+    "card_help": "Scrivi direttamente sulla scheda: ogni campo è modificabile.",
+    "original_text_label": "Testo originale",
+    "category": "Categoria",
+    "choose_category": "Scegli categoria…",
+    "unresolved_category": "Categoria da verificare",
+    "add_category": "Aggiungi categoria",
+    "card_address_details": "Altri dettagli dell’indirizzo",
+    "card_location_details": "Dettagli del luogo",
+    "card_add_location": "Prepara il luogo del servizio"
   }
 }
