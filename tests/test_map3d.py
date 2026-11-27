@@ -1,4 +1,6 @@
 """Serve the active 3D data set through the real application (in process)."""
+import gzip
+import hashlib
 import json
 import re
 import tempfile
@@ -54,6 +56,30 @@ class Map3dHttpTests(unittest.TestCase):
                 font = client.get(f'/map3d/{VERSION}/fonts/Noto Sans Regular/0-255.pbf')
                 self.assertEqual(font.status_code, 200)
                 self.assertEqual(client.get('/map3d/active').headers['cache-control'], 'no-store')
+
+    def test_bridge_gzip_contract_and_active_descriptor(self):
+        """Browser-decoded gzip matches the descriptor checksum and remains active-only."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            folder = data_set(root / 'map3d')
+            manifest_path = root / 'map3d' / 'active.json'
+            manifest = json.loads(manifest_path.read_text())
+            body = b'{"format":1,"chunks":[]}'
+            for name, content in [('bridge-plan.pmtiles', b'plan'),
+                                  ('bridge-mesh/index.json.gz', gzip.compress(body, mtime=0))]:
+                path = folder / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(content)
+                manifest['files'][name] = {'bytes': len(content), 'sha256': hashlib.sha256(content).hexdigest()}
+            manifest_path.write_text(json.dumps(manifest))
+            with self.client(root) as client:
+                descriptor = client.get('/map3d/active').json()['bridgeMesh']
+                response = client.get(f'/map3d/{VERSION}/bridge-mesh/index.json.gz')
+                self.assertEqual(response.headers['content-encoding'], 'gzip')
+                self.assertEqual(response.content, body)
+                self.assertEqual(descriptor['sha256'], hashlib.sha256(response.content).hexdigest())
+                self.assertEqual(descriptor['bytes'], len(body))
+                self.assertEqual(client.get('/map3d/20200101T000000Z/bridge-mesh/index.json.gz').status_code, 404)
 
     def test_unknown_version_unlisted_file_and_traversal(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -201,6 +201,9 @@ export function createMapPage(context, dependencies={}) {
    case 'toggleOffer':if(state.filters.offersOff.has(payload.code))state.filters.offersOff.delete(payload.code);else state.filters.offersOff.add(payload.code);refresh();break;
    case 'select':select(payload.id);break;
    case 'choose':services.choose(payload.items,payload.matched);break;
+   case 'map3dVersionConflict':
+    saveHandoff(browser,'3d',state);
+    browser.location.assign(switchUrl(browser.location,{view:'3d',lang:state.lang,service:state.selectedId}));break;
    case 'map3dBudget':{
     const button=document.getElementById('view3d-toggle');
     const text=i18n.t('map.map3d.slow',{},'La vista 3D è lenta su questo dispositivo: puoi tornare alla mappa piana.');

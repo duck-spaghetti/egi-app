@@ -5,6 +5,8 @@ version, files with bytes and sha256). Only the active version and only the file
 listed in its manifest are served; anything else is absent. A missing or invalid
 active manifest makes the 3D mode unavailable, never an error page.
 """
+import gzip
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -51,7 +53,19 @@ class Map3d:
         manifest = self.active()
         if not manifest:
             return None
-        return {'version': manifest['version'], 'base': f"/map3d/{manifest['version']}"}
+        summary = {'version': manifest['version'], 'base': f"/map3d/{manifest['version']}"}
+        name = 'bridge-mesh/index.json.gz'
+        if name in manifest['files'] and 'bridge-plan.pmtiles' in manifest['files']:
+            path = self.file(manifest['version'], name)
+            try:
+                with gzip.open(path, 'rb') as stream:
+                    body = stream.read(2 * 1024 * 1024 + 1)
+                if len(body) <= 2 * 1024 * 1024:
+                    summary['bridgeMesh'] = {'url': name, 'sha256': hashlib.sha256(body).hexdigest(),
+                                             'bytes': len(body), 'gzipBytes': manifest['files'][name]['bytes']}
+            except (OSError, TypeError, EOFError):
+                pass
+        return summary
 
     def file(self, version: str, name: str) -> Path | None:
         """Path of a listed file of the active version, or None."""

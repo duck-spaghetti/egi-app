@@ -18,7 +18,7 @@ def owner(request: Request) -> Map3d:
 def active(module: Map3d = Depends(owner)):
     """Availability and base URL of the active version (no-store)."""
     summary = module.summary()
-    return {'availability': 'available', **summary} if summary else {'availability': 'unavailable'}
+    return JSONResponse({'availability': 'available', **summary} if summary else {'availability': 'unavailable'}, headers={'Cache-Control': 'no-store'})
 
 
 @router.get('/map3d/{version}/{name:path}')
@@ -28,4 +28,8 @@ def data_file(version: str, name: str, module: Map3d = Depends(owner)):
     if path is None:
         return JSONResponse({'error': 'not_found'}, status_code=404)
     media = next((v for k, v in TYPES.items() if name.endswith(k)), 'application/octet-stream')
-    return FileResponse(path, media_type=media, headers={'Cache-Control': IMMUTABLE})
+    headers = {'Cache-Control': IMMUTABLE}
+    if name.endswith('.json.gz'):
+        media = 'application/json'
+        headers['Content-Encoding'] = 'gzip'
+    return FileResponse(path, media_type=media, headers=headers)

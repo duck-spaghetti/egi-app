@@ -211,21 +211,30 @@ export function layers3d(base, C = COLORS_3D) {
 
 /** Lift bridge labels: MapLibre draws symbols at ground level, decks are raised, so labels move
  * up on screen by as much as a point h metres high does at the current zoom and pitch. */
+export const NATIVE_BRIDGES = ["piers-3d", "decks-3d", "parapets-3d"];
+
 export function liftBridgeLabels(map) {
   const ids = map.getStyle().layers.filter(l => l.metadata?.["egi:lift"]).map(l => [l.id, l.metadata["egi:lift"]]);
   const update = () => {
+    if (map.isStyleLoaded && !map.isStyleLoaded()) return;
     const z = map.getZoom(), lat = map.getCenter().lat, pitch = map.getPitch() * Math.PI / 180;
     const ppm = 512 * 2 ** z / (40075016.686 * Math.cos(lat * Math.PI / 180));
-    for (const [id, h] of ids) map.setPaintProperty(id, "text-translate", [0, -h * ppm * Math.sin(pitch)]);
+    for (const [id, h] of ids) if (!map.getLayer || map.getLayer(id)) map.setPaintProperty(id, "text-translate", [0, -h * ppm * Math.sin(pitch)]);
   };
   map.on("move", update);
+  map.on("style.load", update);
   update();
-  return () => map.off("move", update);
+  return () => {map.off("move", update);map.off("style.load", update);};
 }
 
 /** Complete style for the active data set version. */
-export function egiStyle(base) {
+export function egiStyle(base, continuousBridges = false) {
   const extra = layers3d(base);
+  if (continuousBridges) {
+    extra.sources.bridges.url = `pmtiles://${base}/bridge-plan.pmtiles`;
+    extra.layers = extra.layers.filter(layer => !NATIVE_BRIDGES.includes(layer.id));
+    extra.layers.find(layer => layer.id === 'bridge-plan').paint['fill-opacity'] = 1;
+  }
   return {
     version: 8,
     glyphs: `${base}/fonts/{fontstack}/{range}.pbf`,

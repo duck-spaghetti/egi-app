@@ -1270,3 +1270,26 @@ The changed transport contract selects the exact consolidated importer fixture
 through `.checks/integration.json` and `EGI_IMPORTER_REPO` for its byte comparison.
 The private importer is not automatically published or given new CI credentials;
 remote verification requires that identified fixture to be provided explicitly.
+
+### Continuous bridge rendering
+
+A dataset containing `bridge-plan.pmtiles` and `bridge-mesh/index.json.gz` enables
+continuous bridge decks and parapets in 3D. Legacy-only datasets retain their
+native rendering. The map owns one dedicated custom layer; it shares MapLibre's
+matrix/depth/render loop and does not change the transport renderer interface.
+
+The page pins the index checksum and dataset version. The loader bounds decoded
+responses, checks hashes/schema/frame/provenance and admits the entire visible
+set only after GPU upload. It retains at most eight complete spatial chunks and
+8MiB of bridge-owned buffers. Initial pending loads show complete planar footprints; existing native fallback
+remains visible during a retry until every mesh upload is ready (user decision,
+2026-11-27). Normal operation uses the lightweight plan archive;
+the stepped archive is installed lazily for complete native fallback on failure
+or budget exceedance. Viewport changes cancel obsolete work; context restoration
+reattaches/reuploads automatically. Same-version failures can be retried; a detected
+active-version change uses the existing page handoff/reload to preserve filters
+and selection rather than mixing revisions. No periodic metadata polling is added.
+
+Bridge heights preserve the importer's inferred ramp model and source centerlines.
+Native labels keep their approximate camera-dependent lift; exact deck-following
+3D text and physical-phone acceptance remain deferred.

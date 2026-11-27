@@ -34,5 +34,8 @@ const assert=require('node:assert/strict');const {environment,element}=require('
  const named=await fixture('2d');named.emit('savedMap',{id:'operators',entries:[],name:'Operatori'});env.get('view3d-toggle').click();
  assert(!named.redirect.includes('operators'),'list identity stays out of the URL');const transferred=JSON.parse(named.session.getItem('egi.map.handoff'));named.page.dispose();
  const restored=await fixture('3d',true,transferred);assert.equal(restored.state.filters.savedCollection,'operators','view switch keeps the named collection instead of quick favorites');assert.equal(restored.state.savedListName,'Operatori');restored.page.dispose();
+ const versioned=await fixture('3d');versioned.emit('savedMap',{id:'operators',entries:[],name:'Operatori'});versioned.emit('select',{id:'service'});versioned.emit('map3dVersionConflict',{});
+ assert(versioned.redirect.includes('vista=3d'));assert(versioned.redirect.includes('service'),'version recovery preserves selection');
+ const recovered=JSON.parse(versioned.session.getItem('egi.map.handoff'));assert.equal(recovered.filters.savedCollection,'operators');assert.equal(recovered.savedListName,'Operatori');versioned.page.dispose();
  console.log('PASS: integrated directions, reference continuation, automatic focus/List exception and 2D-to-3D handoff');
 })().catch(e=>{console.error(e);process.exitCode=1;});

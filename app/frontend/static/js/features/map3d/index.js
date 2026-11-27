@@ -1,3 +1,4 @@
+import {createBridgeScene} from './bridge-scene.js';
 import {createTransportScene} from '../transport-scene/index.js';
 import {siteMarkers,USER_DOT_HTML,USER_DOT_LABEL} from "../map/pins.js";
 import {clusterSites,clusterAppearance,siteLabel,placeSiteHeads,siteHeadBox,CLUSTER_DISTANCE,STEM_ZOOM,NAME_ZOOM,DETAIL_ZOOM} from "./sites.js";
@@ -29,7 +30,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   devicePixelRatio=globalThis.devicePixelRatio||1,origin=globalThis.location?.origin||"",
   frame=globalThis.requestAnimationFrame?.bind(globalThis),cancelFrame=globalThis.cancelAnimationFrame?.bind(globalThis),
   clock=()=>globalThis.performance?.now?.()??Date.now(),heap=()=>globalThis.performance?.memory?.usedJSHeapSize??null}) {
- let state={},entries=[],visible=true,disposed=false,headsDirty=false,transportScene=null;
+ let state={},entries=[],visible=true,disposed=false,headsDirty=false,transportScene=null,bridgeScene=null;
  const runtime={map:null,markers:new Map(),user:null,bounds:null,cleanups:[],layout:[],screen:null};
  const t=(key,fallback)=>translate(key,{},fallback);
  const bounds=()=>[[Number(context.boundsWest),Number(context.boundsSouth)],[Number(context.boundsEast),Number(context.boundsNorth)]];
@@ -41,7 +42,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   if(pmtiles&&!PROTOCOLS.has(maplibre)){maplibre.addProtocol("pmtiles",new pmtiles.Protocol().tile);PROTOCOLS.add(maplibre);}
   runtime.bounds=bounds();
   const map=runtime.map=new maplibre.Map({
-   container:"map",style:egiStyle(base),
+   container:"map",style:egiStyle(base,Boolean(context.map3d.bridgeMesh)),
    center:[Number(context.longitude),Number(context.latitude)],zoom:Math.max(Number(context.zoom)||12,11),
    pitch:45,maxPitch:60,touchPitch:false,pitchWithRotate:false,
    // Attributions (CTRN Regione Lazio, OpenStreetMap, Protomaps) always shown in full.
@@ -64,7 +65,13 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   runtime.cleanups.push(()=>{map.off("move",queueHeadLayout);map.off("render",flushHeadLayout);cancelHeadLayout();});
   if(maplibre.MercatorCoordinate)transportScene=createTransportScene({map,maplibre,onStopSelect:key=>map.fire("egi:stopselect",{key})});
   watchBudget(map);
-  map.on("load",()=>{if(map.getStyle)runtime.cleanups.push(liftBridgeLabels(map));render();});
+  map.on("load",()=>{
+   if(disposed)return;
+   if(map.getStyle)runtime.cleanups.push(liftBridgeLabels(map));
+   if(context.map3d.bridgeMesh&&maplibre.MercatorCoordinate)bridgeScene=createBridgeScene({map,maplibre,base,
+    version:context.map3d.version,descriptor:context.map3d.bridgeMesh,onVersionConflict:()=>emit('map3dVersionConflict',{})});
+   render();
+  });
   // The drawing itself is decorative: services, controls and attributions are separate HTML.
   const canvas=map.getCanvas?.();canvas?.setAttribute("aria-hidden","true");canvas?.removeAttribute?.("role");
  }
@@ -278,9 +285,10 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   for(const entry of runtime.markers.values())entry.marker.remove();
   runtime.markers.clear();runtime.user?.remove();runtime.user=null;
   runtime.layout=[];runtime.screen=null;
+  bridgeScene?.dispose();bridgeScene=null;
   transportScene?.dispose();transportScene=null;
   runtime.map?.remove();runtime.map=null;
  }
  return {mount,update,attach,center,contains,focusService,invalidate:()=>runtime.map?.resize(),servicesVisible,dispose,
-  markerCount:()=>runtime.markers.size};
+  bridgeStats:()=>bridgeScene?.stats(),markerCount:()=>runtime.markers.size};
 }
