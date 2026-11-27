@@ -41,7 +41,7 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: 0.625rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: var(--control-ink);
@@ -115,7 +115,7 @@ html[dir="rtl"] .map-city-tag,
 
 .list-header h2 {
   font-family: "Fraunces", serif;
-  font-size: 22px;
+  font-size: 1.375rem;
   font-weight: 900;
   margin: 0;
   letter-spacing: -0.01em;
@@ -123,7 +123,7 @@ html[dir="rtl"] .map-city-tag,
 
 .list-header .sub {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 0.6875rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--ink-soft);
@@ -155,7 +155,7 @@ html[dir="rtl"] .map-city-tag,
 .pin .pin-fallback {
   color: var(--paper);
   font-weight: 700;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 
@@ -165,7 +165,7 @@ html[dir="rtl"] .map-city-tag,
   border: none;
   font-family: "IBM Plex Sans", sans-serif;
   font-weight: 600;
-  font-size: 10px;
+  font-size: 0.625rem;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -199,7 +199,7 @@ html[dir="rtl"] .map-city-tag,
   justify-content: center;
   gap: clamp(2px, 0.8vw, 5px);
   color: rgba(36,36,36,0.72);
-  font-size: 9px;
+  font-size: 0.5625rem;
   line-height: 1;
 }
 
@@ -270,7 +270,7 @@ html[dir="rtl"] .map-city-tag,
   border-radius: 8px;
   padding: 12px;
   font: inherit;
-  font-size: 14px;
+  font-size: 0.875rem;
   text-align: left;
   display: inline-flex;
   align-items: center;
@@ -305,7 +305,7 @@ html[dir="rtl"] .map-city-tag,
   background: var(--bg);
   border-radius: 6px;
   font: inherit;
-  font-size: 15px;
+  font-size: 0.9375rem;
   color: var(--ink);
 }
 
@@ -357,7 +357,7 @@ html[dir="rtl"] .map-city-tag,
 .sos-card .label,
 .app-meta-block .v {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 400;
   text-transform: uppercase;
   letter-spacing: 0.11em;
@@ -366,7 +366,7 @@ html[dir="rtl"] .map-city-tag,
 
 .sos-card h3 {
   font-family: "Fraunces", serif;
-  font-size: 22px;
+  font-size: 1.375rem;
   margin: 4px 0 10px;
   font-weight: 900;
 }
@@ -392,13 +392,13 @@ html[dir="rtl"] .map-city-tag,
   border-radius: 6px;
   color: var(--paper);
   text-decoration: none;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .sos-num .num {
   font-family: "IBM Plex Mono", monospace;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 #sheet-sos .sos-num {
@@ -426,7 +426,7 @@ html[dir="rtl"] .map-city-tag,
   text-align: center;
   padding: 24px 0 8px;
   color: var(--ink-faint);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .app-meta-block .logo {
@@ -451,7 +451,7 @@ html[dir="rtl"] .map-city-tag,
   gap: 6px;
   max-width: 100%;
   min-width: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--ink-soft);
   margin-top: 1px;
 }
@@ -484,7 +484,7 @@ html[dir="rtl"] .map-city-tag,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--ink-soft);
   text-align: end;
 }
@@ -493,7 +493,7 @@ html[dir="rtl"] .map-city-tag,
   display: inline-flex; align-items: center; gap: 4px;
   background: #e8f0e8;
   color: #2d5f3f;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
   padding: 3px 8px;
   border-radius: var(--radius-pill);
@@ -512,7 +512,7 @@ html[dir="rtl"] .map-city-tag,
   color: var(--ink);
   font: inherit;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 0.875rem;
   text-decoration: none;
   border-radius: var(--radius-soft);
   cursor: pointer;
@@ -523,7 +523,7 @@ html[dir="rtl"] .map-city-tag,
 
 
 .leaflet-control-attribution {
-  font-size: 9px !important;
+  font-size: 0.5625rem !important;
   background: rgba(251,249,243,0.85) !important;
 }
 
@@ -546,22 +546,22 @@ html[dir="rtl"] .map-city-tag,
 .empty-state p {
   font-family: "Fraunces", serif;
   font-style: italic;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
  /* guide descriptions keep the printed line breaks */
-.facility-name { display:block;color:var(--ink-soft);font-size:14px;margin:6px 0 10px; }
+.facility-name { display:block;color:var(--ink-soft);font-size: 0.875rem;margin:6px 0 10px; }
 
 .pin-count { position:absolute;top:-10px;right:-8px;min-width:17px;background:#242424;color:white;border-radius:20px;padding:1px 4px;font:bold 10px/15px system-ui;transform:rotate(45deg); }
 
 .coordinates { font-family:monospace; }
 
-.category-badge { display:inline-flex;align-items:center;gap:6px;border-radius:30px;padding:5px 9px;color:white;font:600 12px/1.3 system-ui;max-width:100%; }
+.category-badge { display:inline-flex;align-items:center;gap:6px;border-radius:30px;padding:5px 9px;color:white;font: 600 0.75rem/1.3 system-ui;max-width:100%; }
 
 .category-badge img { width:17px;height:17px;object-fit:contain;filter:brightness(0) invert(1); }
 
 .outside-search { border-style:dashed; }
 
-.transport-legend { list-style:none;margin:6px 0 10px;padding:0;display:grid;gap:8px;font-size:12px;color:var(--ink-soft); }
+.transport-legend { list-style:none;margin:6px 0 10px;padding:0;display:grid;gap:8px;font-size: 0.75rem;color:var(--ink-soft); }
 
 .transport-legend li { display:flex;align-items:center;gap:8px; }
 
@@ -599,7 +599,7 @@ html[dir="rtl"] .map-city-tag,
  .list-header { position:relative; }
 }
 
-.list-header #reference-status { margin:8px 0 0;font-size:12px; }
+.list-header #reference-status { margin:8px 0 0;font-size: 0.75rem; }
 
 .stage.list-mode .floating-actions .nav-btn[data-sheet="filters"] { visibility:hidden; }
 
@@ -622,22 +622,22 @@ html[dir="rtl"] .map-city-tag,
 
 
 /* Source freshness on service cards (user decision 2026-11-09: say when data may be old). */
-.freshness-note { font-size:12px;line-height:1.45;margin:6px 0;padding:6px 9px;border-radius:8px;background:#f2efe6;color:var(--ink-soft); }
+.freshness-note { font-size: 0.75rem;line-height: 1.45;margin:6px 0;padding:6px 9px;border-radius:8px;background:#f2efe6;color:var(--ink-soft); }
 
 .freshness-note.stale { background:#fff3d6;color:#6b4b00; }
 
 
 /* Quick paths and taxonomy chips (taxonomy v0.2) */
-.quick-paths h3 { margin:0 0 8px;font-size:15px; }
+.quick-paths h3 { margin:0 0 8px;font-size: 0.9375rem; }
 
 .path-buttons { display:flex;flex-wrap:wrap;gap:8px; }
 
-.path-btn { font-size:13px;padding:8px 11px; }
+.path-btn { font-size: 0.8125rem;padding:8px 11px; }
 
 .path-btn.on { background:var(--ink, #242424);color:#fff;border-color:transparent; }
 
-.path-note { margin:10px 0 0;padding:9px 11px;border-radius:9px;background:#f3ecdc;font-size:13px;line-height:1.45; }
+.path-note { margin:10px 0 0;padding:9px 11px;border-radius:9px;background:#f3ecdc;font-size: 0.8125rem;line-height: 1.45; }
 
-.list-who { display:block;font-size:12px;color:var(--ink-faint);margin-top:4px; }
+.list-who { display:block;font-size: 0.75rem;color:var(--ink-faint);margin-top:4px; }
 
 .list-flag { color:#805d14; }

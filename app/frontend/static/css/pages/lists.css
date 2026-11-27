@@ -1,0 +1,16 @@
+.collection-actions{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin:16px 0}
+.lists-controls label{display:block;margin:12px 0}.lists-controls input{display:block;max-width:100%;min-height:44px;font:inherit;padding:10px;border:1px solid var(--line);border-radius:8px}
+.lists-controls select{max-width:100%}.lists-controls form label{margin:0}
+.lists-controls [hidden],#collection-document[hidden]{display:none}
+#collection-title{overflow-wrap:anywhere}.collection-remove{margin-top:12px}
+.print-brand{display:none}
+@page{size:A4;margin:18mm}
+@media print{
+  html{font-size:11pt!important}body{background:white;color:black}
+  .favorites-page{max-width:none;padding:0}.lists-controls,.collection-remove{display:none!important}
+  .print-brand{display:block}.favorite-card{border:0;border-top:1px solid #aaa;border-radius:0;padding:12pt 0;margin:12pt 0}
+  .favorite-card h3,.favorite-card h2{break-after:avoid}.favorite-card .service-section{padding:6pt 0}
+  .favorite-card table tr,.favorite-meta,.contact-row{break-inside:avoid}
+  .favorite-card a{color:black;text-decoration:underline}.favorite-card h2{padding:0}
+  .favorite-card img,.favorite-card svg{display:none}
+}
