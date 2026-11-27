@@ -8,14 +8,31 @@ import shutil
 import sys
 
 from devchecks.python_tests import check as python_check
-from devchecks.report import Check, exit_code, report, run
+from devchecks.report import Check, exit_code, report
+from devchecks.resources import ResourceRun, preflight, PrerequisiteError, CleanupError, run_check as run
 
 
 def checks(root, profile):
     """Discover executable suites, with later mandatory stages explicitly blocked."""
-    # Test output must not corrupt the machine-readable report on stdout.
-    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-        yield python_check(root, profile)
+    # Keep Quick lightweight and unchanged; native Integration owns resource supervision.
+    if profile == 'integration':
+        try:
+            capacity = preflight()
+            yield Check('resource-preflight', 'passed',
+                        ('WARNING below30 GiB: ' if capacity['warning'] else '') + str(capacity))
+        except (OSError, PrerequisiteError) as error:
+            yield Check('resource-preflight', 'blocked', str(error))
+            return
+    try:
+        scope = ResourceRun(root).activate() if profile == 'integration' else contextlib.nullcontext()
+        with scope, contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            yield python_check(root, profile)
+        if profile == 'integration':
+            yield Check('resource-teardown', 'passed', 'Owned native run reconciled; unrelated environments preserved')
+    except CleanupError as error:
+        yield Check('resource-teardown', 'failed', str(error))
+    except (OSError, PrerequisiteError) as error:
+        yield Check('resource-prerequisite', 'blocked', str(error))
     node = shutil.which("node")
     if not node:
         yield Check("javascript", "blocked", "Node runtime unavailable")

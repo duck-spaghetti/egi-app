@@ -129,3 +129,15 @@ with ResourceRun(Path.cwd()).activate():
                            environment={**os.environ, 'PYTHONPATH': str(ROOT / 'scripts')})
         self.assertEqual(result.status, 'failed')
         self.assertEqual(set(Path('/private/tmp').glob('egi-resource-*')) - before, set())
+
+    def test_app_fixture_schema_failure_rolls_back(self):
+        """The actual app fixture cleans even when schema deployment fails in its constructor."""
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('resource_app_fixture', ROOT / 'tests/native.py')
+        fixture = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(fixture)
+        with ResourceRun(ROOT).activate() as run:
+            with patch.object(fixture, 'REPOSITORY', str(ROOT)), patch.object(fixture.Cluster, 'sql', side_effect=RuntimeError('controlled schema failure')):
+                with self.assertRaisesRegex(RuntimeError, 'controlled schema'):
+                    fixture.Cluster(65479, 'egi_fixture_rollback')
+            self.assertEqual([p.name for p in run.path.iterdir()], ['run.json'])

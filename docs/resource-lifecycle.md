@@ -32,3 +32,14 @@ python -m unittest discover -s tests -p test_resource_lifecycle_native.py
 Use the configured PostgreSQL18 runtime and the selected project Python. These
 checks create/remove only their own synthetic fixtures. Existing demo databases,
 source evidence and backups are preserved.
+
+App Integration wraps in-process native suites in an exact run scope and reports
+resource-preflight and resource-teardown as separate schema1 entries. Quick does
+not create a native run. Subprocess browser/offline/PDF stages use `run_check`;
+exit2 remains prerequisite-blocked instead of becoming a product failure. The
+previously pinned report.py/python_tests.py files are unchanged for Reviewer.
+
+`tests/native.py` uses OwnedCluster before deploying schema/fixtures, and rolls
+back deployment failures before returning an object to unittest. Full Integration
+still requires its existing live retained-pilot and cross-repository prerequisites;
+resource success never waives missing mandatory evidence.
