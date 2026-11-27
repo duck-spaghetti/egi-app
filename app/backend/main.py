@@ -101,3 +101,39 @@ def mount_selected(application, configuration):
     from .api.address_search.router import router as search
     from .api.map3d.router import router as map3d
     from .api.contribute.router import router as contribute
+    application.include_router(pages)
+    application.include_router(contribute)
+    application.include_router(search)
+    application.include_router(map3d)
+    if configuration.canonical:
+        from .api.directory.router import router as directory
+        application.include_router(directory)
+    else:
+        from .api.preview.router import router as preview
+        application.include_router(preview)
+    if configuration.editorial:
+        from .api.moderation.router import router as moderation
+        application.include_router(moderation)
+        from .api.preparations.router import router as preparations
+        application.include_router(preparations)
+        from .api.preparations.catalog import router as preparation_catalog
+        application.include_router(preparation_catalog)
+        from .api.preparations.workbench import router as preparation_workbench
+        application.include_router(preparation_workbench)
+        from .api.preparations.proposals import router as preparation_proposals
+        application.include_router(preparation_proposals)
+        from .api.preparations.groups import router as preparation_groups
+        application.include_router(preparation_groups)
+        from .api.preparations.pages import router as preparation_pages
+        application.include_router(preparation_pages)
+        from .api.preparations.review import router as community_review
+        application.include_router(community_review)
+    if not configuration.canonical or configuration.local_layers:
+        from .api.transport.router import router as transport
+        from .api.cycleways.router import router as cycleways
+        application.include_router(transport)
+        application.include_router(cycleways)
+    application.state.mounted = True
+
+
+app = create_app()
