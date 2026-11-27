@@ -21,7 +21,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
   return {container,sources:{},layers:[],handlers:[],zoom:14.4,
    getContainer(){return container;},getBounds(){return bounds;},getZoom(){return this.zoom;},isStyleLoaded:()=>true,
    getStyle(){return {layers:[{id:'background',type:'background'},{id:'water-label',type:'symbol'}]};},
-   addSource(id,s){this.sources[id]={...s,setData(d){this.data=d;}};},getSource(id){return this.sources[id];},removeSource(id){delete this.sources[id];},
+   addSource(id,s){this.sources[id]={...s,setData(d){this.data=d;this.updates=(this.updates||0)+1;}};},getSource(id){return this.sources[id];},removeSource(id){delete this.sources[id];},
    addLayer(l,before){this.layers.push({...l,before});},getLayer(id){return this.layers.find(l=>l.id===id);},removeLayer(id){this.layers=this.layers.filter(l=>l.id!==id);},
    on(...args){this.handlers.push(args);},once(){},off(){},fitBounds(b){this.fitted=b;}};
  }
@@ -45,9 +45,15 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
  const stops=created.markers.filter(m=>!m.removed);assert.equal(stops.length,1);
  assert.equal(stops[0].options.element.innerHTML,TransportLayer.stopIconHtml(stop.properties,false));
  same(stops[0].lngLat,[12.49,41.9]);assert.match(status.textContent,/Rete programmata per 2026-11-26/);
+ const stableStart=created.markers.length,sourceUpdates=map.sources['egi-transport-lines'].updates;
+ const started=performance.now();for(let i=0;i<10;i++)await transit.reload();
+ console.log(JSON.stringify({reloads:10,milliseconds:performance.now()-started,newMarkers:created.markers.length-stableStart,removedOriginal:stops[0].removed}));
+ assert.equal(stops[0].removed,false,'unchanged viewport data must not remove/reinsert visible stop (flicker)');assert.equal(map.sources['egi-transport-lines'].updates,sourceUpdates,'unchanged line data is not resent to the worker');
+ const changed={...stop,properties:{...stop.properties,name:'Updated station'}};responses['/api/preview/transport'].features=[line,rail,changed];await transit.reload();assert.equal(stops[0].removed,false);assert.equal(stops[0].options.element.title,'Updated station','reused stop receives current properties');
+
  // A stop opens a popup with the same content, then its departures.
  stops[0].options.element.click();await wait(20);
- const popup=created.popups.at(-1);assert.match(popup.html,/Battistini/);
+ const popup=created.popups.at(-1);assert.match(popup.html,/Battistini/);assert.match(popup.html,/Updated station/);
  assert(calls.some(c=>c.url.startsWith('/api/preview/transit/departures?stops=s1')));
  // Focus on lines: chip, fit, label marker; dispose removes layers, source and markers.
  await transit.reload(); // Hold a fresh response behind the open popup.

@@ -40,7 +40,7 @@ function create(map, elements, maplibre) {
   const ownMap = (event, ...args) => { map.on(event, ...args); cleanup.push(() => map.off?.(event, ...args)); };
   const modes = new Set(elements.modes ? ["metro", "rail", "tram", "bus"].filter(mode => elements.modes[mode]?.checked) : ["metro", "rail", "tram", "bus"]);
   let visible = false, features = [], request = null, timer = null, focused = null, popup = null, held = null;
-  let markers = [];
+  let markers = new Map(),lineData=null;
   const names=createStopNames(map.getContainer());
   const refreshNames=()=>names.refresh(leafletZoom(map));
   const scale=()=>TransportLayer.scalePaline(map.getContainer(),map.getZoom()+1);
@@ -89,13 +89,13 @@ function create(map, elements, maplibre) {
   }
 
   function render() {
-    names.clear();
-    for (const marker of markers) marker.remove();
-    markers = [];
+    const previous=markers,next=new Map();
     syncDetail();scale();
     const source = map.getSource?.(LINES);
     const shown = disposed || !visible ? [] : features;
-    source?.setData({type: "FeatureCollection", features: shown.filter(f => f.geometry.type !== "Point").map(f => lineFeature(f, focused))});
+    const lines={type:"FeatureCollection",features:shown.filter(f=>f.geometry.type!=="Point").map(f=>lineFeature(f,focused))};
+    const encoded=JSON.stringify(lines);
+    if(source&&encoded!==lineData){source.setData(lines);lineData=encoded;}
     const labelled = new Set(),stops=[];
     for (const feature of shown) {
       const props = feature.properties;
@@ -105,10 +105,12 @@ function create(map, elements, maplibre) {
           const at = TransportLayer.lineLabelPoint(feature.geometry, focused.center);
           const style = TransportLayer.focusLineStyle(props.transport_type, props.color, props.code);
           if (at) {
-            const el = document.createElement("span");
-            el.className = "tl-icon";
-            el.innerHTML = `<span class="tl-line-label" style="--line-color:${style.color}">${escape(props.code || props.name)}</span>`;
-            markers.push(new maplibre.Marker({element: el, anchor: "center"}).setLngLat([at[1], at[0]]).addTo(map));
+            const key=`line:${props.route_id}`,html=`<span class="tl-line-label" style="--line-color:${style.color}">${escape(props.code || props.name)}</span>`;
+            let entry=previous.get(key);
+            if(!entry){const element=document.createElement('span');element.className='tl-icon';entry={element,marker:new maplibre.Marker({element,anchor:'center'}).setLngLat([at[1],at[0]]).addTo(map)};}
+            if(entry.html!==html){entry.element.innerHTML=html;entry.html=html;}
+            const position=JSON.stringify(at);if(entry.position!==position){entry.marker.setLngLat([at[1],at[0]]);entry.position=position;}
+            next.set(key,entry);
           }
         }
         continue;
@@ -117,16 +119,27 @@ function create(map, elements, maplibre) {
       const ids = props.stop_ids || [props.stop_id];
       const near = Boolean(focused && ids.some(id => focused.stopIds.has(id)));
       const anchored=TransportLayer.pointDetail(props,leafletZoom(map));
-      const el = document.createElement("button");
-      el.type = "button"; el.className = `tl-icon tl-gl-stop${anchored?" tl-point-detail":""}`; el.title = props.name; el.setAttribute("aria-label", props.name);
-      el.innerHTML = TransportLayer.stopIconHtml(props, near, anchored);
-      stops.push({element:el,props,near});
-      el.addEventListener("click", event => {
-        event.stopPropagation?.();
-        openPopup([lng, lat], TransportLayer.popupHtml(props), current => { if (!props.untimed) loadDepartures(current, ids, props); });
-      });
-      markers.push(new maplibre.Marker({element: el, anchor: "center"}).setLngLat([lng, lat]).addTo(map));
+      const key=String(feature.id||JSON.stringify([props.transport_type,ids]));
+      let entry=previous.get(key);
+      if(!entry){
+        const el=document.createElement('button');el.type='button';
+        entry={element:el,marker:new maplibre.Marker({element:el,anchor:'center'}).setLngLat([lng,lat]).addTo(map)};
+        el.addEventListener('click',event=>{
+          event.stopPropagation?.();
+          openPopup(entry.lngLat,TransportLayer.popupHtml(entry.props),current=>{if(!entry.props.untimed)loadDepartures(current,entry.ids,entry.props);});
+        });
+      }
+      const el=entry.element,signature=JSON.stringify([props,near,anchored]);
+      entry.props=props;entry.ids=ids;entry.lngLat=[lng,lat];
+      if(entry.signature!==signature){
+        el.className=`tl-icon tl-gl-stop${anchored?' tl-point-detail':''}`;el.title=props.name;el.setAttribute('aria-label',props.name);
+        el.innerHTML=TransportLayer.stopIconHtml(props,near,anchored);entry.signature=signature;
+      }
+      const position=JSON.stringify([lng,lat]);if(entry.position!==position){entry.marker.setLngLat([lng,lat]);entry.position=position;}
+      stops.push({element:el,props,near});next.set(key,entry);
     }
+    for(const [key,entry] of previous)if(!next.has(key))entry.marker.remove();
+    markers=next;
     names.update(stops,leafletZoom(map));
   }
 
@@ -235,8 +248,8 @@ function create(map, elements, maplibre) {
     dispose() {
       disposed = true; visible = false; listeners.abort(); request?.abort(); clearTimeout(timer); clearInterval(interval);
       for (const clean of cleanup) clean();
-      for (const marker of markers) marker.remove();
-      names.dispose();markers = []; popup?.remove(); popup = null; chip.remove?.();
+      for (const entry of markers.values()) entry.marker.remove();
+      names.dispose();markers.clear(); popup?.remove(); popup = null; chip.remove?.();
       for (const id of LINE_LAYERS) if (map.getLayer?.(id)) map.removeLayer(id);
       if (map.getSource?.(LINES)) map.removeSource(LINES);
     }};

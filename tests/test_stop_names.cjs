@@ -24,7 +24,9 @@ const assert=require('node:assert/strict');const {performance}=require('node:per
  const button=element();button.getBoundingClientRect=()=>({left:190,right:210,top:190,bottom:210,width:20,height:20});button.querySelector=()=>button;
  const entry={element:button,props:{transport_type:'metro',name:'<img onerror=bad>',stop_ids:['a']}};
  const owner=createStopNames(root);owner.update([entry],16);assert.equal(entry.label.textContent,'<img onerror=bad>');assert.equal(entry.label.innerHTML,'');assert.equal(entry.label.hidden,false);
- owner.refresh(15);assert.equal(entry.label.hidden,true);owner.clear();
+ const originalLabel=entry.label;owner.update([{element:button,props:entry.props}],16);assert.equal(button.children.length,1,'unchanged refresh retains label DOM');
+ originalLabel.isConnected=false;button.children=[];const changed={element:button,props:{...entry.props,name:'Renamed'}};owner.update([changed],16);assert.equal(changed.label,originalLabel);assert.equal(button.children.length,1,'changed marker HTML reattaches the label');assert.equal(changed.label.textContent,'Renamed');
+ owner.refresh(15);assert.equal(changed.label.hidden,true);owner.clear();
  const zeroRoot=element(),glyph=element(),foot=element();
  zeroRoot.getBoundingClientRect=()=>({left:200,right:200,top:200,bottom:200,width:0,height:0});
  glyph.getBoundingClientRect=()=>({left:190,right:210,top:162,bottom:182,width:20,height:20});foot.getBoundingClientRect=()=>({left:197,right:203,top:197,bottom:203,width:6,height:6});

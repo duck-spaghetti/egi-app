@@ -60,11 +60,16 @@ export function createStopNames(root){
  }
  function update(next,zoom){
   if(disposed)return;
+  const previous=new Map(entries.map(entry=>[entry.element,entry]));
   entries=next.filter(e=>e.element);
   for(const entry of entries){
-   const label=document.createElement('span');label.className='tl-stop-name';label.hidden=true;label.setAttribute('aria-hidden','true');label.textContent=String(entry.props.name||'');
-   entry.element.appendChild(label);entry.label=label;
+   const old=previous.get(entry.element),text=String(entry.props.name||'');
+   const label=old?.label||document.createElement('span');
+   if(!old||!label.isConnected){label.className='tl-stop-name';label.hidden=true;label.setAttribute('aria-hidden','true');entry.element.appendChild(label);}
+   if(label.textContent!==text)label.textContent=text;
+   entry.label=label;previous.delete(entry.element);
   }
+  for(const entry of previous.values())entry.label?.remove?.();
   refresh(zoom);
  }
  function clear(){generation++;cancel?.(pending);pending=null;for(const entry of entries)entry.label?.remove?.();entries=[];}

@@ -868,3 +868,13 @@ Leaflet reaches its maximum at19: bus/tram signs appear there with an opacity
 entry transition at the initial small scale. MapLibre continues its proportional
 zoom ramp. Name bounds include both fading branches; scale geometry changes
 without an extra transform transition so collision geometry stays current.
+
+
+3D transit reloads now reconcile marker IDs, retaining unchanged stop/route-label
+DOM and event handlers. Only changed markup/coordinates update; missing IDs are
+removed. Existing popup holding remains in force. Optional station-name nodes
+are reused (and reattached after changed glyph markup), and identical network
+line data is not resent to the renderer worker. This prevents the close-sign
+entry fade restarting on unchanged viewport reloads. Physical depth occlusion
+of HTML paline behind buildings remains a known presentation limitation pending
+a native3D rendering decision; source coordinates are not moved to fake sidewalks.
