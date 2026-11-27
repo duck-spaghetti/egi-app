@@ -904,3 +904,12 @@ The shared eased fade spans1.5zoom levels (metro16.5–18,road17.5–19); native
 and compact-symbol opacity use the same stops, with a slower onset/completion.
 Compact wrappers exist at every zoom, avoiding markup replacement at the fade or
 point-detail thresholds. Geometry is still cached; source counts/topology unchanged.
+
+
+Transport visibility refinement: native paline are another2× larger (scale3.2
+from the original model, max8.64m). They share the trees'16–16.6zoom appearance
+and grow from ground level. Their compact HTML markers remain fully visible and
+clickable at every zoom, including through buildings; native geometry still uses
+scene depth. No automatic bus/tram text added. Late composition now also waits
+for idle when the initial load event already passed; first layer enable starts
+the request immediately, with camera-change debouncing retained.

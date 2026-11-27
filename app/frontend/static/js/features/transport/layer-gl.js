@@ -1,4 +1,4 @@
-import {createPaline,nativeMode,nativeProgress,stopKey} from './paline-gl.js';
+import {createPaline,nativeMode,stopKey} from './paline-gl.js';
 import {createStopNames} from './stop-names.js';
 import {TransportLayer} from "./layer.js";
 /* Transit layer of the 3D mode: the scheduled metro/rail/tram/bus layer on MapLibre.
@@ -45,20 +45,17 @@ function create(map, elements, maplibre) {
   const paline=createPaline(map,key=>{const entry=markers.get(key);if(entry)selectStop(entry);});
   const names=createStopNames(map.getContainer());
   const refreshNames=()=>names.refresh(leafletZoom(map));
-  const scale=()=>{
-    const root=map.getContainer(),zoom=map.getZoom();TransportLayer.scalePaline(root,zoom+1);
-    for(const [mode,group] of [['metro','metro'],['bus','road']]){
-      const progress=nativeProgress(mode,zoom);root.style.setProperty(`--tl-${group}-progress`,progress);
-      root.style.setProperty(`--tl-native-${group}-pointer`,progress>=1?'none':'auto');
-    }
-  };
-  ownMap("zoom",scale);
   const chip = document.createElement("div");
   chip.className = "tl-focus-chip"; chip.hidden = true;
   map.getContainer().appendChild(chip);
 
   function ready(fn) {
-    if (map.isStyleLoaded?.() !== false) fn(); else { map.once("load", fn); cleanup.push(() => map.off?.("load", fn)); }
+    let finished=false;
+    const run=()=>{
+      if(finished||disposed||map.isStyleLoaded?.()===false)return;
+      finished=true;map.off?.('load',run);map.off?.('idle',run);fn();
+    };
+    if(map.isStyleLoaded?.()!==false)run();else {ownMap('load',run);ownMap('idle',run);}
   }
   ready(() => {
     if (disposed || map.getSource?.(LINES)) return;
@@ -101,7 +98,7 @@ function create(map, elements, maplibre) {
 
   function render() {
     const previous=markers,next=new Map();
-    syncDetail();scale();
+    syncDetail();
     const source = map.getSource?.(LINES);
     const shown = disposed || !visible ? [] : features;
     const lines={type:"FeatureCollection",features:shown.filter(f=>f.geometry.type!=="Point").map(f=>lineFeature(f,focused))};
@@ -144,7 +141,7 @@ function create(map, elements, maplibre) {
       entry.props=props;entry.ids=ids;entry.lngLat=[lng,lat];
       if(entry.signature!==signature){
         el.className=`tl-icon tl-gl-stop${anchored||native?' tl-point-detail':''}${native?` tl-native-stop tl-native-${props.transport_type==='metro'?'metro':'road'}-stop`:''}`;el.title=props.name;el.setAttribute('aria-label',props.name);
-        el.innerHTML=native?`<span class="tl-compact" style="--tl-progress:var(--tl-${props.transport_type==='metro'?'metro':'road'}-progress,0)">${TransportLayer.stopIconHtml(props,near,false)}</span>`:TransportLayer.stopIconHtml(props,near,anchored);entry.signature=signature;
+        el.innerHTML=native?`<span class="tl-compact">${TransportLayer.stopIconHtml(props,near,false)}</span>`:TransportLayer.stopIconHtml(props,near,anchored);entry.signature=signature;
       }
       const position=JSON.stringify([lng,lat]);if(entry.position!==position){entry.marker.setLngLat([lng,lat]);entry.position=position;}
       stops.push({element:el,props,near});next.set(key,entry);
@@ -198,7 +195,7 @@ function create(map, elements, maplibre) {
 
   function setVisible(value) {
     if (disposed) return;
-    visible = value;
+    const wasVisible=visible;visible = value;
     if (!visible && focused) clearFocus(false);
     if (elements.toggle) {
       elements.toggle.hidden = false;
@@ -206,7 +203,7 @@ function create(map, elements, maplibre) {
       elements.toggle.setAttribute("aria-pressed", String(visible));
     }
     render();
-    schedule();
+    if(visible&&!wasVisible){clearTimeout(timer);load();}else schedule();
   }
 
   function focus({routeIds, label, stopIds = [], points = [], onClear = null}) {

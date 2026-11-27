@@ -222,8 +222,7 @@
 
 @starting-style { .tl-palina-anchor { opacity:0; } }
 
-/* Native 3D signs own pointer picking when opaque; retained buttons provide keyboard access. */
+/* Retain readable, clickable transport overlays even when native signs are behind buildings. */
 .tl-native-stop { pointer-events:none; }
-.tl-native-metro-stop .tl-compact { pointer-events:var(--tl-native-metro-pointer,auto); }
-.tl-native-road-stop .tl-compact { pointer-events:var(--tl-native-road-pointer,auto); }
+.tl-native-stop .tl-compact { opacity:1;pointer-events:auto;transition:none; }
 .tl-native-stop:focus-visible .tl-compact { opacity:1;outline:3px solid #0570b5;outline-offset:3px; }

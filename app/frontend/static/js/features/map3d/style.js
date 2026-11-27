@@ -125,6 +125,7 @@ export const COLORS_3D = {
   fountainStone: "#e7e0cf", fountainWater: "#7fbfd6", fountainJet: "#dff3fa",
 };
 // Buildings grow in between Z0 and Z1; from M0 the parts morph from block to their own shape by M1.
+export const TREE_START_ZOOM=16,TREE_FULL_ZOOM=16.6;
 export const Z0 = 14, Z1 = 15.5, M0 = 16, M1 = 17.2;
 export const ATTRIBUTION_CTRN = 'Edifici: <a href="https://dati.lazio.it/">CTRN Regione Lazio 2002–2003</a> (CC BY 4.0)';
 const grow = (value, z0 = Z0, z1 = Z1) => ["interpolate", ["linear"], ["zoom"], z0, 0, z1, value];
@@ -155,7 +156,7 @@ export function layers3d(base, C = COLORS_3D) {
         paint: {"line-color": C.wall, "line-width": ["interpolate", ["linear"], ["zoom"], 13, 1, 17, 3.5]}},
       {id: "landmark-plan", type: "fill", source: "landmarks", minzoom: 13,
         paint: {"fill-color": C.iconic, "fill-outline-color": C.iconicEdge, "fill-opacity": fade(1, 13, 14)}},
-      {id: "tree-plan", type: "fill", source: "buildings", "source-layer": "trees", minzoom: 16,
+      {id: "tree-plan", type: "fill", source: "buildings", "source-layer": "trees", minzoom: TREE_START_ZOOM,
         filter: ["all", ["==", ["get", "p"], "crown"], ["<", ["get", "b"], 4]], paint: {"fill-color": C.tree2d, "fill-opacity": 0.9}},
       {id: "blocks-3d", type: "fill-extrusion", source: "buildings", "source-layer": "blocks", minzoom: Z0, maxzoom: M0,
         filter: ["!=", ["get", "class"], "replaced"],
@@ -187,11 +188,11 @@ export function layers3d(base, C = COLORS_3D) {
       {id: "parapets-3d", type: "fill-extrusion", source: "bridges", "source-layer": "parapets", minzoom: 16,
         paint: {"fill-extrusion-color": C.parapet, "fill-extrusion-opacity": fade(0.7, 16, 16.5),
           "fill-extrusion-base": grow(["get", "b"], 16, 16.5), "fill-extrusion-height": grow(["get", "t"], 16, 16.5)}},
-      {id: "trees-3d", type: "fill-extrusion", source: "buildings", "source-layer": "trees", minzoom: 16,
+      {id: "trees-3d", type: "fill-extrusion", source: "buildings", "source-layer": "trees", minzoom: TREE_START_ZOOM,
         paint: {"fill-extrusion-color": ["match", ["get", "p"], "top", ["match", ["get", "v"], 0, C.treeC, C.treeA],
           ["match", ["get", "v"], 0, C.treeA, 1, C.treeB, C.treeC]],
-          "fill-extrusion-opacity": fade(0.7, 16, 16.6), "fill-extrusion-base": grow(["get", "b"], 16, 16.6),
-          "fill-extrusion-height": grow(["get", "t"], 16, 16.6), "fill-extrusion-vertical-gradient": false}},
+          "fill-extrusion-opacity": fade(0.7, TREE_START_ZOOM, TREE_FULL_ZOOM), "fill-extrusion-base": grow(["get", "b"], TREE_START_ZOOM, TREE_FULL_ZOOM),
+          "fill-extrusion-height": grow(["get", "t"], TREE_START_ZOOM, TREE_FULL_ZOOM), "fill-extrusion-vertical-gradient": false}},
     ],
     labels: [
       // Street names on bridges: lifted on screen by the deck height as the camera tilts (liftBridgeLabels).
