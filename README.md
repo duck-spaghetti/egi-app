@@ -906,8 +906,8 @@ Compact wrappers exist at every zoom, avoiding markup replacement at the fade or
 point-detail thresholds. Geometry is still cached; source counts/topology unchanged.
 
 
-Transport visibility refinement: native paline are another2× larger (scale3.2
-from the original model, max8.64m). They share the trees'16–16.6zoom appearance
+Transport visibility refinement: native paline are another2× larger again (scale6.4
+from the original model, max17.28m). They share the trees'16–16.6zoom appearance
 and grow from ground level. Their compact HTML markers remain fully visible and
 clickable at every zoom, including through buildings; native geometry still uses
 scene depth. No automatic bus/tram text added. Late composition now also waits

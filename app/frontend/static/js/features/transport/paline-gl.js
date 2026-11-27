@@ -2,7 +2,7 @@ import {TREE_START_ZOOM,TREE_FULL_ZOOM} from '../map3d/style.js';
 /** Physical stop signs in the existing 3D scene; source coordinates and popup ownership stay upstream. */
 export const PALINE_SOURCE='egi-transport-paline';
 export const PALINE_LAYERS=[`${PALINE_SOURCE}-metro`,`${PALINE_SOURCE}-road`];
-export const SIGN_SCALE=3.2;
+export const SIGN_SCALE=6.4;
 const FADE_WEIGHTS=[0,.15625,.5,.84375,1];
 
 /** Native signs appear/grow with the trees; compact symbols remain a separate permanent overlay. */
