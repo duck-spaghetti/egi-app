@@ -13,35 +13,95 @@ import {escapeHtml,categoryCaption} from '../../format.js';
 /** Screen-space site clustering and progressive labels; editorial/service rules stay upstream. */
 export const CLUSTER_DISTANCE=64, STEM_ZOOM=14, NAME_ZOOM=14, DETAIL_ZOOM=14;
 export const MAX_HEAD_OFFSET=56;
-
-/** Pixel displacement follows map scale: no extra offset at z14, full separation at z17. */
-export const headOffsetScale=zoom=>Math.max(0,Math.min(1,(2**(zoom-STEM_ZOOM)-1)/7));
+export const MAX_LEADER_LENGTH=64;
+/** The fixed 44px head sits above the 24px ground/stem stack. */
+export const siteHeadBox=(point,dx=0,dy=0)=>({left:point.x+dx-22,right:point.x+dx+22,top:point.y+dy-68,bottom:point.y+dy-24});
+// A bounded fan offers alternatives when the shortest direction collides. Compute it once.
+const HEAD_CANDIDATES=[[0,0],...[180,0,210,330,240,300,270,150,30,120,60,90].flatMap(angle=>
+ [20,36,52,56].map(radius=>{
+  const radians=angle*Math.PI/180;return [radius*Math.cos(radians),radius*Math.sin(radians)];
+ })).filter(([dx,dy])=>Math.hypot(dx,dy-21)<=MAX_LEADER_LENGTH)];
 
 /** Separate nearby site heads in screen space; feet and source grouping never move. */
 export function placeSiteHeads(layout,{width,height,zoom,selectedId,rtl=false,controls=null}){
  const result=new Map();if(zoom<STEM_ZOOM)return result;
- const cells=new Map(),size=64,intersects=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
- const keys=box=>{const keys=[];for(let x=Math.floor(box.left/size);x<=Math.floor(box.right/size);x++)for(let y=Math.floor(box.top/size);y<=Math.floor(box.bottom/size);y++)keys.push(`${x}:${y}`);return keys;};
- const add=box=>{for(const key of keys(box)){if(!cells.has(key))cells.set(key,[]);cells.get(key).push(box);}};
- const hits=box=>keys(box).some(key=>(cells.get(key)||[]).some(other=>intersects(box,other)));
- const boxAt=(point,dx,dy)=>({left:point.x+dx-25,right:point.x+dx+25,top:point.y+dy-82,bottom:point.y+dy-20});
+ const cells=new Map(),owners=new Map(),size=64,intersects=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
+ let repairBudget=256;
+ // Numeric cells avoid allocating coordinate strings/arrays for every candidate at every frame.
+ const visitCells=(box,visit,create=false)=>{
+  const right=Math.floor(box.right/size),bottom=Math.floor(box.bottom/size);
+  for(let x=Math.floor(box.left/size);x<=right;x++){
+   let column=cells.get(x);if(!column&&create){column=new Map();cells.set(x,column);}if(!column)continue;
+   for(let y=Math.floor(box.top/size);y<=bottom;y++){
+    let row=column.get(y);if(!row&&create){row=[];column.set(y,row);}if(row&&visit(row))return true;
+   }
+  }
+  return false;
+ };
+ const add=box=>visitCells(box,row=>{row.push(box);},true);
+ const remove=box=>visitCells(box,row=>{const index=row.indexOf(box);if(index>=0)row.splice(index,1);});
+ const hits=box=>visitCells(box,row=>row.some(other=>intersects(box,other)));
+ const boxAt=siteHeadBox;
  const selected=group=>group.site.serviceIds?.includes(String(selectedId));
- const identity=group=>String(group.site.serviceIds?.slice().sort().join(',')||`${group.lngLat}`);
+ const focus=layout.find(selected);
+ // Source-space distance is stable through camera rotation; nearby civic addresses precede distant heads.
+ const distance=group=>!focus?0:group.lngLat&&focus.lngLat?
+  Math.hypot(group.lngLat[0]-focus.lngLat[0],group.lngLat[1]-focus.lngLat[1]):Math.hypot(group.point.x-focus.point.x,group.point.y-focus.point.y);
+ const identity=group=>group.key||String(group.site.serviceIds?.slice().sort().join(',')||`${group.lngLat}`);
+ const screen={width,height,rtl,controls};
+ const inFrame=box=>box.left>=4&&box.right<=width-4&&box.top>=4&&box.bottom<=height-4;
+ const at=(point,dx,dy)=>{
+  const box=boxAt(point,dx,dy);
+  return inFrame(box)&&!hitsMapControls(box,screen)&&!hits(box)?{dx,dy,box}:null;
+ };
+ /** Repair a greedy dead end by relocating at most two heads, with a shared per-pass work cap. */
+ function repair(group){
+  for(const [dx,dy] of HEAD_CANDIDATES){
+   if(repairBudget<=0)return null;
+   const box=boxAt(group.point,dx,dy);if(!inFrame(box)||hitsMapControls(box,screen))continue;
+   const conflicts=new Set();let fixed=false;
+   visitCells(box,row=>{for(const other of row)if(intersects(box,other)){if(!owners.has(other)){fixed=true;return true;}conflicts.add(other);if(conflicts.size>2)return true;}return false;});
+   if(fixed)continue;
+   if(conflicts.size<1||conflicts.size>2)continue;
+   const oldBoxes=[...conflicts],blockers=oldBoxes.map(b=>owners.get(b));if(blockers.some(b=>!b))continue;
+   for(const b of oldBoxes)remove(b);add(box);
+   const alternatives=[];
+   const relocate=index=>{
+    if(index===blockers.length)return true;
+    for(const [x,y] of HEAD_CANDIDATES){
+     if(--repairBudget<0)return false;
+     const alternative=at(blockers[index].point,x,y);if(!alternative)continue;
+     add(alternative.box);alternatives.push(alternative);
+     if(relocate(index+1))return true;
+     alternatives.pop();remove(alternative.box);
+    }
+    return false;
+   };
+   const repaired=relocate(0);
+   remove(box);
+   if(repaired){for(let i=0;i<blockers.length;i++){owners.delete(oldBoxes[i]);owners.set(alternatives[i].box,blockers[i]);result.set(blockers[i],alternatives[i]);}return {dx,dy,box};}
+   for(const b of oldBoxes)add(b);
+  }
+  return null;
+ }
  // Feet are small obstacles; clusters keep their established, undisplaced positions.
  for(const group of layout){const p=group.point;add({left:p.x-5,right:p.x+5,top:p.y-5,bottom:p.y+5});if(group.members.length>1)add({left:p.x-25,right:p.x+25,top:p.y-25,bottom:p.y+25});}
- const ordered=layout.filter(g=>g.members.length===1).sort((a,b)=>Number(selected(b))-Number(selected(a))||identity(a).localeCompare(identity(b)));
- const scale=headOffsetScale(zoom);
- const candidates=[[0,0],[-56,0],[56,0],[0,-36],[-52,-16],[52,-16]].map(([dx,dy])=>[dx*scale,dy*scale]);
- for(const group of ordered){
+ const ordered=layout.filter(g=>g.members.length===1).map(group=>({group,key:identity(group),selected:selected(group),distance:distance(group)}))
+  .sort((a,b)=>Number(b.selected)-Number(a.selected)||a.distance-b.distance||a.key.localeCompare(b.key));
+ for(const {group} of ordered){
   let placed=null;
-  for(const [dx,dy] of candidates){
-   const box=boxAt(group.point,dx,dy);
-   const inFrame=box.left>=4&&box.right<=width-4&&box.top>=4&&box.bottom<=height-4;
-   const overTools=hitsMapControls(box,{width,height,rtl,controls});
-   if(inFrame&&!overTools&&!hits(box)){placed={dx,dy,box};break;}
+  const previous=group.previous;
+  // Keep a valid direction, shortening along it only when a substantial reduction fits.
+  if(previous&&previous.dx**2+previous.dy**2<=MAX_HEAD_OFFSET**2&&previous.dx**2+(previous.dy-21)**2<=MAX_LEADER_LENGTH**2){
+   const held=at(group.point,previous.dx,previous.dy);
+   if(held)placed=previous.dx===0&&previous.dy===0?held:at(group.point,0,0)||at(group.point,previous.dx*.75,previous.dy*.75)||held;
   }
+  if(!placed)for(const [dx,dy] of HEAD_CANDIDATES){
+   placed=at(group.point,dx,dy);if(placed)break;
+  }
+  if(!placed&&repairBudget>0)placed=repair(group);
   // A bounded layout cannot guarantee space in arbitrarily dense views. Keep every site reachable.
-  placed||={dx:0,dy:0,box:boxAt(group.point,0,0)};result.set(group,placed);add(placed.box);
+  placed||={dx:0,dy:0,box:boxAt(group.point,0,0)};result.set(group,placed);owners.set(placed.box,group);add(placed.box);
  }
  return result;
 }

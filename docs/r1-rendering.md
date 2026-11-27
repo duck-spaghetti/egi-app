@@ -1,5 +1,11 @@
 # R1 rendering changes and verification
 
+> User-review correction, 2026-11-27: the initial compact-offset implementation
+> introduced intermediate-zoom overlaps. The adaptive-direction
+> correction below supersedes the initial behavior and its acceptance evidence.
+> Earlier sections are retained as the record of the first candidate, not a
+> claim that its regression was already covered by the original tests.
+
 Scope: EGI-120–121, specification r0.3, whole-set and local commits only.
 The user explicitly selected local M2 `19efd55` as the base instead of fetched
 `origin/dev` (`a75bd0e`). Other branches and the M2 preview are preserved.
@@ -94,3 +100,32 @@ Real-phone acceptance remains pending, along with its separately agreed budgets.
 R2, feed acquisition/polling, importer artifacts, metadata caching and monument
 expansion are outside this change. Verification uses a temporary isolated server;
 the existing M2 preview and port 4317 are not changed.
+
+## EGI-120 review correction: adaptive directions
+
+The original zoom-scaled candidate set collapsed distinct civic heads at
+intermediate zooms. The corrected planner uses a bounded fan with 56px maximum
+head displacement and 64px maximum SVG leader length. It retains valid directions
+and shortens only when a collision-free position exists. Source-space proximity
+puts the selected site's neighbours before distant markers. A capped local repair
+can relocate at most two blocking heads per repair; the shared work cap prevents
+an unbounded search in saturated views.
+
+The icon's layout height is fixed at 44px, independently of label content. Its
+collision footprint now matches that size. The label's integrated white backing
+is separate from the fixed icon geometry, so a taller label does not move the
+symbol or its ground connection. Accessible names and source grouping remain.
+
+Camera movement marks layout dirty; one flush in MapLibre's own render event
+updates existing head transforms and SVG endpoints after marker positioning.
+This replaces the extra animation-frame callback that could lag native movement.
+The full grouping/content pipeline still runs only on settled/data updates.
+Unsafe secondary labels are suppressed during camera movement and recomputed
+after settling; they are not rebuilt on each render. Numeric grid cells avoid
+per-candidate string/array allocations, and unchanged DOM flags are not rewritten.
+
+Regression coverage includes intermediate zooms, four retained anonymous Giolitti
+screen projections, changing available directions, exact anchors, content/identity,
+the map render lifecycle and 20 visibility cycles. The original f426e98 behavior
+reproduces the collision. The full-catalogue browser journey verifies all 594
+retained records, not just the seven records addressed on Via Giolitti.

@@ -1,5 +1,5 @@
 import {siteMarkers,USER_DOT_HTML,USER_DOT_LABEL} from "../map/pins.js";
-import {clusterSites,clusterAppearance,siteLabel,placeSiteHeads,headOffsetScale,hitsMapControls,CLUSTER_DISTANCE,STEM_ZOOM,NAME_ZOOM,DETAIL_ZOOM} from "./sites.js";
+import {clusterSites,clusterAppearance,siteLabel,placeSiteHeads,siteHeadBox,hitsMapControls,CLUSTER_DISTANCE,STEM_ZOOM,NAME_ZOOM,DETAIL_ZOOM} from "./sites.js";
 import {egiStyle,liftBridgeLabels} from "./style.js";
 /** createMap3d: the 3D mode's map module, on MapLibre GL JS, with the current map's interface.
  *
@@ -28,8 +28,8 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   devicePixelRatio=globalThis.devicePixelRatio||1,origin=globalThis.location?.origin||"",
   frame=globalThis.requestAnimationFrame?.bind(globalThis),cancelFrame=globalThis.cancelAnimationFrame?.bind(globalThis),
   clock=()=>globalThis.performance?.now?.()??Date.now(),heap=()=>globalThis.performance?.memory?.usedJSHeapSize??null}) {
- let state={},entries=[],visible=true,disposed=false,zoomFrame=null;
- const runtime={map:null,markers:new Map(),user:null,bounds:null,cleanups:[]};
+ let state={},entries=[],visible=true,disposed=false,headsDirty=false;
+ const runtime={map:null,markers:new Map(),user:null,bounds:null,cleanups:[],layout:[],screen:null};
  const t=(key,fallback)=>translate(key,{},fallback);
  const bounds=()=>[[Number(context.boundsWest),Number(context.boundsSouth)],[Number(context.boundsEast),Number(context.boundsNorth)]];
  const move=options=>reduceMotion?runtime.map.jumpTo(options):runtime.map.easeTo({duration:500,...options});
@@ -58,8 +58,9 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
    emit("pickedReference",{lat:event.lngLat.lat,lng:event.lngLat.lng,label:"Punto scelto sulla mappa"});
   });
   map.on("moveend",render);
-  map.on("zoom",queueHeadZoom);
-  runtime.cleanups.push(()=>{map.off("zoom",queueHeadZoom);cancelHeadZoom();});
+  map.on("move",queueHeadLayout);
+  map.on("render",flushHeadLayout);
+  runtime.cleanups.push(()=>{map.off("move",queueHeadLayout);map.off("render",flushHeadLayout);cancelHeadLayout();});
   watchBudget(map);
   map.on("load",()=>{if(map.getStyle)runtime.cleanups.push(liftBridgeLabels(map));render();});
   // The drawing itself is decorative: services, controls and attributions are separate HTML.
@@ -116,7 +117,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
  function wrap(el){const box=document.createElement("div");box.className="map3d-marker";box.append(el);return box;}
 
  /** Cancel the pending gesture write before settled layout or teardown takes ownership. */
- function cancelHeadZoom(){if(zoomFrame!==null){cancelFrame?.(zoomFrame);zoomFrame=null;}}
+ function cancelHeadLayout(){headsDirty=false;}
 
  /** Move the existing head and its SVG endpoint together, without replacing content or the anchor. */
  function positionHead(entry,dx,dy){
@@ -126,42 +127,58 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   entry.dx=dx;entry.dy=dy;
  }
 
- /** Coalesce zoom events; keep each settled candidate's direction until full collision layout at moveend. */
- function queueHeadZoom(){
-  if(disposed||!visible||zoomFrame!==null)return;
-  if(!frame){zoomHeads();return;}
-  zoomFrame=frame(()=>{zoomFrame=null;zoomHeads();});
- }
- function zoomHeads(){
+ /** Coalesce camera events; update collision placement without rebuilding service content. */
+ function queueHeadLayout(){if(!disposed&&visible)headsDirty=true;}
+ /** Flush after MapLibre positions its markers, in the same rendered frame rather than a later RAF. */
+ function flushHeadLayout(){if(headsDirty){headsDirty=false;layoutHeads();}}
+ function layoutHeads(){
   if(disposed||!runtime.map)return;
-  const zoom=runtime.map.getZoom(),scale=headOffsetScale(zoom);
-  for(const entry of runtime.markers.values())if(entry.head){
-   positionHead(entry,entry.head.dx*scale,entry.head.dy*scale);
-   entry.el.dataset.anchored=String(zoom>=STEM_ZOOM);
+  const zoom=runtime.map.getZoom(),layout=runtime.layout;
+  for(const group of layout)group.point=runtime.map.project(group.lngLat);
+  const heads=placeSiteHeads(layout,{...runtime.screen,zoom,selectedId:state.selectedId});
+  for(const group of layout){
+   const offset=heads.get(group)||{dx:0,dy:0};group.headPoint.x=group.point.x+offset.dx;group.headPoint.y=group.point.y+offset.dy;
+   group.previous=offset;
+   const entry=runtime.markers.get(group.key);if(!entry?.head)continue;
+   entry.head=offset;positionHead(entry,offset.dx,offset.dy);
+   const anchored=String(zoom>=STEM_ZOOM);if(entry.el.dataset.anchored!==anchored)entry.el.dataset.anchored=anchored;
+  }
+  // Retain readable content/accessibility; suppress only labels that now cover a head or another label.
+  const labels=[],intersects=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
+  for(const group of layout)if(group.label){
+   const {headPoint:p,label:l}=group,box={left:p.x+l.left,right:p.x+l.right,top:p.y+l.top,bottom:p.y+l.bottom};
+   const blocked=box.left<0||box.right>runtime.screen.width||box.top<0||box.bottom>runtime.screen.height||
+    hitsMapControls(box,runtime.screen)||labels.some(other=>intersects(box,other))||
+    layout.some(other=>other!==group&&intersects(box,siteHeadBox(other.headPoint)));
+   const entry=runtime.markers.get(group.key),hidden=String(blocked);if(entry.el.dataset.labelColliding!==hidden)entry.el.dataset.labelColliding=hidden;
+   if(!blocked)labels.push(box);
   }
  }
 
  function render() {
-  cancelHeadZoom();
+  cancelHeadLayout();
   const map=runtime.map;
   if(!map||disposed)return;
   const next=new Map(),labels=[];
+  runtime.layout=[];
   if(visible){
    const viewport=map.getContainer?.(),screenWidth=viewport?.clientWidth||Infinity,screenHeight=viewport?.clientHeight||Infinity;
    // Read the actual UI once before writing markers; safe areas/RTL/stack heights cannot drift from layout.
    const originBox=viewport?.getBoundingClientRect?.(),scene=viewport?.parentElement||viewport;
    const controls=originBox&&scene?.querySelectorAll?[...scene.querySelectorAll('.maplibregl-ctrl,.map-mode-tools,.map-brand,.map-city-tag,.floating-actions .nav-btn,.floating-actions .view-toggle')].map(el=>el.getBoundingClientRect()).filter(b=>b.width>0&&b.height>0).map(b=>({left:b.left-originBox.left,right:b.right-originBox.left,top:b.top-originBox.top,bottom:b.bottom-originBox.top})):null;
+   runtime.screen={width:screenWidth,height:screenHeight,rtl:document.documentElement?.dir==='rtl',controls};
    const onscreen=screenWidth===Infinity?entries:entries.filter(site=>{const p=map.project([site.lng,site.lat]);return p.x>=-120&&p.x<=screenWidth+120&&p.y>=-120&&p.y<=screenHeight+120;});
    const layout=cluster(onscreen).map(group=>{
     const {site,members}=group,count=members.length;
     const lngLat=count>1?[members.reduce((a,m)=>a+m.lng,0)/count,members.reduce((a,m)=>a+m.lat,0)/count]:[site.lng,site.lat];
-    return {...group,lngLat,point:map.project(lngLat)};
+    const key=count===1?`site:${site.serviceIds.slice().sort().join(',')}`:`${lngLat[0].toFixed(6)},${lngLat[1].toFixed(6)},${count}`;
+    return {...group,key,lngLat,point:map.project(lngLat),previous:runtime.markers.get(key)?.head};
    });
    const heads=placeSiteHeads(layout,{width:screenWidth,height:screenHeight,zoom:map.getZoom(),selectedId:state.selectedId,rtl:document.documentElement?.dir==='rtl',controls});
+   runtime.layout=layout;
    for(const group of layout){const head=heads.get(group);group.headPoint=head?{x:group.point.x+head.dx,y:group.point.y+head.dy}:group.point;}
    for(const group of layout){
-    const {site,members,lngLat,point}=group,count=members.length;
-    const key=count===1?`site:${site.serviceIds.slice().sort().join(',')}`:`${lngLat[0].toFixed(6)},${lngLat[1].toFixed(6)},${count}`;
+    const {site,members,lngLat,point,key}=group,count=members.length;
     let entry=runtime.markers.get(key);
     if(!entry){
      entry={data:null};
@@ -184,8 +201,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
     entry.data={site,lngLat};
     if(count===1){
      const offset=heads.get(group)||{dx:0,dy:0},headPoint=group.headPoint;
-     const scale=headOffsetScale(map.getZoom());
-     entry.head={dx:scale?offset.dx/scale:0,dy:scale?offset.dy/scale:0};
+     entry.head=group.previous=offset;
      const selected=site.serviceIds.includes(String(state.selectedId));
      const anchored=map.getZoom()>=STEM_ZOOM,detail=selected||map.getZoom()>=DETAIL_ZOOM;
      const maxWidth=Math.min(detail?260:200,Math.max(130,(screenWidth-50)/2-30));
@@ -203,17 +219,20 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
       const preferred=headPoint.x+30+width>screenWidth-140;
       for(const leftSide of [preferred,!preferred]){
        const left=leftSide?headPoint.x-30-width:headPoint.x-24,right=leftSide?headPoint.x+24:headPoint.x+30+width;
-       const box={left,right,top:headPoint.y-24-Math.max(44,labelHeight),bottom:headPoint.y-20};
+       const height=Math.max(44,labelHeight),box={left,right,top:headPoint.y-46-height/2,bottom:headPoint.y-46+height/2};
        const inFrame=box.left>=0&&box.right<=screenWidth&&box.top>=0&&box.bottom<=screenHeight;
-       const hitsPin=layout.some(other=>other!==group&&intersects(box,{left:other.headPoint.x-25,right:other.headPoint.x+25,top:other.headPoint.y-82,bottom:other.headPoint.y-20}));
+       const hitsPin=layout.some(other=>other!==group&&intersects(box,siteHeadBox(other.headPoint)));
        const hitsTools=hitsMapControls(box,{width:screenWidth,height:screenHeight,rtl,controls});
-       if(inFrame&&!hitsTools&&!hitsPin&&!labels.some(b=>intersects(box,b))){placement={width,leftSide,box};break;}
+       if(inFrame&&!hitsTools&&!hitsPin&&!labels.some(b=>intersects(box,b))){placement={width,leftSide,box,height};break;}
       }
       if(placement)break;
      }
      entry.el.style.setProperty?.('--site-label-width',`${(placement?.width||maxWidth)-20}px`);
+     entry.el.style.setProperty?.('--site-head-height',`${placement?.height||44}px`);
      const labelled=(selected||map.getZoom()>=NAME_ZOOM)&&Boolean(placement);
      if(labelled)labels.push(placement.box);
+     group.label=labelled?{left:placement.box.left-headPoint.x,right:placement.box.right-headPoint.x,top:placement.box.top-headPoint.y,bottom:placement.box.bottom-headPoint.y}:null;
+     entry.el.dataset.labelColliding='false';
      entry.el.dataset.labelSide=placement?.leftSide?'left':'right';
      const html=`<span class="map3d-pin-body">${site.html}${labelled?siteLabel(site,detail,translate):''}</span><span class="map3d-stem" aria-hidden="true"></span><span class="map3d-ground" aria-hidden="true"></span><svg class="map3d-leader" width="1" height="1" aria-hidden="true"><path d="M0 0 L0 -21"></path></svg>`;
      entry.el.dataset.anchored=String(anchored);entry.el.dataset.labelled=String(labelled);entry.el.dataset.selected=String(selected);
@@ -261,6 +280,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   for(const clean of runtime.cleanups.splice(0))clean();
   for(const entry of runtime.markers.values())entry.marker.remove();
   runtime.markers.clear();runtime.user?.remove();runtime.user=null;
+  runtime.layout=[];runtime.screen=null;
   runtime.map?.remove();runtime.map=null;
  }
  return {mount,update,attach,center,contains,focusService,invalidate:()=>runtime.map?.resize(),servicesVisible,dispose,

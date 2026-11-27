@@ -34,6 +34,6 @@ const assert=require('node:assert/strict');const {performance}=require('node:per
  env.document.documentElement.dir='rtl';map.update({pois:state.pois,selectedId:'b'},state.pois);
  assert.equal(mobile.dataset.labelled,'true');// Control collision geometry is covered by the shared planner tests.
  const adjacent=[{id:'near-a',title:'Via Uno 10',longitude:12.5,latitude:41.9},{id:'near-b',title:'Via Uno 12',longitude:12.50001,latitude:41.9}];
- state.pois=adjacent;map.update(state,adjacent);const nearButtons=markers.filter(m=>!m.removed).map(m=>m.getElement().children[0]);assert.equal(nearButtons.length,2);assert(nearButtons.some(b=>Math.abs(parseFloat(b.style['--site-head-x']))===56),'close separate sites get an inclined leader');assert.equal(adjacent[1].longitude,12.50001,'head separation preserves source coordinates');
+ state.pois=adjacent;map.update(state,adjacent);const nearButtons=markers.filter(m=>!m.removed).map(m=>m.getElement().children[0]);assert.equal(nearButtons.length,2);assert(nearButtons.some(b=>Math.abs(parseFloat(b.style['--site-head-x']))>=50),'close separate sites get an inclined leader');assert.equal(adjacent[1].longitude,12.50001,'head separation preserves source coordinates');
  map.dispose();
 })().catch(e=>{console.error(e);process.exitCode=1;});

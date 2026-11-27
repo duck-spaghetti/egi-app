@@ -13,6 +13,26 @@ const assert=require('node:assert/strict');const {environment}=require('./module
  const denseHeads=Array.from({length:8},(_,i)=>({site:{serviceIds:[String(i)]},members:[{}],point:{x:400+i*2,y:350},lngLat:[12.5+i*.00001,41.9]}));
  const compact=placeSiteHeads(denseHeads,view);assert(Math.max(...[...compact.values()].map(p=>Math.hypot(p.dx,p.dy-21)))<=64,'dense service leaders remain within64px instead of89px');
  const positions=[...heads.values()];assert(positions.some(p=>p.dx||p.dy));for(let i=0;i<positions.length;i++){assert(Math.hypot(positions[i].dx,positions[i].dy)<=MAX_HEAD_OFFSET);for(let j=0;j<i;j++)assert(!overlap(positions[i].box,positions[j].box),'distinct close heads must not overlap');}
+ for(const zoom of [15,15.5,16,16.5,17,18]){
+  const placed=[...placeSiteHeads(close,{...view,zoom}).values()];
+  for(let i=0;i<placed.length;i++)for(let j=0;j<i;j++)assert(!overlap(placed[i].box,placed[j].box),`nearby civic markers remain separate at z${zoom}`);
+ }
+ const moving=close.map(g=>({...g,previous:heads.get(g)}));
+ const stable=placeSiteHeads(moving,view);for(const g of moving){const p=stable.get(g);assert(p.dx*g.previous.dx+p.dy*g.previous.dy>=0,'a valid direction is retained when shortening');assert(Math.hypot(p.dx,p.dy)<=Math.hypot(g.previous.dx,g.previous.dy),'reuse does not lengthen a valid candidate');}
+ const sideBlocked=close.slice(0,2).map(g=>({...g,previous:heads.get(g)}));
+ const turned=placeSiteHeads(sideBlocked,{...view,controls:[{left:300,right:370,top:250,bottom:345}]});
+ assert(turned.get(sideBlocked[1]).dx>0,'blocked previous direction uses free space on the other side');
+ // Retained screen projections of the five Giolitti sites; anonymous IDs preserve deterministic ordering.
+ const streetViews=[[[716.645,379.474],[633.052,331.84],[640,338],[586.951,293.957],[643.74,338.633]],
+  [[693.597,288.476],[631.192,342.967],[640,338],[572.265,378.792],[640.893,335.364]],
+  [[569.151,299.662],[647.033,344.236],[640,338],[698.096,386.233],[636.265,337.367]],
+  [[580.601,392.885],[648.723,333.081],[640,338],[702.691,300.245],[639.102,340.65]]];
+ for(const points of streetViews){
+  const scene=points.map(([x,y],i)=>({site:{serviceIds:[String(i)]},members:[{}],point:{x,y}}));
+  const placed=[...placeSiteHeads(scene,{width:1280,height:676,zoom:15,selectedId:'2'}).values()];
+  for(let i=0;i<placed.length;i++)for(let j=0;j<i;j++)assert(!overlap(placed[i].box,placed[j].box),'Giolitti civic heads stay separate across bearings at z15');
+  assert(placed.every(p=>Math.hypot(p.dx,p.dy-21)<=64),'direction changes retain the leader bound');
+ }
  const reordered=placeSiteHeads([...close].reverse(),view);for(const group of close)assert.deepEqual({...heads.get(group)},{...reordered.get(group)},'stable identity order prevents pan jitter');
  const mobileClose=close.map((g,i)=>({...g,point:{x:195+i*3,y:400+i*2}}));const mobileHeads=[...placeSiteHeads(mobileClose,{width:390,height:844,zoom:17}).values()];for(let i=0;i<mobileHeads.length;i++)for(let j=0;j<i;j++)assert(!overlap(mobileHeads[i].box,mobileHeads[j].box),'mobile nearby heads stay separate');
  assert.equal(placeSiteHeads(close,{...view,zoom:13}).size,0,'overview clusters retain their established layout');

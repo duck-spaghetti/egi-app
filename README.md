@@ -884,13 +884,17 @@ identical line/mesh data is not resent to the renderer worker. Explicit wrapper
 stacking is transport10, service20, popup30, navigation40. Service label backgrounds
 are white80%, text/status/icons opaque. Source feet stay fixed while service heads
 try stable screen offsets up to56px (leaders at most64px), connected by leaders.
-Offsets shrink continuously from full separation at z17 to zero extra displacement
-at z14. During zoom, one coalesced animation-frame write updates the existing head
-and SVG endpoint together; source anchors and candidate directions stay fixed.
-Full clustering/collision and label placement run after the gesture settles,
-without reformatting service data during gesture updates. Pending gesture writes
-are canceled on settled layout, visibility changes and disposal. In fully saturated
-views overlap cannot be ruled out. Native sign orientation remains schematic.
+Heads try a bounded fan of directions and shorten only when there is room; zoom
+never forces necessary separation to zero. Source-space proximity prioritizes
+the selected site's neighbours, and valid directions are retained where possible.
+One bounded collision pass updates existing heads/SVG endpoints in MapLibre's
+own render frame during zoom, rotation and pan; there is no second layout RAF loop
+or service-content rebuild. The spatial index uses numeric cells and a capped
+local repair can relocate at most two blocking heads. Labels that become unsafe
+are temporarily suppressed, retaining accessible names. Full grouping and label
+placement still run after settling. Settled layout, visibility changes and disposal
+cancel pending layout. Arbitrarily saturated views can still exceed bounded space.
+Native transport sign orientation remains schematic.
 
 Service opening labels show known closing times and the next known opening using
 the schedule timezone, without inventing boundaries for incomplete/24h schedules.
