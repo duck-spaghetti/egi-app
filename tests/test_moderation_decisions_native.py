@@ -198,7 +198,7 @@ class DecisionTests(unittest.TestCase):
 
     def test_large_existing_components_and_ranges_survive_scalar_edit(self):
         """Existing collections above UI insertion bounds are not silently truncated."""
-        from tests.test_moderation_workspace import ServiceWorkspaceTests
+        from tests.test_moderation_workspace_native import ServiceWorkspaceTests
 
         before = self.heads()
         body = self.body()
@@ -220,7 +220,7 @@ class DecisionTests(unittest.TestCase):
 
     def test_invalid_hours_keep_other_unsaved_schedule_values(self):
         """A half-filled range does not discard another day's valid but unsaved correction."""
-        from tests.test_moderation_workspace import ServiceWorkspaceTests
+        from tests.test_moderation_workspace_native import ServiceWorkspaceTests
 
         html = self.browser.get(f'/moderazione/servizio/{self.service}').text
         form = ServiceWorkspaceTests.fields(html, f'action="/moderazione/servizio/{self.service}/bozza"')

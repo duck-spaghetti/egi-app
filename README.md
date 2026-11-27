@@ -24,18 +24,18 @@ choice is preserved. Do not install a second Python lint/type toolchain.
 Quick discovers Python fixture tests, Node test*.cjs suites, syntax and focused ESLint
 checks. Explicit native/live suites are reported as Integration selections. The one
 optional sibling-importer drift case reports its test identity/reason if absent;
-other unexpected skips block the profile. Complete is the default delivery profile
-and stays blocked until the later browser/offline/generated-PDF tickets provide their
-required stages. Integration owns explicitly configured native/cross-repository
+other unexpected skips block the profile. Complete is the default delivery profile and includes actual browser, offline and
+generated-PDF stages. See [browser verification](docs/browser-verification.md). Integration owns explicitly configured native/cross-repository
 checks and is also currently blocked until its owning integration stage exists.
 Exit codes:0 passed,1 failed,2 prerequisite-blocked. JSON schema1 includes source
 commit, observed per-check state, named Python outcomes, reasons and durations.
 Quick is not evidence of Complete success. Native desktop print remains separate.
 
 The approved workspace execution record is
-`project_egi/.scratch/agent-workflow-improvements/execution.md`. Saved-list and
-Community feature branches have not been integrated into this dev-based worktree;
-their product behavior is not claimed by these environment-only changes.
+`project_egi/.scratch/agent-workflow-improvements/execution.md`. Saved-list and Community feature bases are locally integrated in this milestone
+branch under the explicit session-2 grant; their original worktrees and existing
+previews are preserved. Native database properties and final acceptance remain
+separate from synthetic browser verification.
 
 ## Commit and push validation — EGI-131
 
@@ -258,7 +258,7 @@ contributions grouped by service, filtered by state, kind, category, waiting rea
 and claimant; a contribution page shows its text, the submitter's contact, proposals
 and history, and lets a person claim, take over, release, reassign or set a waiting
 reason ("serve l'admin" puts it in the admin's view). Tests:
-`tests/test_moderation_access.py`, `tests/test_moderation_queue.py` (need `EGI_DATABASE_REPO`) and
+`tests/test_moderation_access_native.py`, `tests/test_moderation_queue_native.py` (need `EGI_DATABASE_REPO`) and
 `tests/test_moderation_oidc.py` (ID token verification against a mock provider).
 
 `/moderazione/servizi` finds any service by name, published or not; its workspace
@@ -285,7 +285,7 @@ location, or without one. A created location or service cites what the person
 verified, recorded as a "Redazione EGI" observation (`editorial.record_observation`,
 egi_database 013); a new location is published together with the service. The
 moderation pages allow images from `tile.openstreetmap.org` for that map, sent with
-the origin only as referrer. Tests: `tests/test_moderation_workspace.py`.
+the origin only as referrer. Tests: `tests/test_moderation_workspace_native.py`.
 
 ### Contribution decisions (EGI-85)
 
@@ -315,7 +315,7 @@ separate protection-release form approves/publishes an exact draft while releasi
 one chosen protection under the existing database capability and scope checks.
 Ordinary publication never releases it.
 
-Native tests: `tests/test_moderation_decisions.py` with `EGI_DATABASE_REPO`. The
+Native tests: `tests/test_moderation_decisions_native.py` with `EGI_DATABASE_REPO`. The
 retention scheduler templates remain in the database repository's
 `scripts/retention/`; installing one, provisioning a real login or applying SQL to
 a non-disposable demo still requires the existing separate grant. Tests use only
@@ -329,7 +329,7 @@ only in canonical mode with `EGI_INTAKE_DATABASE_URL` set to a login created
 `LOGIN IN ROLE egi_intake`, which may only call `editorial.submit_contribution`
 (global limits, honeypot, admin switch; no IP). Otherwise the page explains that
 contributions are not available. The form states retention and confirms receipt only.
-Tests: `tests/test_contribute.py` (needs `EGI_DATABASE_REPO`).
+Tests: `tests/test_contribute_native.py` (needs `EGI_DATABASE_REPO`).
 
 ## Setup and start
 

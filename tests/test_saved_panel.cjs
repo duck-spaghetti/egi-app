@@ -1,8 +1,12 @@
 const assert=require('node:assert/strict');
-const {environment}=require('./module_fixture.cjs');
+const {strictEnvironment}=require('./module_fixture.cjs');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 (async()=>{
- const env=environment({window:{addEventListener(){}}});
+ const fixture={nodes:['sheet-saved','saved-groups','saved-create','saved-new','saved-status']};
+ const env=strictEnvironment(fixture,{window:{addEventListener(){}}});
+ assert.throws(()=>env.document.getElementById('missing-return'),/Missing required DOM node/);
+ assert.throws(()=>env.get('saved-groups').querySelector('unsupported'),/Unsupported DOM operation/);
+ assert.equal(strictEnvironment({nodes:[],optional:['absent-banner']}).document.getElementById('absent-banner'),null);
  const {Lifecycle}=await env.load('lifecycle.js');const scope=new Lifecycle();
  const {createSavedPanel}=await env.load('features/favorites/panel.js');
  const entry={id:'00000000-0000-0000-0000-000000000001',status:'saved',card:{name:'Shared POI',place:{address:'Roma'}}};

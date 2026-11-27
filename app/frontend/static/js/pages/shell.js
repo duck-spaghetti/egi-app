@@ -108,7 +108,7 @@ function bindUi() {
 }
 
 function openSheet(id) {
-  sheetReturnFocus = document.activeElement;
+  if (!document.activeElement?.closest?.('.sheet')) sheetReturnFocus = document.activeElement;
   document.querySelectorAll(".sheet").forEach((sheet) => {sheet.classList.remove("shown");if(sheet.id==='sheet-saved'){sheet.inert=true;sheet.setAttribute('aria-hidden','true');}});
   const sheet = document.getElementById(id);
   if (sheet) {

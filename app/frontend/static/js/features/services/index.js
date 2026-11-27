@@ -14,7 +14,7 @@ const closeSheets=()=>emit('closeSheets');
 const favorites=context.canonical ? createFavorites({territory:context.profile?.territory_code || 'roma',prepare:prepareOffline}) : null;
 const collections=context.canonical?createCollections({territory:context.profile?.territory_code || 'roma',prepare:prepareOffline}):null;
 let collectionEntries=new Map();
-const chooseSavedList=favorites?createCollectionPicker({favorites,changed:()=>{void favoriteControls.load(true);},territory:context.profile?.territory_code || 'roma',scope,translate,notify:message=>emit('toast',{message})}):null;
+const chooseSavedList=favorites?createCollectionPicker({favorites,changed:()=>{void refreshSavedPanel();},territory:context.profile?.territory_code || 'roma',scope,translate,notify:message=>emit('toast',{message})}):null;
 const favoriteControls=favorites ? createFavoriteControls({favorites,scope,translate,
   listSaved:async()=>{const lists=await collections.list();collectionEntries=new Map(lists.map(list=>[list.id,list.entries]));return lists.flatMap(list=>list.entries.map(entry=>entry.id));},
   chooseList:(control,id,language,copy)=>chooseSavedList(control,id,language,copy || [...collectionEntries.values()].flat().find(entry=>entry.id===id && entry.status==='saved')),
@@ -22,6 +22,14 @@ const favoriteControls=favorites ? createFavoriteControls({favorites,scope,trans
     unavailable:favoriteControls.entries().filter(entry=>entry.status==='unavailable').map(entry=>entry.id)})}) : null;
 
 const savedPanel=favorites && document.getElementById('sheet-saved')?.hasAttribute?.('aria-modal') ? createSavedPanel({favorites,collections,scope,translate,emit,changed:()=>favoriteControls.load(true),renderEntry:(entry,group)=>renderListItem(projectSavedEntry(entry,state.catalogPois || state.pois),{position:`saved-${group}`,selectAttribute:'data-saved-select'})}) : null;
+
+/** Refresh both bookmark membership and the visible library after a committed picker action. */
+async function refreshSavedPanel() {
+  const loaded=await favoriteControls.load(true);
+  if(!loaded || scope.signal.aborted || !savedPanel?.visible())return;
+  try{await savedPanel.render();}
+  catch(error){if(!scope.signal.aborted)emit('toast',{message:t('lists.error')});}
+}
 
 /** Reuse current public cards where available; retain saved copies and scrubbed unavailable entries. */
 function savedServices(snapshot) {
