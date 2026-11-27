@@ -30,26 +30,36 @@ export function createI18n(scope, http) {
     return promise;
   }
 
-  async function setLanguage(lang) {
-    const requested = normalizeLang(lang);
-    const generation = ++languageGeneration;
-    const fallback = await loadMessages("it");
-    const messages = requested === "it" ? fallback : await loadMessages(requested);
+  /** Prepare a dictionary without mutating the active page; commit only the latest context. */
+  async function prepareLanguage(lang) {
+    const requested=normalizeLang(lang),generation=++languageGeneration;
+    const fallback=await loadMessages("it");
+    const messages=requested==="it"?fallback:await loadMessages(requested);
     scope.check();
-    if (generation !== languageGeneration) return;
-    currentLang=requested;
-    fallbackMessages=fallback;currentMessages=messages;
-    document.documentElement.lang = currentLang;
-    document.documentElement.dir = currentLang === "ar" ? "rtl" : "ltr";
-    return currentMessages;
+    return {
+      t:(key,params={},text="")=>translate(messages,fallback,key,params,text),
+      commit(){
+        scope.check();if(generation!==languageGeneration)return false;
+        currentLang=requested;fallbackMessages=fallback;currentMessages=messages;
+        document.documentElement.lang=currentLang;
+        document.documentElement.dir=currentLang==="ar"?"rtl":"ltr";
+        return true;
+      },
+    };
   }
 
-  function t(key, params = {}, fallback = "") {
-    const value = lookup(currentMessages, key) ?? lookup(fallbackMessages, key) ?? fallback;
-    if (typeof value !== "string") {
-      return fallback || key;
-    }
-    return interpolate(value, params);
+  async function setLanguage(lang) {
+    const prepared=await prepareLanguage(lang);
+    prepared.commit();return currentMessages;
+  }
+
+  function translate(messages,fallback,key,params,text) {
+    const value=lookup(messages,key)??lookup(fallback,key)??text;
+    return typeof value==="string"?interpolate(value,params):text||key;
+  }
+
+  function t(key,params={},fallback="") {
+    return translate(currentMessages,fallbackMessages,key,params,fallback);
   }
 
   function translatePage(root = document) {
@@ -87,6 +97,7 @@ export function createI18n(scope, http) {
 
   return {
     setLanguage,
+    prepareLanguage,
     t,
     translatePage,
     getCurrentLanguage: () => currentLang,

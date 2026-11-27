@@ -1,10 +1,10 @@
-import {reconcileMarkup,forgetMarkup} from '../../reconcile.js';
+import {reconcileMarkup,reconcileRows,forgetMarkup} from '../../reconcile.js';
 import {createPresentation} from "./presentation.js";
 /** createServices owns its behavior; dependencies and snapshots are explicit. */
 export function createServices({context,scope,loader,sites,transit,translate,emit}) {
 let state={pois:[],categories:[],languages:[],categoryTranslations:[],taxonomy:{course_levels:[]},filters:{cats:new Set(),offersOff:new Set()},lang:context.languageCode||'it',matchedIds:new Set()};
 const model=createPresentation({snapshot:()=>state,context,translate});
-const {normalizePublicService,normalizeArea,normalizeCategory,mergeServiceCategories,applyCategoryLabels,normalizeCategoryIconPath,resolveCategory,categoryBadge,serviceTitle,serviceKind,serviceOrganiser,sourceNames,formatDistance,sourceOpeningStatus,todayHours,renderServiceHeader,renderInfoSection,renderHoursSection,renderContactsSection,renderSourcesSection,renderServiceBar,serviceButton,SERVICE_SECTIONS,escapeHtml,t}=model;
+const {normalizePublicService,normalizeArea,normalizeCategory,mergeServiceCategories,applyCategoryLabels,categoryBadge,formatDistance,sourceOpeningStatus,renderServiceHeader,renderInfoSection,renderHoursSection,renderContactsSection,renderSourcesSection,renderServiceBar,serviceButton,SERVICE_SECTIONS,escapeHtml,t}=model;
 let descriptions=new Map(),refreshTime=null;
 /** Memoization belongs to one coherent refresh, including its clock/reference/language context. */
 function beginRefresh(snapshot,now=new Date()){state=snapshot;refreshTime=now;descriptions=new Map();}
@@ -103,26 +103,25 @@ function renderList(list) {
     reconcileMarkup(wrap,`<div class="empty-state"><p>${state.filters.section==="directory" ? "Nessun servizio esplicitamente a distanza nei dati selezionati. I servizi senza coordinate restano nell’elenco da localizzare." : "Nessun servizio per questa ricerca."}</p></div>`);
     return;
   }
-  const html=list.map(poi=>{
+  const rows=list.map(poi=>{
     const raw=poi.raw || {};
     const siblings=sites.siblings(poi).length;
     const distance=state.userLoc ? (poi._dist==null ? "Distanza non disponibile" : formatDistance(poi._dist)) : "";
-    const icon=normalizeCategoryIconPath(poi.category_icon_path);
+    const display=describe(poi);
     // Same hierarchy as the service sheet header (layout r3): category, title, place, hours, who.
-    const status=sourceOpeningStatus(raw.hours_display);
-    const today=todayHours(raw.hours_display);
-    const who=[serviceOrganiser(poi), ...sourceNames(poi)].filter(Boolean);
-    return `<button type="button" class="poi-item" data-id="${escapeHtml(poi.id)}"><span class="marker-stripe" style="background:${poi.category_color}"></span><span class="info">
-      <span class="meta">${categoryBadge(resolveCategory(poi))}${distance?`<span class="dist">${escapeHtml(distance)}</span>`:""}${raw.itinerant_source?'<span class="dist">Itinerante</span>':""}</span>
-      <span class="service-list-title"><span class="name">${escapeHtml(serviceTitle(poi))}</span></span>
-      <span class="service-kind">${escapeHtml(serviceKind(poi))}${siblings>1?` <span class="service-key">· ${siblings} servizi qui</span>`:""}</span>
+    const status=display.status,today=display.today;
+    const who=[display.organiser,...display.sources].filter(Boolean);
+    return {id:poi.id,html:`<button type="button" class="poi-item" data-id="${escapeHtml(poi.id)}"><span class="marker-stripe" style="background:${poi.category_color}"></span><span class="info">
+      <span class="meta">${display.categoryBadge}${distance?`<span class="dist">${escapeHtml(distance)}</span>`:""}${raw.itinerant_source?'<span class="dist">Itinerante</span>':""}</span>
+      <span class="service-list-title"><span class="name">${escapeHtml(display.title)}</span></span>
+      <span class="service-kind">${escapeHtml(display.kind)}${siblings>1?` <span class="service-key">· ${siblings} servizi qui</span>`:""}</span>
       <span class="facility-name">${escapeHtml(poi.address || "")}</span>
       <span class="service-status ${status.kind}" data-opening-service="${escapeHtml(poi.id)}"><strong>${escapeHtml(status.label)}</strong>${today ? `<span class="service-today">${escapeHtml(today)}</span>` : ""}<small hidden></small></span>
       ${transit.badge(poi)}
       <span class="list-who">${escapeHtml(who.join(" · "))} · <span class="list-flag">da verificare</span></span>
-    </span></button>`;
-  }).join("");
-  reconcileMarkup(wrap,html,{fallback:()=>wrap.querySelector('.poi-item')||document.getElementById('view-toggle')});
+    </span></button>`};
+  });
+  reconcileRows(wrap,rows);
 }
 function bindHoursToggle() {
   const toggle = document.querySelector("[data-hours-toggle]");
@@ -164,11 +163,11 @@ function updateOpeningBadges() {
 
 /** Only an applicable latest human check can remove the verification reminder. */
 
-async function load(language) {
+async function load(language, targetTranslate=translate) {
  const bundle=await loader.load(language);
  scope.check();
  const candidate={...state,lang:language,languages:bundle.languages,categoryTranslations:bundle.categoryTranslations,taxonomy:bundle.taxonomy};
- const projection=createPresentation({snapshot:()=>candidate,context,translate});
+ const projection=createPresentation({snapshot:()=>candidate,context,translate:targetTranslate});
  const categories=projection.applyCategoryLabels(projection.mergeServiceCategories(bundle.categories
   .filter(c=>c.area_id==null||Number(c.area_id)===Number(context.cityId)).map(projection.normalizeCategory),bundle.rows));
  return {categories,pois:bundle.rows.map(projection.normalizePublicService).filter(Boolean),languages:bundle.languages,

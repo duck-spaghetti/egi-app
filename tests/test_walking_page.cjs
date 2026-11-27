@@ -12,7 +12,7 @@ const assert=require('node:assert/strict');const {environment,element}=require('
   const map={mount(){},update(view){updates++;selected=view.selectedId;},dispose(){},attach(){},center(){},contains:()=>true,invalidate(){},focusService:(...p)=>focused.push(p)};
   const saved=new Map();const session={setItem:(k,v)=>saved.set(k,v),getItem:k=>saved.get(k),removeItem:k=>saved.delete(k)};
   const page=createMapPage({languageCode:'it',localLayers:true,view:{mode,available:true}},
-   {i18n:{setLanguage:async()=>{},t:(k,p,f)=>f||k},http:{},browser:{session,location:{pathname:'/map',search:'',assign:url=>redirect=url}},
+   {i18n:{setLanguage:async()=>{},prepareLanguage:async()=>({t:(k,p,f)=>f||k,commit:()=>true}),t:(k,p,f)=>f||k},http:{},browser:{session,location:{pathname:'/map',search:'',assign:url=>redirect=url}},
     factories:{map:()=>map,services:args=>{emit=args.emit;return services;},search:()=>({select:()=>[],update(){}}),origin:()=>feature,transport:()=>feature,cycleways:()=>feature,shell:({state})=>{pageState=state;return shell;},
     buses:()=>({mount(){},dispose(){},refreshLabels(){labels++;}}),
     walking:()=>({mount(){mounted++;},clear(){routeGeneration++;},dispose(){},walk:(a,b)=>{walks.push([a,b]);const token=routeGeneration;return new Promise(resolve=>completions.push(()=>{if(token===routeGeneration)routeViews++;resolve();}));}})}});

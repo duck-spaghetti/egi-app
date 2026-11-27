@@ -16,7 +16,7 @@ const suggestions=document.getElementById("suggestions");
 const toast=document.getElementById("toast");
 const settingsBackHead=document.getElementById("settings-back-head");
 const t=i18n.t;
-const {refresh,renderFilters,renderSearchOptions,resetFilters,chooseReferencePoint,geocodeAddress,loadOriginTransit,locateUser}=actions;
+const {refresh,renderFilters,resetFilters,chooseReferencePoint,geocodeAddress,loadOriginTransit,locateUser}=actions;
 
 function bindUi() {
   document.getElementById("open-now-filter").addEventListener("change",event=>{state.filters.openNow=event.target.checked; refresh();}, {signal: scope.signal});
@@ -24,7 +24,6 @@ function bindUi() {
   for (const [id,key] of [["source-filter","source"],["issue-filter","issue"],["access-filter","access"],["audience-filter","audience"],["section-filter","section"],["sort-services","order"]]) {
     document.getElementById(id).addEventListener("change",event=>{
       state.filters[key]=event.target.value;
-      if (key==="source") renderSearchOptions();
       if (key==="order" && event.target.value==="distance" && !state.userLoc) openSheet("sheet-location");
       refresh();
     }, {signal: scope.signal});
@@ -45,8 +44,7 @@ function bindUi() {
     document.getElementById("service-query").value="";
     document.getElementById("open-now-filter").checked=false;
     renderFilters(); closeSheets();
-    if (state.view!=="list") toggleView();
-    refresh();
+    if (state.view!=="list") toggleView();else refresh();
   }, {signal: scope.signal});
   document.getElementById("origin-transit").addEventListener("toggle", event => {
     if (event.target.open) void loadOriginTransit();
@@ -163,7 +161,6 @@ function renderLanguageList() {
     button.className = `pill${state.lang === code ? " active" : ""}`;
     button.textContent = code.toUpperCase();
     button.addEventListener("click", () => {
-      state.lang = code;
       emit("language",{language:code});
     }, {signal: scope.signal});
     wrap.append(button);

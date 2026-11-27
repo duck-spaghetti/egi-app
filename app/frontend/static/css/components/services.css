@@ -5,6 +5,9 @@
   gap: 12px;
   align-items: flex-start;
   cursor: pointer;
+  /* Offscreen rows stay accessible; the browser remembers measured block sizes. */
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 220px;
 }
 
 .poi-item .marker-stripe {

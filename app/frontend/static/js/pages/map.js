@@ -51,9 +51,10 @@ export function createMapPage(context, dependencies={}) {
  const cycle=factories.cycleways();
  const walking=context.view?.mode==='3d'&&factories.walking?factories.walking({context,scope,translate:i18n.t}):null;
  const buses=context.view?.mode==='3d'&&context.localLayers!==false&&factories.buses?factories.buses({scope,http,translate:i18n.t,container:document.getElementById("live-buses-controls")}):null;
- let mounted=false, loading=null, languageGeneration=0, refreshInFlight=false;
+ let mounted=false, loading=null, languageGeneration=0, rendering=false, refreshAgain=false;
+ const openingRequests=new Map();scope.own(()=>openingRequests.clear());
  const shell=factories.shell({state,scope,i18n,emit,actions:{refresh,
-  renderFilters:renderFilters,renderSearchOptions:()=>search.update(snapshot()),resetFilters,
+  renderFilters,resetFilters,
   chooseReferencePoint:origin.choose,geocodeAddress:origin.search,locateUser:origin.locate,loadOriginTransit:transit.origin}});
 
  function snapshot(){return structuredClone(state);}
@@ -109,16 +110,22 @@ export function createMapPage(context, dependencies={}) {
   }
   return new URLSearchParams(browser.location?.search||'').get('servizio');
  }
+ /** Commit one snapshot/clock to every consumer; reentrant filter repair gets a fresh pass. */
  function refresh(){
   if(scope.signal.aborted)return;
-  const now=new Date();sites.reset();let view=snapshot();
-  if(services.beginRefresh)services.beginRefresh(view,now);else services.update(view);transit.update(view);origin.update(view);
-  const list=search.select(view,now);state.matchedIds=new Set(list.map(row=>row.id));view=snapshot();
-  services.update(view,list);search.update(view,now);
-  map.update(view,state.focusSiteKey?state.pois.filter(row=>sites.key(row)===state.focusSiteKey):list);
-  shell.update();
+  if(rendering){refreshAgain=true;return;}
+  rendering=true;
+  try{do{
+   refreshAgain=false;
+   const now=new Date();sites.reset();const view=snapshot();
+   if(services.beginRefresh)services.beginRefresh(view,now);else services.update(view);
+   const list=search.select(view,now);state.matchedIds=new Set(list.map(row=>row.id));view.matchedIds=state.matchedIds;
+   transit.update(view);origin.update(view);services.update(view,list);search.update(view,now);
+   map.update(view,state.focusSiteKey?view.pois.filter(row=>sites.key(row)===state.focusSiteKey):list);
+   shell.update();
+  }while(refreshAgain&&!scope.signal.aborted);}finally{rendering=false;}
  }
- function renderFilters(){search.update(snapshot());shell.languages();shell.cities();}
+ function renderFilters(){shell.languages();shell.cities();}
  function resetFilters(){
   Object.assign(state.filters,{cats:new Set(),offersOff:new Set(),q:'',issue:'',access:'',audience:'',meal:'',level:'',section:'all',openNow:false});
   document.getElementById('service-query').value='';document.getElementById('open-now-filter').checked=false;
@@ -135,21 +142,25 @@ export function createMapPage(context, dependencies={}) {
  async function language(code){
   const generation=++languageGeneration;
   try{
-   await i18n.setLanguage(code);scope.check();
-   const data=await services.load(code);scope.check();if(generation!==languageGeneration)return;
+   const dictionary=await i18n.prepareLanguage(code);scope.check();if(generation!==languageGeneration)return;
+   const data=await services.load(code,dictionary.t);scope.check();if(generation!==languageGeneration)return;
+   if(!dictionary.commit())return;
    const chosen=new Set(state.filters.cats);Object.assign(state,data);state.lang=code;
    state.filters.cats=new Set(state.categories.map(row=>row.slug).filter(slug=>chosen.has(slug)));
    refresh();renderFilters();shell.translate();walking?.clear();buses?.refreshLabels();shell.close();
    if(state.selectedId)select(state.selectedId);
   }catch(error){if(!scope.signal.aborted && generation===languageGeneration)shell.toast('Catalogo temporaneamente non disponibile. Riprova.');}
  }
- async function refreshOpening(){
-  if(!context.canonical || refreshInFlight || scope.signal.aborted)return;
-  refreshInFlight=true;
-  const generation=languageGeneration;
-  try{const data=await services.load(state.lang);scope.check();if(generation!==languageGeneration)return;Object.assign(state,data);refresh();services.refreshHours();}
-  catch(error){if(!scope.signal.aborted)services.refreshHours();}
-  finally{refreshInFlight=false;}
+ /** Share only the current language-generation request; never retain a settled response. */
+ function refreshOpening(){
+  if(!context.canonical||scope.signal.aborted)return;
+  const generation=languageGeneration,code=state.lang,key=`${generation}:${code}`;
+  if(openingRequests.has(key))return openingRequests.get(key);
+  const request=(async()=>{
+   try{const data=await services.load(code);scope.check();if(generation!==languageGeneration||code!==state.lang)return;Object.assign(state,data);refresh();services.refreshHours();}
+   catch(error){if(!scope.signal.aborted&&generation===languageGeneration)services.refreshHours();}
+   finally{if(openingRequests.get(key)===request)openingRequests.delete(key);}
+  })();openingRequests.set(key,request);return request;
  }
  function emit(type,payload={}){
   if(scope.signal.aborted)return;
@@ -197,7 +208,7 @@ export function createMapPage(context, dependencies={}) {
    try{
     await i18n.setLanguage(state.lang);scope.check();
     map.mount();mounted=true;scope.own(map.dispose);scope.own(sites.dispose);
-    scope.own(services.dispose);scope.own(origin.dispose);scope.own(transit.dispose);scope.own(cycle.dispose);
+    scope.own(search.dispose||(()=>{}));scope.own(services.dispose);scope.own(origin.dispose);scope.own(transit.dispose);scope.own(cycle.dispose);
     shell.bind();shell.layout();shell.translate();bindView();
     if(walking){walking.mount(map.attach);scope.own(walking.dispose);}
     if(buses){buses.mount(map.attach);scope.own(buses.dispose);}
@@ -214,8 +225,8 @@ export function createMapPage(context, dependencies={}) {
     const service=chosen&&state.pois.find(row=>String(row.id)===chosen);
     if(service){select(service.id);if(state.pendingWalkId===String(service.id))walkTo(service);}
     if(context.localLayers!==false){void transit.summaries();scope.every(transit.summaries,300000);}
-    scope.every(()=>{services.refreshHours();if(!context.canonical||state.filters.openNow)refresh();void refreshOpening();},30000);
-    document.addEventListener('visibilitychange',()=>{if(!document.hidden){services.refreshHours();if(!context.canonical)refresh();void refreshOpening();}},{signal:scope.signal});
+    scope.every(()=>{refresh();services.refreshHours();void refreshOpening();},30000);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden){refresh();services.refreshHours();void refreshOpening();}},{signal:scope.signal});
    }catch(error){
     if(scope.signal.aborted)return;
     document.getElementById('poi-list').innerHTML='<div class="empty-state"><p>Catalogo temporaneamente non disponibile. Riprova.</p></div>';

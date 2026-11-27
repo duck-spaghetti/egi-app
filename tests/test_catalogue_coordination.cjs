@@ -1,0 +1,28 @@
+/** Concurrent bundle reads coalesce only until settlement; page commits reject old contexts. */
+const assert=require('node:assert/strict');const {environment}=require('./module_fixture.cjs');
+const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject}};
+(async()=>{const timers=[],env=environment({setInterval:fn=>(timers.push(fn),timers.length),clearInterval(){}}),{Lifecycle}=await env.load('lifecycle.js'),{createLoader}=await env.load('features/services/loader.js');
+ let reads=[],failed=false;const gate=deferred(),scope=new Lifecycle(),http={request:url=>{reads.push(url);return gate.promise.then(()=>({ok:!failed||url.endsWith('/taxonomy'),json:async()=>[]}));}};
+ const loader=createLoader({context:{cityId:1},scope,http});const a=loader.load('it'),b=loader.load('it');assert.equal(a,b);assert.equal(reads.length,6);gate.resolve();await a;await loader.load('it');assert.equal(reads.length,12,'settled bundle never caches metadata');failed=true;await assert.rejects(loader.load('it'));failed=false;await loader.load('it');assert.equal(reads.length,24,'failure permits retry');
+ const fallback=createLoader({context:{cityId:1},scope,http:{request:async url=>({ok:!url.endsWith('/taxonomy'),json:async()=>[]})}});assert.equal((await fallback.load('it')).taxonomy.needs.length,0);scope.dispose();assert.throws(()=>loader.load('it'),{name:'AbortError'});
+ const {createI18n}=await env.load('i18n.js');const dictionary=deferred(),languageScope=new Lifecycle();
+ const translator=createI18n(languageScope,{request:async url=>({ok:true,json:()=>url.endsWith('/ar.json')?dictionary.promise:Promise.resolve({title:'IT'})})});
+ await translator.setLanguage('it');const oldLanguage=translator.prepareLanguage('ar');await new Promise(setImmediate);await translator.prepareLanguage('fr');dictionary.resolve({title:'AR'});const prepared=await oldLanguage;assert.equal(prepared.t('title'),'AR');assert.equal(prepared.commit(),false);assert.equal(env.document.documentElement.dir,'ltr','superseded dictionary cannot change direction after newer data failure');assert.equal(translator.getCurrentLanguage(),'it');languageScope.dispose();
+ // Actual target dictionary and normalizer: preparation cannot mutate the visible page.
+ const normalScope=new Lifecycle(),{createServices}=await env.load('features/services/index.js');
+ const realTranslator=createI18n(normalScope,{request:async url=>({ok:true,json:async()=>({common:{not_available:url.includes('/ar.')?'AR unavailable':'IT unavailable'},map:{category_orientation:url.includes('/ar.')?'AR orientation':'IT orientation'}})})});
+ await realTranslator.setLanguage('it');const target=await realTranslator.prepareLanguage('ar');
+ const bundle={categories:[{id:1,slug:'orientamento',label:'Orientamento'}],rows:[{id:1,place:{is_protected_address:true},category:{id:1,slug:'orientamento'}}],languages:[{id:1,code:'it'},{id:2,code:'ar'}],areas:[],categoryTranslations:[],taxonomy:{needs:[{id:1,slug:'orientamento',label:'Orientamento'}]}};
+ const realServices=createServices({context:{canonical:true},scope:normalScope,loader:{load:async()=>bundle},sites:{},transit:{},translate:realTranslator.t,emit(){}});
+ const projected=await realServices.load('ar',target.t);assert.equal(projected.pois[0].address,'AR unavailable');assert.equal(projected.taxonomy.needs[0].label,'AR orientation');assert.equal(env.document.documentElement.dir,'ltr');assert.equal(target.commit(),true);assert.equal(env.document.documentElement.dir,'rtl');realServices.dispose();normalScope.dispose();
+ const {createMapPage}=await env.load('pages/map.js');let emit,loads=[],frames=[],searches=0,fail=false;
+ const feature={update(){},mount(){},dispose(){},summaries(){},detail(){},origin(){},badge:()=>'',shell:()=>'',cancelOrigin(){},locate(){},search(){},choose(){},set(){}};
+ const page=createMapPage({canonical:true,localLayers:false,languageCode:'it'}, {http:{request(){throw Error('unexpected')}},i18n:{setLanguage:async()=>{},prepareLanguage:async()=>({t:()=>'',commit:()=>true}),t:()=>''},factories:{
+  map:()=>({...feature,mount(){},update:view=>frames.push(view),contains:()=>true}),
+  services:options=>(emit=options.emit,{...feature,load:code=>{if(!loads.length){loads.push({code});return Promise.resolve({pois:[]})}const wait=deferred();loads.push({code,...wait});return wait.promise},beginRefresh(){},show(){},refreshHours(){},describe:()=>({})}),
+  search:()=>({select:()=>[],update:()=>searches++,dispose(){}}),origin:()=>feature,transport:()=>feature,cycleways:()=>feature,shell:()=>({...feature,bind(){},layout(){},translate(){},languages(){},cities(){},close(){},toast(){}})}});
+ await page.mount();assert.equal(searches,1,'one facet update per mount refresh');timers.at(-1)();timers.at(-1)();assert.equal(loads.length,2,'overlapping periodic refresh shares in-flight request');
+ emit('language',{language:'ar'});await new Promise(setImmediate);assert.equal(loads[2].code,'ar');loads[2].resolve({pois:[],stamp:'new'});await new Promise(setImmediate);assert.equal(frames.at(-1).lang,'ar');loads[1].resolve({pois:[],stamp:'old'});await new Promise(setImmediate);assert.equal(frames.at(-1).stamp,'new');
+ timers.at(-1)();assert.equal(loads.at(-1).code,'ar');loads.at(-1).reject(Error('offline'));await new Promise(setImmediate);assert.equal(frames.at(-1).stamp,'new');timers.at(-1)();const last=loads.at(-1);assert.equal(last.code,'ar');page.dispose();const n=frames.length;last.resolve({stamp:'retired',pois:[]});await new Promise(setImmediate);assert.equal(frames.length,n);
+ console.log('PASS: in-flight-only coalescing, six fresh reads, fallback, retry, one refresh, context ordering and disposal');
+})().catch(e=>{console.error(e);process.exitCode=1});

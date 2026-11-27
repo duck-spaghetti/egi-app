@@ -31,7 +31,7 @@ function renderCatGrid() {
     const slug=category.slug,n=facets?.cats.get(slug)||0,on=state.filters.cats.has(slug);
     return `<button type="button" class="cat-tile${on?' active':''}${n?'':' empty'}" data-need="${escapeHtml(slug)}" aria-pressed="${on}">${describe({category,category_id:category.id,raw:{}}).categoryBadge}<span class="cat-count" aria-label="${n} servizi">${n}</span></button>`;
   }).join('');
-  reconcileMarkup(wrap,html,{fallback:()=>wrap.querySelector('button')});
+  reconcileMarkup(wrap,html,{fallback:()=>document.querySelector('#sheet-filters.shown [data-close]')||document.getElementById('view-toggle')});
   renderOfferGroups();
 }
 
@@ -59,7 +59,7 @@ function renderOfferGroups() {
     const level = levels.length ? `<label class="offer-meal" data-control="level">Livello del corso <select data-level><option value="">Qualsiasi</option>${levels.map(l => `<option value="${escapeHtml(l.code)}"${f.level === l.code ? " selected" : ""}>${escapeHtml(l.label)} (${levelCounts.get(l.code) || 0})</option>`).join("")}</select></label>` : "";
     return `<div class="offer-group" data-need-group="${escapeHtml(c.slug)}"><h4>${escapeHtml(categoryCaption(c.label || c.slug))}</h4><div class="offer-chips">${chips || '<span class="source-note">Nessuna prestazione con i filtri attivi.</span>'}</div>${meal}${level}</div>`;
   }).join("");
-  reconcileMarkup(wrap,html,{fallback:()=>document.getElementById('cat-grid').querySelector('button')});
+  reconcileMarkup(wrap,html,{fallback:()=>document.querySelector('#sheet-filters.shown [data-close]')||document.getElementById('view-toggle')});
   const meal=wrap.querySelector('[data-meal]'),level=wrap.querySelector('[data-level]');
   if(meal)meal.value=f.meal||'';if(level)level.value=f.level||'';
 }
