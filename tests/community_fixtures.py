@@ -18,9 +18,12 @@ def request(text='Sportello') -> dict:
 
 
 def result(req: dict) -> dict:
-    """Propose one exact name with a source-specific validated quote."""
-    return {'schema_version':1,'input_id':req['input_id'],'input_hash':req['input_hash'],
+    """Propose one exact name under the requested explicit fixture protocol."""
+    value = {'schema_version':req['schema_version'],'input_id':req['input_id'],'input_hash':req['input_hash'],
         'config_version':req['config_version'],'state':'complete','mapping':None,'diagnostics':[],
         'candidates':[{'candidate_key':'one','service':{'name':req['text']},'location':{'kind':'none'},
             'diagnostics':[],'evidence':[{'id':str(uuid4()),'path':'/service/name','input_id':req['input_id'],
                 'input_hash':req['input_hash'],'kind':'stated','quote':req['text'],'span':{'start':0,'end':len(req['text'])}}]}]}
+    if req['schema_version'] == 2:
+        value['candidates'][0]['source_facts'] = []
+    return value

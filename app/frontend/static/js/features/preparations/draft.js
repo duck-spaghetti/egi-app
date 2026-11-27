@@ -18,8 +18,14 @@ function edited(payload, path, value) {
   writePath(payload, path, value);
   payload.evidence = payload.evidence.filter(e => !related(e.path, path));
   for (const old of Object.keys(payload.field_origins)) if (old.startsWith(path + '/')) delete payload.field_origins[old];
-  if (path.startsWith('/service/') || path.startsWith('/location/')) {
+  if (path.startsWith('/service/') || path.startsWith('/location/') || /^\/source_facts\/\d+\/value$/.test(path)) {
     payload.field_origins[path] = {state: value === undefined ? 'cleared' : 'manual'};
+  }
+  if (/^\/source_facts\/\d+\/value$/.test(path)) {
+    const fact=payload.source_facts[Number(parts(path)[1])];
+    for(const resolution of payload.resolutions || [])if(resolution.fact_id===fact.fact_id){
+      resolution.state='unresolved';resolution.context={};resolution.candidates=[];delete resolution.selected;
+    }
   }
 }
 function changes(base, next, keys = []) {
@@ -53,9 +59,32 @@ export class PreparationDraft {
   rebase(remote, choices = {}) {
     const local = ['service', 'location', 'target', 'outcome'].flatMap(key => changes(this.base[key], this.payload[key], [key]));
     const conflicts = local.filter(change => !equal(readPath(remote.payload, change.path), readPath(this.base, change.path)) && !equal(readPath(remote.payload, change.path), change.value));
-    if (conflicts.some(change => !['local', 'remote'].includes(choices[change.path]))) return conflicts.map(change => ({...change, remote: readPath(remote.payload, change.path)}));
+    // Fact positions may change remotely. Compare/apply editable values by stable
+    // private identity so another fact's correction or source quote survives.
+    const facts=(this.payload.source_facts || []).flatMap((fact,index)=>{
+      const before=(this.base.source_facts || []).find(old=>old.fact_id===fact.fact_id);
+      return before && equal(before.value,fact.value)?[]:[{path:'/source_facts/'+index+'/value',fact,index,value:fact.value,before}];
+    });
+    const factConflicts=facts.filter(change=>{
+      const found=(remote.payload.source_facts || []).find(fact=>fact.fact_id===change.fact.fact_id);
+      return (!found && !!change.before) || !equal(found?.value,change.before?.value) && !equal(found?.value,change.value);
+    });
+    const all=[...conflicts.map(change=>({...change,remote:readPath(remote.payload,change.path)})),
+      ...factConflicts.map(change=>({...change,remote:(remote.payload.source_facts || []).find(fact=>fact.fact_id===change.fact.fact_id)?.value}))];
+    if(all.some(change=>!['local','remote'].includes(choices[change.path])))return all;
     const payload = clone(remote.payload);
     for (const change of local) if (choices[change.path] !== 'remote') edited(payload, change.path, change.value);
+    for(const change of facts)if(choices[change.path]!=='remote'){
+      payload.schema_version=2;payload.source_facts??=[];payload.resolutions??=[];
+      let index=payload.source_facts.findIndex(fact=>fact.fact_id===change.fact.fact_id);
+      if(index<0){
+        index=payload.source_facts.length;payload.source_facts.push(clone(change.fact));
+        const from='/source_facts/'+change.index,into='/source_facts/'+index;
+        for(const evidence of this.payload.evidence)if(evidence.path.startsWith(from+'/'))payload.evidence.push({...clone(evidence),path:into+evidence.path.slice(from.length)});
+        for(const [path,origin]of Object.entries(this.payload.field_origins))if(path.startsWith(from+'/'))payload.field_origins[into+path.slice(from.length)]=clone(origin);
+      }
+      edited(payload,'/source_facts/'+index+'/value',change.value);
+    }
     this.base = clone(remote.payload);
     this.version = remote.id;
     this.payload = payload;

@@ -831,7 +831,9 @@
       "calendar_id": "Calendario",
       "effects": "Variazioni",
       "event_version_id": "Ricorrenza",
-      "kind": "Tipo"
+      "kind": "Tipo",
+      "source_facts": "Informazioni dalla fonte",
+      "source_value": "Valore originale"
     },
     "choice_labels": {
       "in_person": "In presenza",
@@ -987,6 +989,14 @@
     "add_category": "Aggiungi categoria",
     "card_address_details": "Altri dettagli dell’indirizzo",
     "card_location_details": "Dettagli del luogo",
-    "card_add_location": "Prepara il luogo del servizio"
+    "card_add_location": "Prepara il luogo del servizio",
+    "literal_org": "Ente indicato nella fonte",
+    "literal_location_org": "Ente della sede indicato nella fonte",
+    "literal_category": "Categoria nella fonte",
+    "literal_location_category": "Categoria della sede nella fonte",
+    "literal_original": "Testo originale",
+    "literal_value": "Valore modificabile",
+    "literal_unresolved": "Da collegare al catalogo",
+    "source_facts": "Informazioni dalla fonte"
   }
 }

@@ -24,4 +24,5 @@ async def editor(request: Request):
     person, sources, options = await run_in_threadpool(context)
     return module.render(request, 'preparations.html', person,
         preparation_context={'sources': sources, 'fields': dictionary(), 'references': options,
+            'capabilities': {'item_payload_versions': [1, 2], 'interpretation_result_versions': [1, 2]},
             'text': module.catalog.languages['it']['community']})

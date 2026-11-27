@@ -6,10 +6,15 @@ import {renderCard} from './card.js';
 import {evidenceMatches} from './evidence.js';
 const $=id=>document.getElementById(id), context=JSON.parse($('community-review-context').textContent), text=context.text;
 const writable=!context.resolution && !context.closed, proposed=context.snapshot.values;
-const payload={schema_version:1,service:structuredClone(!context.service_id || !writable ? proposed.service : context.baseline),
+const payload={schema_version:proposed.schema_version || 1,service:structuredClone(!context.service_id || !writable ? proposed.service : context.baseline),
   location:structuredClone(!context.service_id || !writable ? proposed.location : {kind:'none'}),
   target:proposed.target,field_origins:structuredClone(!context.service_id || !writable ? proposed.field_origins || {} : {}),evidence:context.snapshot.evidence,outcome:'review'};
+if(proposed.schema_version===2){
+  payload.source_facts=structuredClone(proposed.source_facts);payload.resolutions=structuredClone(proposed.resolutions);
+  Object.assign(payload.field_origins,structuredClone(Object.fromEntries(Object.entries(proposed.field_origins || {}).filter(([path])=>path.startsWith('/source_facts/')))));
+}
 if(context.resolution){payload.service=structuredClone(context.accepted_service);payload.location=structuredClone(context.accepted_location || {kind:'none'});payload.field_origins={};payload.evidence=[];}
+if(context.resolution && payload.schema_version===2){payload.source_facts=[];payload.resolutions=[];}
 const draft=new PreparationDraft(context.snapshot.item_id,{id:context.snapshot.item_version_id,payload});
 let pending;
 function summarize(value) {
@@ -31,7 +36,7 @@ function comparison() {
   else {const heading=node('p',text.review_baseline+' → '+text.review_after,'hint');$('review-comparison').append(heading,table);}
 }
 function render() {
-  const view={...context,sourceName:context.snapshot.source_metadata.name,text:{...text,input_origin:text.review_current_value},evidenceFilter:evidence=>evidenceMatches(draft.payload,proposed,evidence),onEvidence:(evidence)=>{
+  const view={...context,canEditFacts:false,sourceName:context.snapshot.source_metadata.name,text:{...text,input_origin:text.review_current_value},evidenceFilter:evidence=>evidenceMatches(draft.payload,proposed,evidence),onEvidence:(evidence)=>{
     $('review-field-evidence').hidden=false;$('review-field-evidence').replaceChildren(node('strong',text.source_passage),node('blockquote',evidence.quote));
   }};
   ($('review-editor').classList.contains('preparation-fields')?renderFields:renderCard)($('review-editor'),draft,view,writable,comparison);comparison();

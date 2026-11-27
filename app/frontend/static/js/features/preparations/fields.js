@@ -137,5 +137,28 @@ export function renderFields(root, draft, context, canEdit, changed, redrawAll) 
     for (const key of dictionary.scalars.location) scalar(location, body, key, '/location/body');
     for (const key of dictionary.arrays.location) collection(location, body, key, '/location/body');
   }
-  root.append(service, location);
+  const literals=node('section',undefined,'preparation-source-facts');literals.dataset.kind='source_facts';
+  for(const kind of ['organization_name','category_label'])for(const subject of ['service','location']){
+    const entries=(draft.payload.source_facts || []).map((fact,index)=>({fact,index})).filter(item=>item.fact.kind===kind && item.fact.subject===subject);
+    if(!entries.length)continue;
+    const group=node('section',undefined,'preparation-literal-group');group.dataset.factKind=kind;group.dataset.subject=subject;
+    const caption=kind==='organization_name'?(subject==='location'?text.literal_location_org:text.literal_org):(subject==='location'?text.literal_location_category:text.literal_category);
+    group.append(node('h3',caption));
+    for(const {fact,index}of entries){
+      const path='/source_facts/'+index+'/value',sourcePath='/source_facts/'+index+'/source_value';
+      const row=node('div',undefined,'preparation-control preparation-literal-control');row.dataset.factId=fact.fact_id;
+      const input=node('input');input.type='text';input.value=fact.value || '';input.placeholder=caption;
+      input.setAttribute('aria-label',caption+' '+(index+1));input.disabled=!canEdit || context.canEditFacts===false;
+      const hint=node('span',undefined,'hint'),status=node('span'),original=node('span',text.literal_original+': '+fact.source_value,'preparation-literal-original');
+      const state=()=>{status.textContent=draft.payload.field_origins[path]?.state==='cleared'?text.cleared:draft.payload.field_origins[path]?.state==='manual'?text.changed:text.literal_unresolved;original.hidden=fact.value===fact.source_value;};state();
+      input.addEventListener('input',()=>{draft.edit(path,input.value || undefined);changed();state();});
+      hint.append(status);
+      if(context.onEvidence)for(const citation of evidenceFor(draft.payload,sourcePath).filter(item=>!context.evidenceFilter || context.evidenceFilter(item))){
+        const link=button(text.see_source,()=>context.onEvidence(citation,sourcePath));link.dataset.evidence=citation.id;hint.append(link);
+      }
+      row.append(input,original,hint);group.append(row);
+    }
+    literals.append(group);
+  }
+  root.append(service, location, literals);
 }

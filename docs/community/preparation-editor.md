@@ -101,3 +101,34 @@ also verifies advertised adopted references survive private save/reopen. This is
 manual classification only: unresolved organization names, raw source categories,
 automatic matching and clustering require the pending reviewed contract amendment.
 Visual fidelity, narrow-screen behavior and whole-milestone acceptance remain open.
+
+## Literal organization/category controls — EGI-116
+
+Private v2 cards show source organization names below the service heading and
+original category labels separately from the existing canonical-term selector.
+Card and field views edit the same current value. Original spelling and exact
+source_value evidence remain retained when a correction is manual or the value is
+explicitly cleared. A quote button targets the original claim, not the corrected
+value. Unresolved names stay visible without a manufactured organization UUID.
+
+Fact value edits record manual/cleared origins and invalidate that fact's stale
+selection. Conflict recovery compares local/current fact values by stable fact ID,
+remaps the value path when another editor reorders facts, and preserves another
+fact's independent correction and quotation. Existing retry/version/save machinery
+and ACLs remain authoritative. No field edit starts an IA request.
+
+Moderation receives the submitted source facts and only their relevant quotes.
+These literal submitted claims are currently read-only there; EGI-117/119 add the
+explicit resolution/acceptance decisions. Canonical fields retain existing editing.
+Accepted canonical previews do not display unresolved source claims as accepted
+relationships; the original submitted version remains available separately.
+
+Final current suite188 run/182 passed/6 external-prerequisite skips; four Node
+actual-module checks pass including reordered-fact conflict recovery. Actual browser
+on owned4328 confirms organization edit, card/field switch, explicit clear, save and
+reopen preserve the original quote; restore and selective submission show both facts
+in moderation with exact quote inspection and no console errors. Measured actual
+viewports1280 and390px have no horizontal page overflow; temporary override reset.
+Screenshots are retained in the workspace community-checks-20261127 folder. These
+checks do not assert final prototype fidelity, automatic matching, group quality or
+real-provider acceptance. No organization/canonical public record was created.

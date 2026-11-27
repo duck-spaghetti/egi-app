@@ -27,12 +27,14 @@ def array_schema(item: dict) -> dict:
 
 def output_schema(request: dict) -> dict:
     """Describe only proposed facts, excluding canonical IDs and publish permissions."""
-    fields = dictionary()
+    fields = dictionary(request['field_dictionary_version'])
 
     def component(members: dict) -> dict:
         """Recursively describe fields allowed by the reusable interpretation module."""
         properties = {}
         for key, descriptor in members.items():
+            if request['schema_version'] == 2 and key in ('organizations', 'classifications'):
+                continue
             if descriptor in ('reference', 'permission', 'references'):
                 continue
             if descriptor.endswith('[]'):
@@ -56,9 +58,14 @@ def output_schema(request: dict) -> dict:
         'quote': {'type':'string'}})
     location = {'anyOf': [object_schema({'kind': {'type':'string','enum':['none']}}),
         object_schema({'kind':{'type':'string','enum':['new']},'body':component(fields['location'])})]}
-    candidate = object_schema({'candidate_key':{'type':'string'}, 'service':component(fields['service']),
-        'location':location, 'evidence':array_schema(evidence), 'diagnostics':array_schema(diagnostic)})
-    return object_schema({'schema_version': {'type':'integer','enum':[1]},
+    candidate_fields = {'candidate_key':{'type':'string'}, 'service':component(fields['service']),
+        'location':location, 'evidence':array_schema(evidence), 'diagnostics':array_schema(diagnostic)}
+    if request['schema_version'] == 2:
+        fact = {key: {'type':'string', **({'enum':fields['source_fact_choices'][key]} if key in fields['source_fact_choices'] else {})}
+                for key in fields['source_fact']}
+        candidate_fields['source_facts'] = array_schema(object_schema(fact))
+    candidate = object_schema(candidate_fields)
+    return object_schema({'schema_version': {'type':'integer','enum':[request['schema_version']]},
         'input_id': {'type':'string','enum':[request['input_id']]},
         'input_hash': {'type':'string','enum':[request['input_hash']]},
         'config_version': {'type':'string','enum':[request['config_version']]},

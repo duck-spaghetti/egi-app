@@ -172,7 +172,10 @@ function renderEvidence() {
     $('card-evidence').append(node('p',caption(evidence.path), 'hint'),node('blockquote',evidence.quote || evidence.note || text.not_set));
   }
 }
-function caption(path) { return path.split('/').filter(part=>part && part!=='body').map(part => text.field_labels[part] || text[part] || (/^\d+$/.test(part) ? Number(part)+1 : part)).join(' · '); }
+function caption(path) {
+  if(path.startsWith('/source_facts/'))return text.source_facts+' · '+(Number(path.split('/')[2])+1)+' · '+(path.endsWith('/value')?text.literal_value:text.literal_original);
+  return path.split('/').filter(part=>part && part!=='body').map(part => text.field_labels[part] || text[part] || (/^\d+$/.test(part) ? Number(part)+1 : part)).join(' · ');
+}
 async function openCard(id) {
   if (draft?.dirty && !await save()) return;
   const result = await api('/preparazioni/'+workspace.id+'/schede/'+id);

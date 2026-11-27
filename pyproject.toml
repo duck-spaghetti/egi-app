@@ -18,4 +18,4 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = []
-community = ["egi-reviewer==0.2.0"]
+community = ["egi-reviewer==0.3.1"]

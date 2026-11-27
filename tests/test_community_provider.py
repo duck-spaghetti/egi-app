@@ -129,8 +129,32 @@ class ProviderTests(unittest.TestCase):
 
     def test_configuration_requires_explicit_data_and_dispatch_settings(self):
         """A key alone is insufficient to authorize live provider dispatch."""
-        for field,value in (('store',True),('live_authorized',False),('provider','other'),('model','bad model')):
+        for field,value in (('store',True),('live_authorized',False),('provider','other'),('model','bad model'),
+                            ('interpretation_version',True),('interpretation_version',3)):
             config = deepcopy(CONFIG)
             config[field] = value
             with self.subTest(field=field),self.assertRaises(ConfigurationError):
                 self.adapter(lambda _: None,config)
+
+    def test_v2_output_schema_uses_the_pinned_literal_fact_dictionary(self):
+        """Actual provider requests require v2 facts without exposing canonical roles."""
+        req = request('Sportello')
+        req.update(schema_version=2, field_dictionary_version='egi-preparation-fields/2', requested_output_shape='interpretation.result.v2')
+        calls = []
+
+        def response(exchange):
+            """Capture the real constructed schema and return a controlled v2 result."""
+            body = json.loads(exchange.content)
+            calls.append(body)
+            schema = body['text']['format']['schema']
+            self.assertEqual(schema['properties']['schema_version']['enum'], [2])
+            candidate = schema['properties']['candidates']['items']['properties']
+            self.assertEqual(set(candidate['source_facts']['items']['properties']), {'fact_key','subject','kind','source_value'})
+            self.assertNotIn('organizations', candidate['service']['properties'])
+            self.assertNotIn('classifications', candidate['service']['properties'])
+            return httpx.Response(200,json={'status':'completed','output':[{'type':'message','role':'assistant',
+                'content':[{'type':'output_text','text':json.dumps(result(req))}]}], 'usage':{'input_tokens':100,'output_tokens':20}})
+        actual = interpret(req, self.adapter(response, {**CONFIG, 'interpretation_version':2}))
+        self.assertEqual(actual['schema_version'],2)
+        self.assertEqual(actual['state'],'complete')
+        self.assertEqual(len(calls),1)

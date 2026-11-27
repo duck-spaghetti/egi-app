@@ -10,6 +10,8 @@ export function renderCard(root,draft,context,canEdit,changed) {
   const metadata=node('div',undefined,'preparation-card-metadata'),categories=service.querySelector('[data-field=classifications]');
   categories.querySelector('h3').remove();metadata.append(categories,mode);
   header.append(metadata,service.querySelector('[data-field=name]'));
+  for(const group of controls.querySelectorAll('[data-fact-kind=organization_name]'))header.append(group);
+  for(const group of controls.querySelectorAll('[data-fact-kind=category_label]'))metadata.prepend(group);
   card.append(header);
   function section(title,content) {
     const part=node('section',undefined,'preparation-card-section');part.append(node('h3',title),content);card.append(part);return part;

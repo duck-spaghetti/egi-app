@@ -8,22 +8,23 @@ from contextlib import AbstractContextManager
 from threading import Event, Thread
 from uuid import uuid4
 
-from review.insertion import OUTPUT_SHAPE, interpret, validate_request
-from review.insertion_fields import VERSION, ContractError
+from review.insertion import OUTPUT_SHAPE, OUTPUT_SHAPE_V2, interpret, validate_request
+from review.insertion_fields import VERSION, VERSION_V2, ContractError
 
 from .provider import ConfigurationError, OpenAIAdapter, validate_config
 
 
 def build_request(claim: dict) -> dict:
-    """Use only assigned eligible text, filtered source metadata and its exact map."""
+    """Select the frozen protocol and use only eligible text/metadata and its map."""
     config = validate_config(claim['provider_config'])
+    version = config.get('interpretation_version', 1)
     eligible = claim['eligible_payload']
-    return validate_request({'schema_version':1,'task':claim['task'],
+    return validate_request({'schema_version':version,'task':claim['task'],
         'input_id':claim['input_id'],'input_hash':eligible['input_hash'],
         'config_version':claim['config_version'],'text':eligible['text'],
         'source_metadata':eligible['source_metadata'],'locator_map':claim['locator_map'],
-        'field_dictionary_version':VERSION,'language_version':config['language_version'],
-        'taxonomy_version':config['taxonomy_version'],'requested_output_shape':OUTPUT_SHAPE})
+        'field_dictionary_version':VERSION if version == 1 else VERSION_V2,'language_version':config['language_version'],
+        'taxonomy_version':config['taxonomy_version'],'requested_output_shape':OUTPUT_SHAPE if version == 1 else OUTPUT_SHAPE_V2})
 
 
 class Heartbeat(AbstractContextManager):

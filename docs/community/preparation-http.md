@@ -62,3 +62,14 @@ skips. After the final local hardening changes, all three preparation HTTP journ
 passed on native PostgreSQL, including source admission, minimal people output and
 invalid-session handling. No new dependency was selected. The upstream TestClient
 httpx deprecation is informational; the project's selected httpx stack is retained.
+
+## Payload compatibility — EGI-116
+
+Existing response/receipt schema_version1 remains unchanged while an item payload
+can explicitly be1 or2. The authenticated bootstrap declares supported item/result
+versions. v2 raw source facts, resolutions and original-value evidence are validated
+by PostgreSQL023/024, not a permissive replacement Python model. The server maps
+item_schema_downgrade to a content-free409; new malformed/stale fact errors stay
+content-free422/409. The existing JSON/text limits, Origin/token checks and read
+permissions apply. Native HTTP checks prove v2 save/reopen/selective moderation and
+old-client downgrade refusal without a new endpoint or any canonical side effect.

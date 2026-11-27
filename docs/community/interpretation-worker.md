@@ -17,9 +17,9 @@ Install the normal runtime lock, then the approved reproducible Reviewer artifac
   -r requirements-community.lock.txt
 ```
 
-The internal extra is `community`, pinned to egi-reviewer 0.2.0. The separate hash
+The internal extra is `community`, pinned to egi-reviewer 0.3.1. The separate hash
 lock requires wheel SHA-256
-`bbbf8cc126c5fb07fa38a3beabd93cadefa7034949bdd2146173a7e8aaac7d72`.
+`18b83ded49a89e916cda8ebafd1be80cf88cb642aa2e57011fa961d3e84dfdd2`.
 It must not import a mutable neighboring checkout. The ordinary web application
 can still run without this worker-only extra; Community provider tests require it.
 
@@ -118,3 +118,19 @@ refuses them unless the injected transport is httpx.MockTransport, even if a rea
 key exists locally. The ordinary network worker therefore cannot accidentally send
 demo material through a synthetic configuration. Seven controlled provider tests
 and the native integration tests passed with this guard enabled.
+
+## Literal source-fact protocol — EGI-116
+
+An immutable provider_config can select interpretation_version2; omission means1.
+validate_config rejects Boolean/unknown versions. Request version, pinned field
+dictionary and result schema are selected together before dispatch. v2 Structured
+Outputs exposes the pinned source_fact dictionary, requires literal claims, and
+excludes canonical organization/classification components. Null cleaning preserves
+required fact metadata for independent Reviewer rejection; it cannot repair missing
+claims or turn model keys into canonical IDs. Existing pending v1 jobs stay compatible.
+
+The0.3.1 artifact is installed offline with the selected hash lock; no new dependency
+or live model/configuration is seeded. Native worker+HTTP tests use MockTransport
+only and prove extraction→server fact IDs→manual edit→selective moderation, known
+usage settlement and rejection of an old-client downgrade. Real model quality and
+provider calls remain under the existing EGI-112/113 human gates.

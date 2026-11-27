@@ -282,3 +282,71 @@ class WorkerNativeTests(unittest.TestCase):
         completed = result(req)
         self.assertEqual(self.queue.finish(abandoned,dispatched['dispatch_id'],completed,known)['state'],'succeeded')
         self.assertEqual(self.queue.finish(abandoned,dispatched['dispatch_id'],completed,known)['state'],'succeeded')
+
+    def test_v2_literal_facts_survive_worker_http_edit_and_selective_moderation(self):
+        """Use real worker/DB/HTTP boundaries while all provider I/O stays mocked."""
+        self.owner.execute('INSERT INTO preparation.ai_configurations(version,provider_config,max_input_tokens,max_output_tokens,input_rate_microusd_per_million,cached_rate_microusd_per_million,output_rate_microusd_per_million,verified_at,price_reference) VALUES(%s,%s,300000,2000,1000000,500000,1000000,clock_timestamp(),%s)',
+            ('fixture/facts-2',Jsonb({**CONFIG,'interpretation_version':2}),'Synthetic v2; no provider'))
+        self.owner.execute("UPDATE preparation.ai_settings SET config_version='fixture/facts-2'")
+        self.addCleanup(self.owner.execute,"UPDATE preparation.ai_settings SET config_version='fixture/1'")
+        workspace,input_id = self.prepare('Sportello. Ente: Associazione Alfa. Categoria: Mensa. NOTA NON SELEZIONATA')
+        canonical_before = self.owner.execute('SELECT count(*) FROM data.services').fetchone()[0]
+        job = self.enqueue(workspace,input_id)
+        calls = []
+
+        def response(exchange):
+            """Return literal claims and their exact passages in a single fake exchange."""
+            body = json.loads(exchange.content)
+            req = json.loads(body['input'][0]['content'][0]['text'])
+            self.assertEqual(req['schema_version'],2)
+            calls.append(req)
+            value = result(req)
+            proposed = value['candidates'][0]
+            proposed['service']['name'] = 'Sportello'
+            proposed['evidence'][0].update(quote='Sportello',span={'start':0,'end':9})
+            for index,(kind,label) in enumerate((('organization_name','Associazione Alfa'),('category_label','Mensa'))):
+                proposed['source_facts'].append({'fact_key':str(index),'subject':'service','kind':kind,'source_value':label})
+                start = req['text'].index(label)
+                proposed['evidence'].append({'id':str(uuid4()),'path':f'/source_facts/{index}/source_value','input_id':input_id,
+                    'input_hash':req['input_hash'],'kind':'stated','quote':label,'span':{'start':start,'end':start+len(label)}})
+            return httpx.Response(200,json={'status':'completed','output':[{'type':'message','role':'assistant',
+                'content':[{'type':'output_text','text':json.dumps(value)}]}],'usage':{'input_tokens':100,'output_tokens':20}})
+        self.assertEqual(self.worker(response).run_once()['state'],'succeeded')
+        self.assertEqual(len(calls),1)
+        ids = self.client.get(BASE+f'/preparazioni/{workspace}/lavori/{job}').json()['candidate_ids']
+        created = self.post(f'/preparazioni/{workspace}/schede/crea',{'input_id':input_id,'job_id':job,
+            'selections':[{'candidate_id':ids['one']}],'request_key':str(uuid4())})
+        self.assertEqual(created.status_code,201,created.text)
+        card = created.json()['items'][0]
+        path = f'/preparazioni/{workspace}/schede/{card["item_id"]}'
+        version = self.client.get(BASE+path).json()['version']
+        payload = version['payload']
+        self.assertEqual(payload['schema_version'],2)
+        self.assertEqual(payload['source_facts'][0]['source_value'],'Associazione Alfa')
+        self.assertNotIn('organizations',payload['service'])
+        payload['source_facts'][0]['value'] = 'Associazione Alfa corretta'
+        payload['field_origins']['/source_facts/0/value'] = {'state':'manual'}
+        payload['outcome'] = 'confirmed'
+        saved = self.post(f'/preparazioni/{workspace}/schede',{'changes':[{'item_id':card['item_id'],
+            'expected_version':version['id'],'payload':payload}],'request_key':str(uuid4())})
+        self.assertEqual(saved.status_code,200,saved.text)
+        current = saved.json()['items'][0]['after']
+        reopened = self.client.get(BASE+path).json()['version']['payload']
+        self.assertEqual(reopened['source_facts'][0]['value'],'Associazione Alfa corretta')
+        self.assertEqual(reopened['source_facts'][0]['source_value'],'Associazione Alfa')
+        legacy = {key:value for key,value in deepcopy(payload).items() if key not in ('source_facts','resolutions')}
+        legacy['schema_version'] = 1
+        legacy['field_origins'] = {key:value for key,value in legacy['field_origins'].items() if not key.startswith('/source_facts/')}
+        legacy['evidence'] = [value for value in legacy['evidence'] if not value['path'].startswith('/source_facts/')]
+        old_client = self.post(f'/preparazioni/{workspace}/schede',{'changes':[{'item_id':card['item_id'],
+            'expected_version':current,'payload':legacy}],'request_key':str(uuid4())})
+        self.assertEqual(old_client.status_code,409,old_client.text)
+        sent = self.post(f'/preparazioni/{workspace}/invii',{'items':[{'item_id':card['item_id'],'expected_version':current}],
+            'request_key':str(uuid4())})
+        self.assertEqual(sent.status_code,200,sent.text)
+        contribution = sent.json()['items'][0]['receipt']['contribution_id']
+        page = self.client.get('/moderazione/contributo/'+contribution)
+        self.assertEqual(page.status_code,200,page.text)
+        self.assertIn('Associazione Alfa corretta',page.text)
+        self.assertNotIn('NOTA NON SELEZIONATA',page.text)
+        self.assertEqual(self.owner.execute('SELECT count(*) FROM data.services').fetchone()[0],canonical_before)
