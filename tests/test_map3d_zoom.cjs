@@ -42,7 +42,7 @@ const {environment}=require('./module_fixture.cjs');
  let htmlWrites=writes;const descriptions=described;
  gl.zoom=16.75;gl.fire('move');gl.zoom=16.5;gl.fire('move');assert.equal(writes,htmlWrites,'camera events defer writes to the map render frame');
  flush();assert.equal(offset(),initial,'do not shorten a necessary separation into a collision');
- assert.equal(Number(shifted.querySelector().attributes.d.split('L')[1].split(' ')[0]),offset(),'leader endpoint moves with head');
+ assert.equal(Number(shifted.querySelector().getAttribute('d').split('L')[1].split(' ')[0]),offset(),'leader endpoint moves with head');
  const offsets=buttons.map(b=>[b.style['--site-head-x'],b.style['--site-head-y']]);
  panX=-530;panY=-180;gl.fire('move');flush();
  assert.deepEqual(buttons.map(b=>[b.style['--site-head-x'],b.style['--site-head-y']]),offsets,'pan behind camera controls and viewport edge must not deflect heads');

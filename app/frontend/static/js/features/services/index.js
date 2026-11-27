@@ -1,3 +1,4 @@
+import {reconcileMarkup,forgetMarkup} from '../../reconcile.js';
 import {createPresentation} from "./presentation.js";
 /** createServices owns its behavior; dependencies and snapshots are explicit. */
 export function createServices({context,scope,loader,sites,transit,translate,emit}) {
@@ -99,10 +100,10 @@ function renderList(list) {
   document.getElementById("list-count").textContent=String(list.length);
   const wrap=document.getElementById("poi-list");
   if (!list.length) {
-    wrap.innerHTML=`<div class="empty-state"><p>${state.filters.section==="directory" ? "Nessun servizio esplicitamente a distanza nei dati selezionati. I servizi senza coordinate restano nell’elenco da localizzare." : "Nessun servizio per questa ricerca."}</p></div>`;
+    reconcileMarkup(wrap,`<div class="empty-state"><p>${state.filters.section==="directory" ? "Nessun servizio esplicitamente a distanza nei dati selezionati. I servizi senza coordinate restano nell’elenco da localizzare." : "Nessun servizio per questa ricerca."}</p></div>`);
     return;
   }
-  wrap.innerHTML=list.map(poi=>{
+  const html=list.map(poi=>{
     const raw=poi.raw || {};
     const siblings=sites.siblings(poi).length;
     const distance=state.userLoc ? (poi._dist==null ? "Distanza non disponibile" : formatDistance(poi._dist)) : "";
@@ -121,7 +122,7 @@ function renderList(list) {
       <span class="list-who">${escapeHtml(who.join(" · "))} · <span class="list-flag">da verificare</span></span>
     </span></button>`;
   }).join("");
-  wrap.querySelectorAll(".poi-item").forEach(el=>el.addEventListener("click",()=>emit("select",{id:el.dataset.id}), {signal: scope.signal}));
+  reconcileMarkup(wrap,html,{fallback:()=>wrap.querySelector('.poi-item')||document.getElementById('view-toggle')});
 }
 function bindHoursToggle() {
   const toggle = document.querySelector("[data-hours-toggle]");
@@ -173,8 +174,9 @@ async function load(language) {
  return {categories,pois:bundle.rows.map(projection.normalizePublicService).filter(Boolean),languages:bundle.languages,
   cityOptions:bundle.areas.map(projection.normalizeArea),categoryTranslations:bundle.categoryTranslations,taxonomy:{...bundle.taxonomy,needs:(bundle.taxonomy.needs||[]).map(projection.displayCategory)}};
 }
-function update(snapshot,list) {state=snapshot;if(list)renderList(list);}
-function dispose(){descriptions.clear();refreshTime=null;state={pois:[]};document.getElementById('detail-body').onscroll=null;}
+const listHost=document.getElementById('poi-list');listHost.addEventListener('click',event=>{const row=event.target.closest('[data-id]');if(row&&listHost.contains(row))emit('select',{id:row.dataset.id});},{signal:scope.signal});
+function update(snapshot,list) {state=snapshot;if(list){document.getElementById('list-count').textContent=String(list.length);if(state.view==='list')renderList(list);else if(listHost.childNodes.length){listHost.replaceChildren();forgetMarkup(listHost);}}}
+function dispose(){descriptions.clear();refreshTime=null;state={pois:[]};listHost.replaceChildren();forgetMarkup(listHost);document.getElementById('detail-body').onscroll=null;}
 
 return {load,update,beginRefresh,show:openDetail,choose:openServiceChooser,refreshHours:updateOpeningBadges,describe,dispose};
 }

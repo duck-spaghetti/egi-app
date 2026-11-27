@@ -133,6 +133,7 @@ function toggleView() {
   updateViewToggle();
   syncFilterLayout();
   closeSheets();
+  emit("refresh");
   if (state.view === "map") requestAnimationFrame(() => emit("invalidateMap"));
 }
 

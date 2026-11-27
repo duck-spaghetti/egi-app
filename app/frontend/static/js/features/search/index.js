@@ -1,3 +1,4 @@
+import {reconcileMarkup,forgetMarkup} from '../../reconcile.js';
 import {escapeHtml,categoryCaption,folded,distanceKm} from "../../format.js";
 /** createSearch owns its behavior; dependencies and snapshots are explicit. */
 export function createSearch({scope,describe,emit,debug=false}) {
@@ -26,23 +27,11 @@ function activeFilterLabels(withSource = true) {
 
 function renderCatGrid() {
   const wrap = document.getElementById("cat-grid");
-  wrap.innerHTML = "";
-
-  state.categories.forEach((category) => {
-    const slug = category.slug;
-    const label = categoryCaption(category.label || category.slug);
-    const color = category.color || "var(--cat-other)";
-    const tile = document.createElement("button");
-    tile.className = `cat-tile${state.filters.cats.has(slug) ? " active" : ""}`;
-    tile.setAttribute("aria-pressed", String(state.filters.cats.has(slug)));
-    const n = facets?.cats.get(slug) || 0;
-    tile.innerHTML = `${describe({category,category_id:category.id,raw:{}}).categoryBadge}<span class="cat-count" aria-label="${n} servizi">${n}</span>`;
-    tile.classList.toggle("empty", n === 0);
-    tile.addEventListener("click", () => {
-      emit('toggleNeed',{slug});
-    }, {signal: scope.signal});
-    wrap.append(tile);
-  });
+  const html=state.categories.map(category=>{
+    const slug=category.slug,n=facets?.cats.get(slug)||0,on=state.filters.cats.has(slug);
+    return `<button type="button" class="cat-tile${on?' active':''}${n?'':' empty'}" data-need="${escapeHtml(slug)}" aria-pressed="${on}">${describe({category,category_id:category.id,raw:{}}).categoryBadge}<span class="cat-count" aria-label="${n} servizi">${n}</span></button>`;
+  }).join('');
+  reconcileMarkup(wrap,html,{fallback:()=>wrap.querySelector('button')});
   renderOfferGroups();
 }
 
@@ -57,24 +46,22 @@ function renderOfferGroups() {
   const counts = facets?.offer || new Map();
   const mealCounts = facets?.meal || new Map();
   const levelCounts = facets?.level || new Map();
-  wrap.innerHTML = state.categories.filter(c => f.cats.has(c.slug)).map(c => {
+  const html = state.categories.filter(c => f.cats.has(c.slug)).map(c => {
     const offers = (state.taxonomy.offers || []).filter(o => o.need === c.slug && counts.get(o.code));
     const chips = offers.map(o => {
       const on = !f.offersOff.has(o.code);
       return `<button type="button" class="offer-chip${on ? " on" : ""}" aria-pressed="${on}" data-offer="${escapeHtml(o.code)}">${escapeHtml(o.label)} <span>${counts.get(o.code)}</span></button>`;
     }).join("");
     const meals = c.slug === "mangiare" ? (state.taxonomy.meal_times || []).filter(m => mealCounts.get(m.code) || f.meal === m.code) : [];
-    const meal = meals.length ? `<label class="offer-meal">Pasto <select data-meal><option value="">Qualsiasi</option>${meals.map(m => `<option value="${escapeHtml(m.code)}"${f.meal === m.code ? " selected" : ""}>${escapeHtml(m.label)} (${mealCounts.get(m.code) || 0})</option>`).join("")}</select></label>` : "";
+    const meal = meals.length ? `<label class="offer-meal" data-control="meal">Pasto <select data-meal><option value="">Qualsiasi</option>${meals.map(m => `<option value="${escapeHtml(m.code)}"${f.meal === m.code ? " selected" : ""}>${escapeHtml(m.label)} (${mealCounts.get(m.code) || 0})</option>`).join("")}</select></label>` : "";
     // Course level (Scuolemigranti, user 2026-11-16): only sites that state that level.
     const levels = c.slug === "istruzione" ? (state.taxonomy.course_levels || []).filter(l => levelCounts.get(l.code) || f.level === l.code) : [];
-    const level = levels.length ? `<label class="offer-meal">Livello del corso <select data-level><option value="">Qualsiasi</option>${levels.map(l => `<option value="${escapeHtml(l.code)}"${f.level === l.code ? " selected" : ""}>${escapeHtml(l.label)} (${levelCounts.get(l.code) || 0})</option>`).join("")}</select></label>` : "";
-    return `<div class="offer-group"><h4>${escapeHtml(categoryCaption(c.label || c.slug))}</h4><div class="offer-chips">${chips || '<span class="source-note">Nessuna prestazione con i filtri attivi.</span>'}</div>${meal}${level}</div>`;
+    const level = levels.length ? `<label class="offer-meal" data-control="level">Livello del corso <select data-level><option value="">Qualsiasi</option>${levels.map(l => `<option value="${escapeHtml(l.code)}"${f.level === l.code ? " selected" : ""}>${escapeHtml(l.label)} (${levelCounts.get(l.code) || 0})</option>`).join("")}</select></label>` : "";
+    return `<div class="offer-group" data-need-group="${escapeHtml(c.slug)}"><h4>${escapeHtml(categoryCaption(c.label || c.slug))}</h4><div class="offer-chips">${chips || '<span class="source-note">Nessuna prestazione con i filtri attivi.</span>'}</div>${meal}${level}</div>`;
   }).join("");
-  wrap.querySelectorAll("[data-offer]").forEach(b => b.addEventListener("click", () => {
-    emit('toggleOffer',{code:b.dataset.offer});
-  }, {signal: scope.signal}));
-  wrap.querySelector("[data-meal]")?.addEventListener("change", e => { emit("filter",{key:"meal",value:e.target.value}); }, {signal: scope.signal});
-  wrap.querySelector("[data-level]")?.addEventListener("change", e => { emit("filter",{key:"level",value:e.target.value}); }, {signal: scope.signal});
+  reconcileMarkup(wrap,html,{fallback:()=>document.getElementById('cat-grid').querySelector('button')});
+  const meal=wrap.querySelector('[data-meal]'),level=wrap.querySelector('[data-level]');
+  if(meal)meal.value=f.meal||'';if(level)level.value=f.level||'';
 }
 
 function selectedLabel(id, fallback) {
@@ -195,7 +182,7 @@ function fillFacetSelect(select, facet, allLabel, labels) {
   const values = [...labels.keys()].filter(v => counts.get(v) || v === selected)
     .sort((a, b) => labels.get(a).localeCompare(labels.get(b), "it"));
   if (selected && !labels.has(selected)) emit("filter",{key:facet,value:""});
-  select.innerHTML = `<option value="">${escapeHtml(allLabel)}</option>` + values.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(labels.get(v))} (${counts.get(v) || 0})</option>`).join("");
+  reconcileMarkup(select,`<option value="">${escapeHtml(allLabel)}</option>` + values.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(labels.get(v))} (${counts.get(v) || 0})</option>`).join(""));
   select.value = state.filters[facet];
 }
 
@@ -236,8 +223,13 @@ function renderFacets(now=new Date()) {
 
 /** Source of a service row: Helpinet or one of the map exports (see app/backend/preview.py). */
 
+// Delegate once: removed controls never leave one AbortSignal listener per refresh.
+const grid=document.getElementById('cat-grid'),offers=document.getElementById('offer-groups');
+grid.addEventListener('click',event=>{const tile=event.target.closest('[data-need]');if(tile&&grid.contains(tile))emit('toggleNeed',{slug:tile.dataset.need});},{signal:scope.signal});
+offers?.addEventListener('click',event=>{const chip=event.target.closest('[data-offer]');if(chip&&offers.contains(chip))emit('toggleOffer',{code:chip.dataset.offer});},{signal:scope.signal});
+offers?.addEventListener('change',event=>{if(event.target.matches('[data-meal]'))emit('filter',{key:'meal',value:event.target.value});else if(event.target.matches('[data-level]'))emit('filter',{key:'level',value:event.target.value});},{signal:scope.signal});
 function update(snapshot,now=new Date()){state=snapshot;renderFacets(now);renderActiveFilters();}
 function select(snapshot,now=new Date()){state=snapshot;return filteredPois(now);}
 
-return {update,select,matches:(poi,now)=>passesFilters(poi,null,now),dispose(){}};
+return {update,select,matches:(poi,now)=>passesFilters(poi,null,now),dispose(){state={pois:[],categories:[],filters:{cats:new Set(),offersOff:new Set()},taxonomy:{}};facets=null;for(const id of ['cat-grid','offer-groups','access-filter','audience-filter','source-filter','issue-filter'])forgetMarkup(document.getElementById(id));}};
 }

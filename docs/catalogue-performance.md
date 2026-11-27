@@ -38,3 +38,21 @@ current comparison. Current machine Apple M4/Mac16,12, macOS15.5, Node26.13.1.
 These are Node CPU timings; no DOM layout/paint, HTTP/DB or list opening is included.
 Raw reproduction/data/evidence remain in the workspace's `.local/c` and retained
 M2 audit-data folders. Real browser filter p95≤150ms remains to verify in EGI-126/127.
+
+## EGI-126: lazy list and retained controls
+
+The list only materializes in list mode; returning to the map clears rows and its
+markup memo. Opening the list requests a current refresh. Category tiles, offer
+chips, selects/options and service rows reconcile escaped presentation markup by
+stable keys, retaining surviving nodes, scroll and focus. Removed focused items
+fall back to a visible surviving control (or the view toggle). Delegated listeners
+are installed once per page and removed with its AbortSignal. Search disposal
+releases its snapshot, facets and markup references. No dependency was added.
+
+Controlled DOM tests cover stable node identity, reorder/text changes, scroll and
+lazy row ownership; the shared fixture now models actual child nodes and named
+attributes. Existing tests that relied on fake-DOM differences were corrected to
+assert the same production security/path contract. In the real browser, the
+594-service preview has zero list rows initially,594 when opened, and zero after
+returning to the map. Browser focus/paint and integrated performance are checked
+with the final coherent-refresh implementation below.
