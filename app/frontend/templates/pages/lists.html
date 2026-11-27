@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="it" data-text-zoom-enabled>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>EGI — Le tue liste</title>
+  <link rel="stylesheet" href="/static/css/foundations/tokens.css">
+  <link rel="stylesheet" href="/static/css/components/text-zoom.css">
+  <link rel="stylesheet" href="/static/css/components/services.css">
+  <link rel="stylesheet" href="/static/css/pages/favorites.css">
+  <link rel="stylesheet" href="/static/css/pages/lists.css">
+  <script type="module" src="/static/js/text-zoom.js"></script>
+</head>
+<body>
+  <main class="favorites-page">
+    <header class="lists-controls">
+      <nav class="collection-actions"><a href="/map" data-i18n="favorites.back">Torna alla mappa</a><a href="/preferiti" data-i18n="favorites.title">Preferiti</a></nav>
+      <h1 data-i18n="lists.title">Le tue liste</h1>
+      <p data-i18n="lists.local">Collezioni salvate sul tuo dispositivo. Cancellando i dati del sito perderai le liste.</p>
+      <label><span data-i18n="favorites.language">Lingua dell’interfaccia</span><select id="lists-language"><option value="it">Italiano</option><option value="en">English</option><option value="fr">Français</option><option value="ar">العربية</option></select></label>
+      <form id="lists-create" class="collection-actions">
+        <label><span data-i18n="lists.name">Nome della lista</span><input name="name" maxlength="80" required autocomplete="off"></label>
+        <button type="submit" data-i18n="lists.create">Crea lista</button>
+      </form>
+      <label><span data-i18n="lists.choose">Scegli una lista</span><select id="lists-select"></select></label>
+      <div id="lists-manage" hidden>
+        <form id="lists-rename" class="collection-actions"><label><span data-i18n="lists.name">Nome della lista</span><input name="name" maxlength="80" required autocomplete="off"></label><button type="submit" data-i18n="lists.rename">Rinomina</button></form>
+        <div class="collection-actions"><button type="button" id="lists-delete" data-i18n="lists.delete">Elimina lista</button><button type="button" id="lists-refresh" data-i18n="favorites.refresh">Aggiorna</button><button type="button" id="lists-print" data-i18n="lists.print">Stampa / salva PDF</button></div>
+        <p data-i18n="lists.printHelp">Nella finestra di stampa scegli “Salva come PDF”.</p>
+      </div>
+      <p data-i18n="lists.hint">Aggiungi servizi dalle schede o dai risultati con il pulsante “Aggiungi a una lista”.</p>
+      <p id="lists-status" role="status" aria-live="polite"></p>
+      {% include 'components/text_zoom.html' %}
+    </header>
+    <section id="collection-document" hidden aria-labelledby="collection-title">
+      <p class="print-brand">EGI · <span data-i18n="lists.title">Le tue liste</span></p>
+      <h2 id="collection-title" tabindex="-1"></h2>
+      <p data-i18n="favorites.snapshot">Copia salvata: verifica le informazioni con il servizio. Lo stato di apertura attuale non è disponibile.</p>
+      <div id="collection-cards"></div>
+    </section>
+    <noscript>Attiva JavaScript per gestire le liste salvate sul dispositivo.</noscript>
+  </main>
+  <script>window.EGI_LISTS_CONTEXT = {{ {'canonical': canonical, 'territory': profile.territory_code}|tojson }};</script>
+  <script type="module" src="/static/js/pages/lists.js"></script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="it" data-text-zoom-enabled>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>EGI — Preferiti</title>
+  <link rel="stylesheet" href="/static/css/components/text-zoom.css">
+  <script type="module" src="/static/js/text-zoom.js"></script>
+  <link rel="stylesheet" href="/static/css/foundations/tokens.css">
+  <link rel="stylesheet" href="/static/css/components/services.css">
+  <link rel="stylesheet" href="/static/css/pages/favorites.css">
+</head>
+<body>
+  <main class="favorites-page">
+    <header class="favorites-heading">
+      <a href="/map" data-i18n="favorites.back">Torna alla mappa</a>
+      <a href="/preferiti/liste" data-i18n="lists.title">Le tue liste</a>
+      <h1 class="favorites-heading-title"><svg class="bookmark-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/static/assets/icons/ui/bookmark.svg#bookmark"></use></svg><span data-i18n="favorites.title">Preferiti</span></h1>
+      <p data-i18n="favorites.local">Salvati solo in questo browser. Cancellando i dati del sito perderai i preferiti.</p>
+      <p data-i18n="favorites.snapshot">Copia salvata: verifica le informazioni con il servizio. Lo stato di apertura attuale non è disponibile.</p>
+      <label><span data-i18n="favorites.language">Lingua dell’interfaccia</span>
+        <select id="favorites-language"><option value="it">Italiano</option><option value="en">English</option><option value="fr">Français</option><option value="ar">العربية</option></select>
+      </label>
+      <button id="favorites-refresh" type="button" data-i18n="favorites.refresh">Aggiorna</button>
+      {% include 'components/text_zoom.html' %}
+      <p id="favorites-status" role="status" aria-live="polite"></p>
+    </header>
+    <div id="favorites-list" aria-busy="true"></div>
+    <noscript>Attiva JavaScript per leggere i preferiti salvati sul dispositivo.</noscript>
+  </main>
+  <script>window.EGI_FAVORITES_CONTEXT = {{ {'canonical': canonical, 'territory': profile.territory_code}|tojson }};</script>
+  <script type="module" src="/static/js/pages/favorites.js"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+/* Offline favorites use system fonts and the shared public-card sections. */
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper,#f7f5ef);color:var(--ink,#253532);font: 1rem/1.5 system-ui,sans-serif}
+.favorites-page{max-width:900px;margin:auto;padding:24px max(16px,env(safe-area-inset-right)) 48px max(16px,env(safe-area-inset-left))}
+.favorites-heading{margin-bottom:24px}.favorites-heading h1{font-size: 2rem;margin:16px 0}
+button,select{font: inherit;padding:10px 14px;min-height:44px;border:1px solid #77877e;border-radius:8px;background:#fff;color:inherit;cursor:pointer}
+button:disabled{opacity:.6;cursor:wait}a{color:#175d48}button:focus-visible,a:focus-visible,summary:focus-visible,select:focus-visible{outline:3px solid #bd5c14;outline-offset:3px}
+.favorite-card{background:#fff;border:1px solid #cbd2c9;border-radius:14px;padding:18px;margin:16px 0;overflow-wrap:anywhere}
+.favorite-card summary{cursor:pointer;font-weight:700;font-size: 1.2rem;padding:12px 0;min-height:44px}
+.favorite-meta{font-size: .9rem;color:#46564b}.favorite-card .service-section{padding:14px 0}.favorite-card .service-section h3{margin-top:8px}
+.favorite-card table{width:100%;text-align:start}.favorite-card th,.favorite-card td{padding:6px}
+.favorite-card img{max-width:24px;max-height:24px}.favorite-card svg{width:24px;height:24px}
+.favorite-card .contact-row{display:flex;gap:10px;align-items:center;padding:8px 0;min-height:44px}.favorite-card small{display:block}
+.favorite-card ul{padding-inline-start:22px}.favorite-card .contact-list{list-style:none;padding:0}
+.favorite-card .service-close,.favorite-card .service-anchors{display:none}
+.favorite-card .service-chips{display:flex;flex-wrap:wrap;gap:6px}
+@media(max-width:480px){.favorites-page{padding-top:16px}.favorite-card{padding:12px}.favorites-heading label{display:block;margin:12px 0}}
+.favorites-heading-title{display:flex;align-items:center;gap:12px}
+.favorites-heading-title .bookmark-icon{color:var(--accent);fill:currentColor}
+.favorite-card{position:relative}
+.favorite-card summary,.favorite-card>h2{padding-inline-end:56px}
+.favorite-card>.favorite-toggle{position:absolute;inset-inline-end:8px;top:8px;margin:0}
