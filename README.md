@@ -905,3 +905,11 @@ Native transport sign orientation remains schematic.
 Service opening labels show known closing times and the next known opening using
 the schedule timezone, without inventing boundaries for incomplete/24h schedules.
 The verification qualifier is omitted per user choice; provenance remains in cards.
+
+## R2 transport renderer proposal
+
+[R2 design proposal](docs/r2-renderer-proposal.md) records EGI-122: alternatives,
+shared ownership, original asset plan, depth-aware picking experiment and proposed
+budgets. R2 is authorized whole-set with local commits; concrete architecture,
+asset and test-boundary approval remains required before EGI-123/124 adoption.
+This documentation does not change the current renderer or preview.
