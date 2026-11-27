@@ -22,12 +22,6 @@ def health(module: Pages = Depends(owner)):
     """Report only the selected reader's health."""
     return module.health()
 
-@router.get('/contribuisci', response_class=HTMLResponse)
-def contribute():
-    """Retain the read-only explanation; do not invent a contribution journey."""
-    return '<h1>EGI v0.1 — preview locale</h1><p>La modifica dei dati non è ancora disponibile.</p><a href="/map">Torna alla mappa</a>'
-
-
 @router.get('/preferiti', response_class=HTMLResponse)
 def favorites(request: Request, module: Pages = Depends(owner)):
     """Serve a public offline shell without reading service or visitor data."""

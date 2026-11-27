@@ -133,8 +133,9 @@ rail and cycle runtime paths (`EGI_TRANSPORT_ROOT`, `EGI_RAIL_ROOT`,
 canonical reads; the preview store is not consulted. These layers do not select
 public-launch transport or authorize fresh acquisition/job changes.
 
-For native verification set `EGI_DATABASE_REPO` to the explicit database worktree,
-`EGI_SQITCH` to Sqitch and, if necessary, `PERL5LIB` to its local runtime library.
+For native verification set `EGI_DATABASE_REPO` to the explicit database worktree and,
+optionally, `EGI_SQITCH` to Sqitch (with `PERL5LIB` if needed); without it
+`tests/native.py` runs the plan's deploy scripts with psql in plan order.
 Use the A3 Python environment for `python -m unittest discover -s tests -v` and run
 `node --experimental-vm-modules tests/test_canonical_map.cjs` in addition to the two existing Node suites.
 The independent native harness creates only `/private/tmp/egi-app-read-*` targets.
@@ -217,6 +218,112 @@ B1 still owns module extraction, city configuration, coordinate/query privacy,
 14-day redacted errors and local fonts/libraries. The local demo disables access
 logs but does not claim that broader privacy work is complete.
 
+## Moderation (B3.1)
+
+`/moderazione` is the moderators' area (ADR 0009, 0011 of the workspace). It is not
+linked from public pages and is mounted only when `EGI_EDITORIAL_DATABASE_URL` is set.
+The database verifies each person's session; the app connects with one editorial login.
+
+| Variable | Meaning |
+| --- | --- |
+| `EGI_EDITORIAL_DATABASE_URL` | libpq string of a login created `LOGIN IN ROLE egi_editorial` |
+| `EGI_EDITORIAL_COOKIE_SECRET` | at least 32 random characters; signs form tokens and the Google sign-in cookie |
+| `EGI_EDITORIAL_SECURE_COOKIE` | `true` by default; `false` only for plain-HTTP local tests other than `localhost` |
+| `EGI_EDITORIAL_GOOGLE_CLIENT_ID`, `EGI_EDITORIAL_GOOGLE_CLIENT_SECRET` | enable "Accedi con Google"; the redirect URI to register is `<origin>/moderazione/google/ritorno` |
+| `EGI_EDITORIAL_GOOGLE_METADATA_URL` | another OpenID Connect provider's discovery document |
+
+Sign-in is by Google (bound by issuer and subject, never email) or by password
+(argon2, at least 12 characters); the admin also enters a TOTP code. Sessions last
+8 hours idle and 14 days at most. Every POST must come from this origin; signed-in
+POSTs also carry a per-session form token. New text is in `translations/it.json`
+under `moderation` (other languages fall back to Italian until B2).
+
+Create the first admin once, with the database owner's connection, and hand over the
+printed invitation link (valid 48 hours, once):
+
+```sh
+EGI_OWNER_DATABASE_URL='host=… dbname=… user=OWNER' \
+.venv/bin/python -m app.backend.api.moderation.bootstrap admin "Nome Cognome" --origin http://127.0.0.1:8000
+```
+
+Further accounts are invited from `/moderazione/account`. `/moderazione/coda` lists
+contributions grouped by service, filtered by state, kind, category, waiting reason
+and claimant; a contribution page shows its text, the submitter's contact, proposals
+and history, and lets a person claim, take over, release, reassign or set a waiting
+reason ("serve l'admin" puts it in the admin's view). Tests:
+`tests/test_moderation_access.py`, `tests/test_moderation_queue.py` (need `EGI_DATABASE_REPO`) and
+`tests/test_moderation_oidc.py` (ID token verification against a mock provider).
+
+`/moderazione/servizi` finds any service by name, published or not; its workspace
+(`/moderazione/servizio/<id>`, EGI-83) edits name, description, need, delivery mode,
+status, cost, contacts and access conditions. The form starts from the complete
+revision body read by the database (`editorial.revision_body`, egi_database 012), so
+untouched parts keep their components and evidence; a changed value cites no source.
+"Salva bozza" creates a working draft and leaves the public card unchanged; the
+comparison shows source, public and draft values side by side with the source records'
+text; "Approva e pubblica" publishes exactly that draft with a change summary. A save
+or publication built on revisions that have since moved is refused and the person's
+unsaved values stay on the page. Contact protections are applied by the database on
+public reads, so an edit cannot release them.
+
+Hours (EGI-84) are edited in the same form as structured schedules: one per audience
+(the service, its intake desk or one saved contact line), each weekday open in time
+ranges, closed or unknown, a range ending at or before its start ending the next day.
+Two schedules of one audience may not be valid on a common day, because "aperto ora"
+reads one; shared calendar exceptions are kept as they are. The place section finds a
+location by name or address, or creates one (name, kind, address, optional point
+picked on an OpenStreetMap tile map or typed); moving a service saves a draft of that
+service only. `/moderazione/servizi/nuovo` creates a service at a chosen or new
+location, or without one. A created location or service cites what the person
+verified, recorded as a "Redazione EGI" observation (`editorial.record_observation`,
+egi_database 013); a new location is published together with the service. The
+moderation pages allow images from `tile.openstreetmap.org` for that map, sent with
+the origin only as referrer. Tests: `tests/test_moderation_workspace.py`.
+
+### Contribution decisions (EGI-85)
+
+The contribution detail and the service workspace show proposals individually.
+Accept or amend one into a draft, or reject it without changing the service. A
+moderator explicitly enters and verifies structured contacts, one weekday's hours,
+a single access condition or a new delivery location; visitor prose is not parsed
+into those structures automatically. Changed facts cite the selected observation
+method as Redazione EGI. The other components keep their identities and evidence.
+Concurrent/stale forms are refused; a decision and its draft save commit together.
+Existing contact/condition collections and interval sets above the UI insertion
+bounds are preserved rather than truncated. A refused hours form retains its
+unvalidated controls so other unsaved changes can be corrected and resubmitted.
+
+A new-service contribution opens the location-first creation form with its name,
+offer, address and link prefilled. The moderator confirms the delivery mode and
+verification. It remains a draft; repeating the same accepted name proposal does
+not create a second service. The existing contribution keeps its original target
+(NULL for a new service); at closure the moderator explicitly selects the matching
+published service, searchable by name. Durable preparation/update lineage belongs
+to the separately approved Community work, not this visitor intake.
+
+Closing uses Published (an explicitly selected publication, made after accepted
+proposal decisions), No change, Rejected or Duplicate (reason required). Closure
+uses the existing database retention rules; it does not publish a draft. Admin's
+separate protection-release form approves/publishes an exact draft while releasing
+one chosen protection under the existing database capability and scope checks.
+Ordinary publication never releases it.
+
+Native tests: `tests/test_moderation_decisions.py` with `EGI_DATABASE_REPO`. The
+retention scheduler templates remain in the database repository's
+`scripts/retention/`; installing one, provisioning a real login or applying SQL to
+a non-disposable demo still requires the existing separate grant. Tests use only
+their own temporary clusters/accounts and call the real retention function.
+
+### Visitor contributions (EGI-22)
+
+`/contribuisci` receives reports from a card's "Segnala un errore", still-valid
+signals from "Ancora valido?" and new-service proposals from the menu. It is active
+only in canonical mode with `EGI_INTAKE_DATABASE_URL` set to a login created
+`LOGIN IN ROLE egi_intake`, which may only call `editorial.submit_contribution`
+(global limits, honeypot, admin switch; no IP). Otherwise the page explains that
+contributions are not available. The form states retention and confirms receipt only.
+Tests: `tests/test_contribute.py` (needs `EGI_DATABASE_REPO`).
+
 ## Setup and start
 
 Use the selected existing FastAPI/Jinja2/Uvicorn stack in a dedicated `.venv`.
@@ -228,7 +335,7 @@ To reproduce the approved environment, from this directory:
 ```sh
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.lock.txt
-# test-only: httpx for FastAPI's in-process TestClient
+# dev lock: currently the runtime lock only (httpx is a runtime dependency since EGI-57)
 .venv/bin/python -m pip install -r requirements-dev.lock.txt
 ```
 
@@ -900,3 +1007,31 @@ entries are reused when present; fallback snapshots retain their copy timestamp
 and unknown current-opening status. The filtered map has a persistent collection
 name plus “Torna alle liste” and “Tutti i servizi”; the list view also offers a
 direct return to the grouped panel.
+
+Private Community preparation JSON/raw-text endpoints are documented in
+[preparation HTTP](docs/community/preparation-http.md). They reuse editorial
+sessions and require database changes 014–020; they do not enable CSV or real AI
+calls by themselves.
+
+The Community [card/field editor](docs/community/preparation-editor.md) is available
+at `/moderazione/contribuisci` in editorial mode. Its private drafts, sharing,
+recoverable trash and conflict recovery use the preparation HTTP contracts.
+Source and card are adjacent; the card and field-list presentations share one draft.
+For the changed client modules, run `node --experimental-vm-modules` with each of
+`tests/test_preparation_draft.cjs`, `tests/test_preparation_analysis.cjs`,
+`tests/test_preparation_evidence.cjs` and `tests/test_community_acceptance.cjs`.
+
+The separate [Community interpretation worker](docs/community/interpretation-worker.md)
+uses the hash-pinned Reviewer wheel and the existing httpx stack. Install its
+`requirements-community.lock.txt` before running the full Community test suite.
+No real model, price, worker login or live dispatch is enabled automatically.
+
+[Interpretation selection](docs/community/interpretation-editor.md) connects first
+public insertion and explicit updates to durable jobs, with selected card creation
+and preservation of manual/cleared fields. A configured worker/model is still required.
+
+[Community submission and review](docs/community/submission-review.md) connects
+confirmed private cards to selective queue snapshots and editable acceptance into
+canonical drafts. Source admission and the existing approve/publish action remain
+separate. Database change 021 preserves component proof across collection edits.
+Change 022 keeps selected proof in the correct contact/address/schedule context.
