@@ -123,7 +123,15 @@ class CommitGuardTests(unittest.TestCase):
         hooks=self.root/".githooks";hooks.mkdir()
         (hooks/"commit-msg").write_text("#!/bin/sh\nexec "+shlex.quote(sys.executable)+" "+shlex.quote(str(GUARD))+" --root "+shlex.quote(str(self.root))+" commit-msg \"$1\"\n")
         (hooks/"pre-push").write_text("#!/bin/sh\nexec "+shlex.quote(sys.executable)+" "+shlex.quote(str(GUARD))+" --root "+shlex.quote(str(self.root))+" pre-push\n")
+        remote=self.root/'.git/remote-fixture.git'
+        self.git('init','--bare','-q',str(remote))
+        self.git('push','-q',str(remote),self.base+':refs/heads/dev')
+        sibling=self.root/'.git/other-worktree'
+        self.git('worktree','add','--detach','-q',str(sibling),self.base)
+        self.addCleanup(lambda:self.git('worktree','remove','--force',str(sibling)))
         install(self.root)
+        other=subprocess.run(['git','-C',str(sibling),'config','--get','core.hooksPath'],capture_output=True)
+        self.assertNotEqual(other.returncode,0,'hook activation must not leak into another worktree')
         rejected=subprocess.run(["git","-C",str(self.root),"commit","--allow-empty","-m","Invalid title"],capture_output=True)
         self.assertNotEqual(rejected.returncode,0)
         self.assertEqual(self.git("rev-parse","HEAD"),self.base)
@@ -131,6 +139,13 @@ class CommitGuardTests(unittest.TestCase):
         self.git("add",".")
         self.git("commit","--allow-empty","-q","-m","EGI-7: Incomplete checkpoint")
         self.assertEqual(self.git("config","--worktree","--get","core.hooksPath"),str(hooks))
+        refused=subprocess.run(['git','-C',str(self.root),'push',str(remote),'HEAD:refs/heads/dev'],capture_output=True)
+        self.assertNotEqual(refused.returncode,0)
+        self.assertEqual(self.git('--git-dir='+str(remote),'rev-parse','refs/heads/dev'),self.base)
+        (self.root/'.git/check-mode').write_text('passed')
+        self.git('push','-q',str(remote),'HEAD:refs/heads/dev')
+        self.assertEqual(self.git('--git-dir='+str(remote),'rev-parse','refs/heads/dev'),self.git('rev-parse','HEAD'))
+
 
     def test_integration_failure_survives_complete_success(self):
         """A shared-boundary push stays refused when only Integration is blocked."""
