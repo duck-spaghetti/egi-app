@@ -69,7 +69,7 @@ class ProfileCommandTests(unittest.TestCase):
         self.assertEqual(python["tests"][0]["reason"], "missing fixture")
 
     def test_hook_git_routing_cannot_redirect_checked_fixture(self):
-        """Inherited hook routing cannot redirect fixture Git operations or source identity."""
+        """Inherited hook routing cannot alter a foreign repository or redirect source identity."""
         clean = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
         subprocess.run(['git', 'init', '-q', self.root], env=clean, check=True)
         subprocess.run(['git', '-C', self.root, '-c', 'user.name=Fixture', '-c',
@@ -77,10 +77,17 @@ class ProfileCommandTests(unittest.TestCase):
                         '-qm', 'EGI-140: Fixture'], env=clean, check=True)
         source = subprocess.check_output(['git', '-C', self.root, 'rev-parse', 'HEAD'],
                                          env=clean, text=True).strip()
+        foreign = self.root / '.git/foreign-checkout'
+        subprocess.run(['git', 'init', '-q', foreign], env=clean, check=True)
+        subprocess.run(['git', '-C', foreign, 'config', 'user.name', 'Foreign sentinel'], env=clean, check=True)
+        subprocess.run(['git', '-C', foreign, 'config', 'user.email', 'foreign@example.invalid'], env=clean, check=True)
+        foreign_config = foreign / '.git/config'
+        preserved = foreign_config.read_bytes()
         (self.root / 'tests/test_profile_example.py').write_text(
             "import subprocess, unittest\nfrom pathlib import Path\nclass Example(unittest.TestCase):\n"
-            " def test_ok(self): subprocess.run(['git','-C',str(Path(__file__).resolve().parents[1]),'status','--porcelain'],check=True,capture_output=True)\n")
-        code, result = self.command(environment={**os.environ, 'GIT_DIR': '/unavailable-foreign-git'})
+            " def test_ok(self): subprocess.run(['git','-C',str(Path(__file__).resolve().parents[1]),'config','user.name','Fixture'],check=True,capture_output=True)\n")
+        code, result = self.command(environment={**os.environ, 'GIT_DIR': str(foreign / '.git'), 'GIT_WORK_TREE': str(foreign)})
+        self.assertEqual(foreign_config.read_bytes(), preserved)
         self.assertEqual(code, 2, result)  # Fixture still lacks ESLint; Python must pass.
         self.assertEqual(result['source'], source)
         self.assertEqual(next(item for item in result['checks'] if item['name'] == 'python')['status'], 'passed')

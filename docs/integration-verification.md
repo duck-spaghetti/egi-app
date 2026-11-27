@@ -72,3 +72,8 @@ original fixed SOURCE_DATE_EPOCH=315532800 and the hash-locked wheel requirement
 PostgreSQL18/PostGIS and Sqitch run against disposable owned fixtures. Reports,
 provider output, browser traces and PDFs are retained with the PR head identity.
 These automatic checks need no API keys and do not dispatch paid model requests.
+
+The hook-routing regression uses two real disposable Git repositories and verifies
+that a fixture identity write affects only the checked fixture. A foreign repository
+configuration must remain byte-identical when inherited GIT_DIR/GIT_WORK_TREE point
+to it. Synthetic identities never configure the shared application repository.
