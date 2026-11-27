@@ -102,6 +102,7 @@ class PreparationHttpTests(unittest.TestCase):
         self.assertEqual(len(owner.get(card_path+'/cronologia').json()['versions']), 2)
         self.assertEqual(owner.get(card_path+'/cronologia?limit=101').status_code, 422)
         self.assertNotIn('payload', owner.get(path).json()['items'][0])
+        self.assertEqual(owner.get(path).json()['items'][0]['display_name'], 'Manual correction')
         self.assertEqual(reader.post(path+'/accessi', json=grant, headers=self.headers('mod2')).status_code, 403)
         undo = owner.post(path+'/operazioni/'+saved.json()['operation_id']+'/annulla', json={'request_key': str(uuid4())}, headers=self.headers())
         self.assertEqual(undo.status_code, 200, undo.text)

@@ -1,4 +1,5 @@
 /** Render editable service/location facts with one dictionary in both visual views. */
+import {evidenceFor} from './evidence.js';
 export function node(tag, text, className) {
   const result = document.createElement(tag);
   if (text !== undefined) result.textContent = text;
@@ -9,17 +10,17 @@ export function button(text, action, disabled = false) {
   const result = node('button', text); result.type = 'button'; result.disabled = disabled;
   result.addEventListener('click', action); return result;
 }
-export function renderFields(root, draft, context, canEdit, changed) {
+export function renderFields(root, draft, context, canEdit, changed, redrawAll) {
   const {fields: dictionary, text} = context;
   const label = key => text.field_labels[key] || key;
   const pathFor = (prefix, key) => prefix + '/' + key;
   function edit(path, value) { draft.edit(path, value); changed(); }
-  function redraw() { renderFields(root, draft, context, canEdit, changed); }
+  function redraw() { if(redrawAll)redrawAll();else renderFields(root, draft, context, canEdit, changed); }
   function scalar(parent, body, key, prefix) {
     const path = pathFor(prefix, key), value = body[key];
     const wrapper = node('div', undefined, 'preparation-control'); wrapper.dataset.field = key;
     wrapper.append(node('span', label(key)));
-    let input;
+    let input,clearControl;
     if (key==='territory_id' && context.references?.territories) {
       input=node('select');input.append(new Option(text.not_set,''));
       for(const area of context.references.territories)input.append(new Option(area.name,area.territory_id));
@@ -34,7 +35,9 @@ export function renderFields(root, draft, context, canEdit, changed) {
       if (value !== undefined && !dictionary.choices[key].includes(value)) input.append(new Option(String(value), String(value)));
       input.value = value === undefined ? '' : String(value);
     } else {
-      input = node(['description', 'details', 'cost_note', 'note', 'closure_reason'].includes(key) ? 'textarea' : 'input');
+      input = node(['description', 'details', 'cost_note', 'note', 'closure_reason'].includes(key) || context.cardView && key==='name' ? 'textarea' : 'input');
+      if(context.cardView && key==='name')input.rows=2;
+      if(context.cardView && ['name','description'].includes(key))input.placeholder=label(key);
       if (input.tagName === 'INPUT') input.type = key === 'is_public' ? 'checkbox' : dictionary.numbers.includes(key) ? 'number' : dictionary.dates.includes(key) ? 'date' : dictionary.times.includes(key) ? 'time' : 'text';
       if (key === 'is_public') { input.checked = value === true; input.indeterminate = value === undefined; }
       else input.value = value ?? '';
@@ -48,17 +51,21 @@ export function renderFields(root, draft, context, canEdit, changed) {
       let next = key === 'is_public' ? input.checked : input.value === '' ? undefined : dictionary.numbers.includes(key) ? Number(input.value) : input.value;
       edit(path, next);
       hint.firstChild.textContent = next === undefined ? text.cleared : text.changed;
-      hint.lastChild.disabled = !canEdit || next === undefined;
+      clearControl.disabled = !canEdit || next === undefined;
+      for(const link of hint.querySelectorAll('[data-evidence]'))link.hidden=true;
     });
     wrapper.append(input);
-    const origin = draft.payload.field_origins[path]?.state;
+    const origin = draft.payload.field_origins[path]?.state, citations=key==='is_public'?[]:evidenceFor(draft.payload,path).filter(citation=>!context.evidenceFilter || context.evidenceFilter(citation));
     const hint = node('span', undefined, 'hint');
-    hint.append(node('span', origin === 'cleared' ? text.cleared : origin === 'manual' ? text.changed : origin === 'generated' ? text.generated : value === undefined ? text.not_set : text.input_origin));
-    hint.append(button(text.clear, () => { edit(path, undefined); redraw(); }, !canEdit || value === undefined));
+    hint.append(node('span', origin === 'cleared' ? text.cleared : origin === 'manual' ? text.changed : citations.some(item=>item.kind==='interpreted') ? text.interpreted_value : origin === 'generated' ? text.generated : value === undefined ? text.not_set : text.input_origin));
+    clearControl=button(text.clear, () => { edit(path, undefined); redraw(); }, !canEdit || value === undefined);
+    hint.append(clearControl);
+    if(context.onEvidence)for(const citation of citations){const link=button(text.see_source,()=>context.onEvidence(citation,path));link.dataset.evidence=citation.id;hint.append(link);}
     wrapper.append(hint); parent.append(wrapper);
   }
   function collection(parent, body, key, prefix) {
     const section = node('section', undefined, 'preparation-repeat'), path = pathFor(prefix, key);
+    section.dataset.field=key;
     section.append(node('h3', label(key)));
     const values = body[key] || [];
     values.forEach((value, index) => {
@@ -82,6 +89,7 @@ export function renderFields(root, draft, context, canEdit, changed) {
   }
   root.replaceChildren();
   const service = node('section', undefined, 'preparation-section'); service.append(node('h2', text.service));
+  service.dataset.kind='service';
   const extra = node('details'); extra.append(node('summary',text.additional));
   for (const key of dictionary.scalars.service) scalar(['name','description','delivery_mode','operational_status','cost_state','cost_note'].includes(key) ? service : extra, draft.payload.service, key, '/service');
   for (const key of dictionary.arrays.service) collection(['contacts','conditions','schedules'].includes(key) ? service : extra, draft.payload.service, key, '/service');
@@ -92,6 +100,7 @@ export function renderFields(root, draft, context, canEdit, changed) {
     service.append(place);
   }
   const location = node('section', undefined, 'preparation-section'); location.append(node('h2', text.location), node('p', text.location_note, 'hint'));
+  location.dataset.kind='location';
   const picker = node('select'); picker.setAttribute('aria-label', text.location); picker.disabled = !canEdit;
   picker.append(new Option(text.no_location, 'none'), new Option(text.new_location, 'new'));
   if (draft.payload.location.kind === 'existing') picker.append(new Option(text.existing_location, 'existing'));

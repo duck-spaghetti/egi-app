@@ -1,15 +1,47 @@
 /* Community uses the public font/color foundations and the editorial controls. */
 .preparation-heading { display:flex; align-items:baseline; justify-content:space-between; gap:1rem; }
 .preparation-heading h1 { font:2.4rem Fraunces,serif; margin:.25rem 0; }
-.preparation-layout { display:grid; grid-template-columns:16rem minmax(0,1fr); gap:1.25rem; align-items:start; }
+.preparation-layout { display:grid; grid-template-columns:minmax(0,1fr); gap:1.25rem; align-items:start; }
 .preparation-layout > *, .preparation-layout .desk-form, .preparation-layout .desk-form label { min-width:0; }
 .preparation-layout .desk-form fieldset { min-inline-size:0; }
 .preparation-layout .desk-form input:not([type=checkbox]), .preparation-layout .desk-form select, .preparation-layout .desk-form textarea { box-sizing:border-box; min-width:0; max-width:100%; width:100%; }
-.preparation-sidebar { position:sticky; top:1rem; }
+.preparation-sidebar { position:static; }
+.preparation-sidebar #preparation-list { display:flex; flex-wrap:wrap; gap:.5rem; max-height:9rem; overflow:auto; }
+.preparation-sidebar #create-preparation { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.preparation-initial-text { grid-column:1/-1; }
+.preparation-workbench { display:grid; grid-template-columns:minmax(15rem,.8fr) minmax(0,1.2fr); gap:1.25rem; align-items:start; }
+.preparation-source-column, .preparation-card-column { min-width:0; display:grid; gap:1rem; }
+.preparation-source-column { position:sticky; top:1rem; max-height:calc(100vh - 2rem); overflow:auto; }
+.preparation-source-column textarea { min-height:14rem; resize:vertical; }
+.preparation-source-column .desk-actions { flex-wrap:wrap; }
+.preparation-source-passage { white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; line-height:1.7; }
+.preparation-source-passage mark { background:#f2d890; color:var(--ink); padding:.1rem 0; }
+.preparation-service-card { border:1px solid var(--line); border-radius:.7rem; background:var(--paper); overflow:hidden; }
+.preparation-card-header, .preparation-card-section, .preparation-card-extra, .preparation-card-source { padding:1.15rem 1.4rem; }
+.preparation-card-section, .preparation-card-extra, .preparation-card-source { border-top:1px solid var(--line); }
+.preparation-card-section h3 { margin:0 0 .75rem; font:700 .95rem "IBM Plex Sans",sans-serif; }
+.preparation-card-metadata { display:flex; flex-wrap:wrap; gap:.75rem; }
+.preparation-eyebrow { font:600 .7rem "IBM Plex Mono",monospace; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); }
+.preparation-service-card .preparation-control input:not([type=checkbox]), .preparation-service-card .preparation-control textarea, .preparation-service-card .preparation-control select { background:transparent; border-color:transparent; border-bottom:1px dashed var(--line); padding:.4rem .2rem; border-radius:0; }
+.preparation-service-card .preparation-control input:hover, .preparation-service-card .preparation-control textarea:hover, .preparation-service-card .preparation-control select:hover { border-color:var(--ink-soft); }
+.preparation-service-card .preparation-control[data-field=name] textarea { font:900 1.9rem/1.15 Fraunces,serif; letter-spacing:-.01em; resize:vertical; }
+.preparation-service-card .preparation-control[data-field=description] textarea { min-height:4rem; }
+.preparation-card-header .preparation-control>span:first-child, .preparation-card-section>.preparation-control>span:first-child { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.preparation-service-card .preparation-control .hint { font-size:.7rem; color:var(--ink-soft); }
+.preparation-service-card .preparation-control .hint button { font-size:.7rem; padding:.2rem .35rem; }
+.preparation-service-card .preparation-control:not(:focus-within):not(:hover) .hint>button:not([data-evidence]) { opacity:0; }
+.preparation-service-card .preparation-repeat { border-left:0; padding:0; margin:0; }
+.preparation-service-card .preparation-repeat>fieldset { min-width:0; padding:.6rem; }
+.preparation-contact-extra { margin:.75rem 0 0; font-size:.85rem; }
+.preparation-card-source { display:grid; gap:.35rem; background:var(--bg); }
+.preparation-hours-line { display:grid; gap:.3rem; font-size:.9rem; }
+.preparation-checks { border:1px solid var(--line); background:var(--bg); border-radius:.4rem; padding:.8rem; font-size:.85rem; margin:.75rem 0; }
 .preparation-sidebar details { margin-top:1rem; border-top:1px solid var(--line); padding-top:1rem; }
 #preparation-workspace { display:grid; gap:1rem; }
 #preparation-workspace[hidden], [hidden] { display:none !important; }
 .preparation-cards { display:flex; flex-wrap:wrap; gap:.5rem; }
+.preparation-cards li { min-width:0; max-width:100%; }
+.preparation-cards button { max-width:100%; white-space:normal; overflow-wrap:anywhere; text-align:left; }
 .preparation-cards button[aria-current=true] { outline:2px solid var(--accent); outline-offset:2px; }
 .preparation-preview { display:grid; gap:1.25rem; margin:1.5rem 0; }
 .preparation-section { border-top:1px solid var(--line); padding-top:1rem; }
@@ -33,4 +65,5 @@
 #conflict-fields fieldset { margin:.75rem 0; border:1px solid var(--line); }
 #source-text { width:100%; box-sizing:border-box; }
 button:disabled { cursor:default; opacity:.55; }
-@media(max-width:800px) { .preparation-layout { grid-template-columns:1fr; } .preparation-sidebar { position:static; } .preparation-heading { display:block; } .preparation-fields .preparation-control { grid-template-columns:1fr; } .preparation-fields .preparation-control .hint { grid-column:1; } }
+@media(max-width:640px) { .preparation-workbench { grid-template-columns:1fr; } .preparation-source-column { position:static; max-height:none; overflow:visible; } }
+@media(max-width:800px) { .preparation-layout { grid-template-columns:1fr; } .preparation-sidebar #create-preparation { grid-template-columns:1fr; } .preparation-heading { display:block; } .preparation-fields .preparation-control { grid-template-columns:1fr; } .preparation-fields .preparation-control .hint { grid-column:1; } }

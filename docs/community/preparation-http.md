@@ -33,7 +33,9 @@ duplicate keys, nonfinite numbers and malformed Unicode are refused. Existing
 Successful object receipts add `schema_version:1`; list responses have `items`.
 Workspace/list reads accept `offset` and `limit` (1–100); the workspace response
 contains item summaries, `offset` and `total`, while the card route reads full
-payloads. History takes `after` and `limit` (1–100). Raw original reads return exact
+payloads. The existing summaries include `display_name`: the authorized service
+name limited to 160 characters, or null. No full card payload or additional item
+read is needed to label navigation. History takes `after` and `limit` (1–100). Raw original reads return exact
 bytes with `X-EGI-Schema-Version:1`. All responses are `no-store` and `nosniff`.
 
 Errors contain only `{schema_version:1,code,request_id}`. Missing/invalid sessions

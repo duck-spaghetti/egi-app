@@ -2,12 +2,16 @@
 import {createAnalysis} from './analysis.js';
 import {PreparationDraft} from './draft.js';
 import {renderFields, node, button} from './fields.js';
+import {renderCard} from './card.js';
+import {passageFor} from './evidence.js';
 const $ = id => document.getElementById(id);
 const context = JSON.parse($('preparation-context').textContent), text = context.text;
 const API = '/moderazione/contribuisci/api', token = $('preparation-form-token').value;
 let workspace, draft, mode = 'card', timer, saving, remote, historyAfter = 0, lastOperation;
 let analysis;
 let pendingSubmission;
+let inspectedEvidence;
+let inspectionRequest;
 let pendingInput, creation, manualAttempt, inputBase = '', publicBase = false;
 const inputDirty = () => !!workspace && ($('source-text').value !== inputBase || $('public-material').checked !== publicBase);
 const canEdit = () => workspace?.state === 'active' && ['owner','edit'].includes(workspace?.permission);
@@ -27,6 +31,8 @@ async function api(path, body, options = {}) {
 }
 function changed() {
   renderEvidence();
+  renderChecks();updateCardLabels();
+  if(inspectedEvidence && !draft.payload.evidence.some(item=>item.id===inspectedEvidence))$('source-evidence-panel').hidden=true;
   $('save-state').textContent = text.unsaved;
   clearTimeout(timer);
   if (!draft.conflicted) timer = setTimeout(() => save().catch(problem), 650);
@@ -80,7 +86,9 @@ async function loadWorkspace() {
   if (workspace.current_input_id) $('original-link').href = API+'/preparazioni/'+workspace.id+'/input/'+workspace.current_input_id;
   $('card-list').replaceChildren(); $('no-cards').hidden = workspace.items.length > 0;
   for (const item of workspace.items) {
-    const li = node('li'), control = button((text[item.outcome] || item.outcome)+' · '+text.card+' '+(workspace.items.indexOf(item)+1), () => openCard(item.item_id).catch(problem));
+    const name=item.item_id===draft?.item?draft.payload.service.name:item.display_name;
+    const li = node('li'), control = button((text[item.outcome] || item.outcome)+' · '+(name?.slice(0,160) || text.card+' '+(workspace.items.indexOf(item)+1)), () => openCard(item.item_id).catch(problem));
+    control.dataset.item=item.item_id;
     control.setAttribute('aria-current', String(draft?.item === item.item_id));
     li.append(control); $('card-list').append(li);
   }
@@ -104,6 +112,7 @@ async function openWorkspace(id) {
     $('source-text').value = await response.text();
   }
   inputBase = $('source-text').value; publicBase = $('public-material').checked; analysis?.load(workspace);
+  $('source-evidence-panel').hidden=true;
   history.replaceState(null,'','/moderazione/contribuisci?id='+encodeURIComponent(id)); clearProblem();
 }
 function render() {
@@ -111,7 +120,8 @@ function render() {
   $('editable-fields').classList.toggle('preparation-fields',mode === 'fields');
   $('view-card').setAttribute('aria-pressed',String(mode === 'card'));
   $('view-fields').setAttribute('aria-pressed',String(mode === 'fields'));
-  renderFields($('editable-fields'),draft,context,canEdit() && draft.payload.outcome !== 'trashed',changed);
+  const viewContext={...context,sourceName:context.sources.find(source=>source.id===workspace.source_id)?.name,onEvidence:inspectEvidence};
+  (mode==='card'?renderCard:renderFields)($('editable-fields'),draft,viewContext,canEdit() && draft.payload.outcome !== 'trashed',changed);
   $('card-outcome').value = draft.payload.outcome;
   $('submit-card').disabled = !canEdit() || draft.payload.outcome!=='confirmed';
   $('card-outcome').disabled = !canEdit() || draft.payload.outcome === 'trashed';
@@ -120,7 +130,39 @@ function render() {
   $('restore-card').hidden = draft.payload.outcome !== 'trashed'; $('restore-card').disabled = !canEdit();
   $('undo-card').disabled = !canEdit() || !lastOperation;
   renderEvidence();
+  renderChecks();updateCardLabels();
   analysis?.cardChanged();
+}
+function updateCardLabels() {
+  if(!draft)return;
+  for(const control of $('card-list').querySelectorAll('button')) {
+    if(control.dataset.item===draft.item)control.textContent=(text[draft.payload.outcome] || draft.payload.outcome)+' · '+(draft.payload.service.name?.slice(0,160) || text.unnamed_candidate);
+    control.setAttribute('aria-current',String(control.dataset.item===draft.item));
+  }
+}
+function renderChecks() {
+  if(!draft)return;
+  const service=draft.payload.service,checks=[];
+  if(!service.name?.trim())checks.push(text.check_name);
+  if(!service.delivery_mode)checks.push(text.check_mode);
+  if(!service.description?.trim())checks.push(text.check_description);
+  if(['telephone','online'].includes(service.delivery_mode) && !(service.contacts || []).some(contact=>contact.is_public===true && contact.value?.trim() && (service.delivery_mode==='telephone'?contact.channel_type==='phone':['email','web'].includes(contact.channel_type))))checks.push(text.check_contact);
+  const list=node('ul');for(const message of checks)list.append(node('li',message));
+  $('card-checks').replaceChildren(node('strong',text.preliminary_checks),checks.length?list:node('p',text.basic_checks_present),node('p',text.checks_hint,'hint'));
+}
+async function inspectEvidence(evidence,path) {
+  const item=draft.item,attempt=Symbol();inspectionRequest=attempt;
+  try {
+    const response=await fetch(API+'/preparazioni/'+workspace.id+'/input/'+encodeURIComponent(evidence.input_id),{credentials:'same-origin'});
+    if(!response.ok)throw Object.assign(new Error(),{status:response.status});
+    const original=await response.text();if(draft?.item!==item || inspectionRequest!==attempt || !draft.payload.evidence.some(current=>current.id===evidence.id))return;
+    const passage=passageFor(original,evidence);inspectedEvidence=evidence.id;
+    $('source-evidence-panel').hidden=false;$('source-evidence-panel').open=true;
+    $('source-evidence-title').textContent=text.source_passage+' · '+caption(path);
+    $('source-evidence-note').textContent=!passage.valid?text.source_passage_unmatched:evidence.kind==='interpreted'?text.interpreted_value:text.explicit_value;
+    $('source-evidence-text').replaceChildren(document.createTextNode(passage.before),node('mark',passage.quote),document.createTextNode(passage.after));
+    $('source-evidence-text').querySelector('mark').scrollIntoView({block:'nearest',behavior:'smooth'});
+  }catch(error){problem(error);}
 }
 function renderEvidence() {
   $('card-evidence').replaceChildren();
@@ -148,7 +190,7 @@ $('create-preparation').addEventListener('submit',async event => {
   const form = event.currentTarget;
   try {
     if (inputDirty()) { $('preparation-error').hidden=false; $('preparation-error').textContent=text.save_input_first; return; }
-    if (!creation) { const data = new FormData(form); creation = {title:data.get('title'),source:data.get('source'),name:data.get('source_name'),kind:data.get('source_kind'),sourceKey:uuid(),key:uuid()}; }
+    if (!creation) { const data = new FormData(form); creation = {title:data.get('title').trim(),source:data.get('source'),name:data.get('source_name'),kind:data.get('source_kind'),text:data.get('initial_text'),public:data.get('public_material')==='on',sourceKey:uuid(),key:uuid()}; creation.title ||= (creation.name || context.sources.find(source=>source.id===creation.source)?.name || text.new)+' · '+new Date().toLocaleDateString('it'); }
     const attempt = creation;
     if (attempt.name) {
       const source = await api('/fonti',{metadata:{name:attempt.name,source_kind:attempt.kind},request_key:attempt.sourceKey});
@@ -157,6 +199,8 @@ $('create-preparation').addEventListener('submit',async event => {
     }
     const result = await api('/preparazioni',{source_id:attempt.source,title:attempt.title,request_key:attempt.key});
     creation = null; form.reset(); await list(); await openWorkspace(result.id);
+    $('create-panel').open=false;
+    if(attempt.text){$('source-text').value=attempt.text;$('public-material').checked=attempt.public;await persistInput();analysis.sourceSaved();}
   } catch(error) { if (error.status && error.status < 500 && error.status !== 409) creation = null; problem(error); }
 });
 async function persistInput() {

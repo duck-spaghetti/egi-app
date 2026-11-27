@@ -834,6 +834,10 @@ calls by themselves.
 The Community [card/field editor](docs/community/preparation-editor.md) is available
 at `/moderazione/contribuisci` in editorial mode. Its private drafts, sharing,
 recoverable trash and conflict recovery use the preparation HTTP contracts.
+Source and card are adjacent; the card and field-list presentations share one draft.
+For the changed client modules, run `node --experimental-vm-modules` with each of
+`tests/test_preparation_draft.cjs`, `tests/test_preparation_analysis.cjs`,
+`tests/test_preparation_evidence.cjs` and `tests/test_community_acceptance.cjs`.
 
 The separate [Community interpretation worker](docs/community/interpretation-worker.md)
 uses the hash-pinned Reviewer wheel and the existing httpx stack. Install its
@@ -848,3 +852,4 @@ and preservation of manual/cleared fields. A configured worker/model is still re
 confirmed private cards to selective queue snapshots and editable acceptance into
 canonical drafts. Source admission and the existing approve/publish action remain
 separate. Database change 021 preserves component proof across collection edits.
+Change 022 keeps selected proof in the correct contact/address/schedule context.

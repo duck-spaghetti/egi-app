@@ -17,6 +17,7 @@
   {% if not community.closed and not community.resolution %}<div id="review-proposal-choices"></div>{% endif %}
   <div class="preparation-view-switch" role="group" aria-label="{{ t('community.fields_view') }}"><button type="button" id="review-card" aria-pressed="true">{{ t('community.card') }}</button><button type="button" id="review-fields" aria-pressed="false">{{ t('community.fields_view') }}</button></div>
   <div id="review-editor" class="preparation-preview"></div>
+  <aside id="review-field-evidence" class="preparation-checks" hidden></aside>
   {% if community.resolution %}<details><summary>{{ t("community.review_original_snapshot") }}</summary><div id="review-original-editor" class="preparation-preview"></div></details>{% endif %}
   <details><summary>{{ t('community.evidence') }}</summary>{% for evidence in community.snapshot.evidence %}<blockquote class="desk-quote">{{ evidence.quote or evidence.note or '' }}</blockquote>{% endfor %}</details>
   {% if not community.closed and not community.resolution %}

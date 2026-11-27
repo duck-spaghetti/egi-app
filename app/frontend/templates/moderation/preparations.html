@@ -16,15 +16,18 @@
   <ul id="preparation-list" class="queue-list"></ul>
   <details id="create-panel"><summary>{{ t('community.new') }}</summary>
     <form id="create-preparation" class="desk-form">
-      <label>{{ t('community.title_label') }}<input name="title" required maxlength="500" /></label>
+      <label>{{ t('community.title_label') }}<input name="title" maxlength="500" placeholder="{{ t('community.automatic_title') }}" /></label>
       <label>{{ t('community.source') }}<select name="source"><option value="">{{ t('community.not_set') }}</option>{% for source in preparation_context.sources %}<option value="{{ source.id }}">{{ source.name }}</option>{% endfor %}</select></label>
       <fieldset><legend>{{ t('community.new_source') }}</legend><label>{{ t('community.source_name') }}<input name="source_name" maxlength="200" /></label><label>{{ t('community.source_kind') }}<input name="source_kind" maxlength="80" /></label><p class="hint">{{ t('community.source_kind_hint') }}</p></fieldset>
+      <label class="preparation-initial-text">{{ t('community.input') }}<textarea name="initial_text" rows="6" maxlength="50000"></textarea></label>
+      <label class="check preparation-initial-text"><input type="checkbox" name="public_material" />{{ t('community.public_material') }}</label>
       <button type="submit">{{ t('community.create') }}</button>
     </form>
   </details>
 </aside>
 <section id="preparation-workspace" hidden>
-  <div class="desk-card"><div class="desk-actions"><h2 id="workspace-title"></h2><span id="workspace-permission" class="badge"></span><button id="workspace-refresh" type="button">{{ t("community.refresh_state") }}</button><button id="workspace-trash" type="button">{{ t('community.trash') }}</button><button id="workspace-restore" type="button">{{ t('community.restore') }}</button></div>
+  <div class="desk-card"><div class="desk-actions"><h2 id="workspace-title"></h2><span id="workspace-permission" class="badge"></span><button id="workspace-refresh" type="button">{{ t("community.refresh_state") }}</button><button id="workspace-trash" type="button">{{ t('community.trash') }}</button><button id="workspace-restore" type="button">{{ t('community.restore') }}</button></div></div>
+  <div class="preparation-workbench"><aside class="preparation-source-column"><div class="desk-card">
     <details open><summary>{{ t('community.input') }} · <span id="workspace-source"></span></summary>
       <form id="input-form" class="desk-form"><label for="source-text">{{ t('community.input') }}</label><textarea id="source-text" rows="8" maxlength="50000"></textarea><label class="check"><input id="public-material" type="checkbox" />{{ t('community.public_material') }}</label><p class="hint">{{ t('community.input_hint') }}</p><div class="desk-actions"><button id="save-input" type="submit">{{ t('community.save_input') }}</button><a id="original-link" target="_blank" rel="noopener">{{ t('community.original') }}</a><button id="manual-card" type="button">{{ t('community.manual') }}</button></div></form>
     </details>
@@ -38,15 +41,19 @@
     <div class="desk-actions"><button id="analysis-create" type="button" disabled>{{ t('community.analysis_create') }}</button><button id="analysis-apply" type="button" disabled>{{ t('community.analysis_apply') }}</button></div>
     <p id="analysis-kept" class="hint" role="status"></p>
   </section>
+  <details class="desk-card" id="source-evidence-panel" hidden><summary id="source-evidence-title">{{ t('community.source_passage') }}</summary><p id="source-evidence-note" class="hint"></p><pre id="source-evidence-text" class="preparation-source-passage"></pre></details>
+  </aside><section class="preparation-card-column">
   <div class="desk-card"><ul id="card-list" class="queue-list preparation-cards"></ul><p id="no-cards">{{ t('community.no_cards') }}</p></div>
   <article id="card-editor" class="desk-card" hidden>
     <div class="desk-actions"><div class="preparation-view-switch" role="group" aria-label="{{ t('community.fields_view') }}"><button type="button" id="view-card" aria-pressed="true">{{ t('community.card') }}</button><button type="button" id="view-fields" aria-pressed="false">{{ t('community.fields_view') }}</button></div><button id="save-card" type="button">{{ t('community.save') }}</button><button id="retry-card" type="button" hidden>{{ t('community.retry') }}</button><button id="compare-card" type="button" hidden>{{ t('community.compare') }}</button></div>
     <div id="conflict-panel" hidden><p class="desk-error">{{ t('community.conflict') }}</p><div id="conflict-fields"></div><button id="apply-comparison" type="button">{{ t('community.apply_comparison') }}</button></div>
     <div id="editable-fields" class="preparation-preview"></div>
+    <aside id="card-checks" class="preparation-checks" aria-label="{{ t('community.preliminary_checks') }}" aria-live="polite"></aside>
     <div class="desk-actions"><label>{{ t('community.outcome') }}<select id="card-outcome"><option value="review">{{ t('community.review') }}</option><option value="confirmed">{{ t('community.confirmed') }}</option></select></label><button id="submit-card" type="button">{{ t("community.submit") }}</button><a id="submission-link" hidden>{{ t("community.open_submission") }}</a><button id="trash-card" type="button">{{ t('community.discard_card') }}</button><button id="restore-card" type="button">{{ t('community.restore_card') }}</button></div>
     <details><summary>{{ t('community.evidence') }}</summary><div id="card-evidence"></div></details>
     <details id="history-panel"><summary>{{ t('community.history') }}</summary><ol id="card-history" class="desk-history"></ol><button id="history-more" type="button" hidden>{{ t('community.history_more') }}</button><button id="undo-card" type="button">{{ t('community.undo') }}</button></details>
   </article>
+  </section></div>
   <details class="desk-card" id="sharing-panel"><summary>{{ t('community.sharing') }}</summary><p id="sharing-note">{{ t('community.owner_only') }}</p><ul id="grant-list" class="queue-list"></ul><form id="sharing-form" class="desk-form"><label>{{ t('community.person') }}<select id="share-person" required></select></label><label>{{ t('community.permission') }}<select id="share-permission"><option value="read">{{ t('community.read') }}</option><option value="edit">{{ t('community.edit') }}</option><option value="">{{ t('community.revoke') }}</option></select></label><button type="submit">{{ t('community.share') }}</button></form></details>
 </section>
 </div>

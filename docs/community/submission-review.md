@@ -35,6 +35,12 @@ submitted evidence require an explicit method/note/verification choice, recorded
 the database as the actual moderator's observation. No automatic EGI attribution is
 attached to every field. Contacts need explicit visibility.
 
+The card presentation is shared with preparation. Field-level citation inspection
+shows only submitted quotes, never the original input. Citations are hidden for a
+different baseline value/component and for the accepted canonical preview; the
+immutable original snapshot/evidence remains separately inspectable. This display
+filter does not replace authoritative server-side evidence matching.
+
 Acceptance creates or updates only a draft. Every source actually used in canonical evidence, including the original source
 and editorial observations, needs separate Admin admission before publication. Admin controls
 are shown individually; enabling an unrelated source cannot bypass this check.
@@ -53,6 +59,6 @@ acceptance with an explicit observation, separate draft/source admission/publica
 wrong-source and wrong-service refusal, public read and a linked new-version update
 preserving contacts/proof. The actual JS builder checks selected differences,
 complete arrays, exact heads and removal of caller proof. The full application
-suite passed 185 tests (six external-prerequisite skips); final targeted integrated
+suite ran 185 tests (179 passed, six external-prerequisite skips); final targeted integrated
 checks also passed after local hardening. No real provider calls occurred. Combined
 milestone review, human corpus/model evaluation and user acceptance remain pending.
