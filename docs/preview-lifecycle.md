@@ -50,3 +50,7 @@ changes; native-dialog access is independent from the Playwright automated check
 `tests/test_preview_lifecycle.py` exercises the public CLI with owned/foreign ports,
 stale process fingerprints, reuse/restart and startup failure. It requires loopback
 socket/process permissions and uses only temporary Git fixtures; no live DB is used.
+
+Failed startup acquisition also terminates and reaps the just-created child when
+source/receipt persistence fails. A bounded terminate→kill fallback handles a slow
+child; cleanup errors remain blocked CLI results, never a claim of successful start.

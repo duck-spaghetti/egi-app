@@ -54,7 +54,7 @@ source mismatches and exit/report disagreements propagate to the app boundary.
 ## Delivery and CI
 
 Commit-msg, pre-push and CI invoke the same canonical title policy. Shared check,
-configuration, workflow and contract changes require Integration as well as Complete
+configuration, workflow, native fixture/test and provider-orchestrator changes require Integration as well as Complete
 before push. App profile results are retained at `.local/checks/<profile>.json`,
 including failures captured by a hook; stdout and exit semantics remain unchanged.
 The owning app command clears inherited `GIT_*` routing variables

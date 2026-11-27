@@ -35,9 +35,11 @@ fixture responses. No mock auth/fixture route is mounted by the production entry
 
 The browser journeys observe menu → empty library → visible exit/focus, result and
 detail bookmarks, two independent memberships, one-membership removal, map → lists
-→ complete catalog, truthful storage/network failures and Community card/field
+→ complete catalog (two distinct services: the unsaved one is excluded in collection
+mode and visibly restored on exit), truthful storage/network failures and Community card/field
 edits → selective snapshot rendering. They assert controls/content, not an emitted
-event alone. A hidden return control makes its visibility assertion fail. Original
+event alone. A hidden return control makes its visibility assertion fail. The catalog restoration
+assertion also rejects an equivalent retained-filter view that conceals the unsaved row. Original
 observed focus and stale-membership failures are retained in session evidence.
 The fixes preserve the visible menu opener across sheet transitions and rerender
 the saved panel after a committed picker change.

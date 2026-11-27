@@ -166,3 +166,18 @@ class CommitGuardTests(unittest.TestCase):
         result=self.command("pre-push",input=f"refs/heads/dev {tip} refs/heads/dev {self.base}\n")
         self.assertNotEqual(result.returncode,0)
         self.assertIn("Required integration checks not passed",result.stderr)
+
+    def test_native_and_orchestration_changes_require_integration(self):
+        """Native fixtures and the provider orchestrator cannot pass with Complete alone."""
+        for name in ('checks/integration.py', 'tests/native.py', 'tests/test_example_native.py'):
+            with self.subTest(path=name):
+                base = self.git('rev-parse', 'HEAD')
+                path = self.root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('# controlled native boundary\n')
+                tip = self.commit('EGI-140: Change native boundary')
+                (self.root / '.git/check-mode').write_text('integration-only')
+                update = f'refs/heads/checks {tip} refs/heads/checks {base}\n'
+                result = self.command('pre-push', input=update)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('Required integration checks not passed', result.stderr)

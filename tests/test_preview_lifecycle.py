@@ -1,4 +1,5 @@
 """Exercise the public lifecycle command against isolated real web processes."""
+import importlib.util
 import json
 from pathlib import Path
 import shutil
@@ -7,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch, Mock
 
 
 class PreviewLifecycleTests(unittest.TestCase):
@@ -90,3 +92,45 @@ async def app(scope, receive, send):
         self.assertIn('logs', value)
         self.assertNotIn('Traceback', result.stdout)
         self.assertTrue(Path(value['logs']).exists())
+
+    def load_command(self):
+        """Load the copied owning command for fault injection around a real child."""
+        spec = importlib.util.spec_from_file_location('preview_under_test', self.root / 'scripts/preview.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        module.RUNTIME.mkdir(parents=True)
+        return module
+
+    def test_receipt_write_failure_reaps_new_child(self):
+        """A real child cannot outlive failed receipt persistence or source initialization."""
+        module = self.load_command()
+        children = []
+        launch = subprocess.Popen
+        write = Path.write_text
+        def remember(*args, **kwargs):
+            """Retain only the newly acquired child handle for the postcondition."""
+            child = launch(*args, **kwargs)
+            children.append(child)
+            return child
+        def fail_receipt(path, *args, **kwargs):
+            """Inject a storage failure only at the preview ownership receipt."""
+            if path == module.RUNTIME / 'runtime.json':
+                raise OSError('controlled receipt storage failure')
+            return write(path, *args, **kwargs)
+        with patch.object(module.subprocess, 'Popen', side_effect=remember), patch.object(Path, 'write_text', fail_receipt):
+            with self.assertRaisesRegex(OSError, 'controlled receipt'):
+                module.start(self.port, 'fixture:app', 2)
+        self.assertTrue(children)
+        self.assertIsNotNone(children[0].poll())
+        self.assertTrue(module.available(self.port))
+
+    def test_startup_shutdown_timeout_uses_bounded_kill_fallback(self):
+        """A slow owned child is killed and reaped instead of escaping with a timeout."""
+        module = self.load_command()
+        child = Mock()
+        child.poll.return_value = None
+        child.wait.side_effect = [subprocess.TimeoutExpired('preview', 8), 0]
+        module.discard_startup(child)
+        child.terminate.assert_called_once()
+        child.kill.assert_called_once()
+        self.assertEqual(child.wait.call_count, 2)
