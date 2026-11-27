@@ -98,7 +98,50 @@
     "email_action": "Email",
     "social_action": "Social",
     "telegram_action": "Telegram",
-    "menu": "Menu"
+    "menu": "Menu",
+    "map3d": {
+      "label_3d": "3D view",
+      "label_2d": "flat map",
+      "open": "Open the 3D view (reloads the page)",
+      "close": "Back to the flat map (reloads the page)",
+      "unavailable_webgl": "3D view unavailable: this device or browser does not support WebGL2.",
+      "unavailable_data": "3D view unavailable: the city’s 3D data is not ready.",
+      "unavailable_load": "3D view unavailable: loading failed. Try again later.",
+      "rotate_left": "Rotate left",
+      "rotate_right": "Rotate right",
+      "tilt": "Tilt the view",
+      "cluster": "{count} places in this area: zoom in",
+      "look": "Look at the building",
+      "slow": "The 3D view is slow on this device: you can go back to the flat map.",
+      "site_open": "{open}/{total} services open",
+      "hours_unknown": "Hours unavailable",
+      "category_outside": "{category} · outside filters"
+    },
+    "walk": {
+      "action": "Walk there",
+      "reference": "Choose a reference point first.",
+      "loading": "Finding an indicative route…",
+      "no_route": "No walking route found.",
+      "too_far": "Indicative routes are available within 3 km in a straight line.",
+      "summary": "Indicative route · {distance} · about {minutes} min"
+    },
+    "buses": {
+      "toggle": "Live buses",
+      "lines": "Lines (comma-separated)",
+      "all": "All lines",
+      "zoom": "Zoom in to see buses.",
+      "live": "Bus positions updated.",
+      "empty": "No buses in this area for the chosen lines.",
+      "stale": "Bus feed is out of date.",
+      "unavailable": "Live buses unavailable.",
+      "loading": "Loading bus positions…"
+    },
+    "category_orientation": "Orientation",
+    "directions": {
+      "choose": "Get directions",
+      "google": "Open Google Maps",
+      "in_app": "In-app directions · walking"
+    }
   },
   "contribute": {
     "title": "New service",

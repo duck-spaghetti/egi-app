@@ -68,7 +68,9 @@ def create_app(configuration=None, overrides=None):
             response = await call_next(request)
         except Exception as error:
             response = respond(request, 500, 'internal_error', error)
-        response.headers['Cache-Control'] = 'no-store'
+        if not (request.url.path.startswith('/map3d/') and response.status_code in (200, 206)
+                and request.url.path != '/map3d/active'):
+            response.headers['Cache-Control'] = 'no-store'
         response.headers['X-EGI-Data-Status'] = ('approved-canonical-local' if request.app.state.resources.configuration.canonical else 'unreviewed-source-preview')
         return response
     return application
@@ -80,8 +82,10 @@ def mount_selected(application, configuration):
         return
     from .api.pages.router import router as pages
     from .api.address_search.router import router as search
+    from .api.map3d.router import router as map3d
     application.include_router(pages)
     application.include_router(search)
+    application.include_router(map3d)
     if configuration.canonical:
         from .api.directory.router import router as directory
         application.include_router(directory)

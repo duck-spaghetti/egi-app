@@ -1,13 +1,6 @@
 /** Load actual ES Modules unchanged; callers and tests cross the same Imports. */
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-function element(){
- const classes=new Set(),listeners={};
- return {dataset:{},style:{},hidden:false,value:'',innerHTML:'',textContent:'',children:[],isConnected:true,selectedOptions:[],
- classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x),toggle(x,on){if(on??!classes.has(x))classes.add(x);else classes.delete(x);}},
- setAttribute(){},toggleAttribute(){},getClientRects:()=>[{}],addEventListener(name,fn){listeners[name]=fn;},
- querySelector:()=>element(),querySelectorAll:()=>[],append(x){this.children.push(x);},appendChild(x){this.children.push(x);},replaceChildren(){this.children=[];},focus(){},scrollTo(){},contains:()=>true,
- click(){listeners.click?.({target:this});},dispatch(name,event){listeners[name]?.(event);}};
-}
+const {element}=require('./dom_fixture.cjs');
 function environment(extra={}){
  const elements=new Map();const get=id=>{if(!elements.has(id))elements.set(id,element());return elements.get(id);};
  const document={getElementById:get,querySelector:get,querySelectorAll:()=>[],createElement:element,addEventListener(){},documentElement:{},title:''};

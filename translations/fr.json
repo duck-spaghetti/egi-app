@@ -98,7 +98,50 @@
     "email_action": "Email",
     "social_action": "Social",
     "telegram_action": "Telegram",
-    "menu": "Menu"
+    "menu": "Menu",
+    "map3d": {
+      "label_3d": "vue 3D",
+      "label_2d": "carte plane",
+      "open": "Ouvrir la vue 3D (recharge la page)",
+      "close": "Revenir à la carte plane (recharge la page)",
+      "unavailable_webgl": "Vue 3D indisponible : cet appareil ou ce navigateur ne prend pas en charge WebGL2.",
+      "unavailable_data": "Vue 3D indisponible : les données 3D de la ville ne sont pas prêtes.",
+      "unavailable_load": "Vue 3D indisponible : le chargement a échoué. Réessayez plus tard.",
+      "rotate_left": "Tourner à gauche",
+      "rotate_right": "Tourner à droite",
+      "tilt": "Incliner la vue",
+      "cluster": "{count} lieux dans cette zone : zoomer",
+      "look": "Voir le bâtiment",
+      "slow": "La vue 3D est lente sur cet appareil : vous pouvez revenir à la carte plane.",
+      "site_open": "{open}/{total} services ouverts",
+      "hours_unknown": "Horaires indisponibles",
+      "category_outside": "{category} · hors des filtres"
+    },
+    "walk": {
+      "action": "Y aller à pied",
+      "reference": "Choisissez d’abord un point de référence.",
+      "loading": "Calcul du parcours indicatif…",
+      "no_route": "Aucun parcours piéton trouvé.",
+      "too_far": "Les parcours indicatifs sont disponibles dans un rayon de 3 km à vol d’oiseau.",
+      "summary": "Parcours indicatif · {distance} · environ {minutes} min"
+    },
+    "buses": {
+      "toggle": "Bus en temps réel",
+      "lines": "Lignes (séparées par des virgules)",
+      "all": "Toutes les lignes",
+      "zoom": "Rapprochez la carte pour voir les bus.",
+      "live": "Positions des bus actualisées.",
+      "empty": "Aucun bus dans cette zone pour les lignes choisies.",
+      "stale": "Les données des bus sont périmées.",
+      "unavailable": "Bus en temps réel indisponibles.",
+      "loading": "Chargement des positions des bus…"
+    },
+    "category_orientation": "Orientation",
+    "directions": {
+      "choose": "Obtenir un itinéraire",
+      "google": "Ouvrir Google Maps",
+      "in_app": "Itinéraire dans l’application · à pied"
+    }
   },
   "contribute": {
     "title": "Nouveau service",

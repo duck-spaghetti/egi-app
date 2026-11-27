@@ -4,13 +4,15 @@ export function createLoader({context,http,scope,debug=false}) {
 
 
 const managedFetch=http.request;
+// Only concurrent requests share a bundle. Settlement always permits a fresh read.
+const pending=new Map();scope.own?.(()=>pending.clear());
 async function readJson(response){if(!response.ok)throw Error('unavailable');return response.json();}
 async function services(language) {
  const params=new URLSearchParams({area_id:String(context.cityId),language,limit:'5000'});
  if(debug)params.set('include_unplaced','true');
  return readJson(await managedFetch(`${context.apiBase||'/api/preview'}/services?${params}`));
 }
-async function load(language) {
+async function readBundle(language) {
  const base=context.apiBase||'/api/preview';
  const read=path=>managedFetch(`${base}/${path}`).then(readJson);
  const [categories,rows,languages,areas,categoryTranslations,taxonomy]=await Promise.all([
@@ -23,5 +25,11 @@ async function load(language) {
  return {categories,rows,languages,areas,categoryTranslations,taxonomy};
 }
 
+function load(language) {
+ scope.check();
+ if(pending.has(language))return pending.get(language);
+ const request=readBundle(language).finally(()=>{if(pending.get(language)===request)pending.delete(language);});
+ pending.set(language,request);return request;
+}
 return {load,services};
 }

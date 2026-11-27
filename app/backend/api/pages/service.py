@@ -7,9 +7,9 @@ from .schemas import Health, PageSelection
 
 class Pages:
     """Hide mode-specific bootstrap preparation from HTML routes."""
-    def __init__(self, configuration, reader, source):
+    def __init__(self, configuration, reader, source, map3d=None):
         """Accept only resources selected by application composition."""
-        self.configuration, self.reader, self.source = configuration, reader, source
+        self.configuration, self.reader, self.source, self.map3d = configuration, reader, source, map3d
 
     def entry(self):
         """Return safe initial page values without a database read."""
@@ -29,7 +29,8 @@ class Pages:
             center_lat=public['center'][1], center_lng=public['center'][0], default_zoom=public['zoom'],
             bbox_north=north, bbox_south=south, bbox_east=east, bbox_west=west)
         return {**self.entry(), 'city': city, 'language': SimpleNamespace(**language),
-                'lang': language['code'], 'local_layers': cfg.local_layers if cfg.canonical else True, 'profile': public}
+                'lang': language['code'], 'local_layers': cfg.local_layers if cfg.canonical else True, 'profile': public,
+                'map3d': self.map3d.summary() if self.map3d else None}
 
     def health(self):
         """Report the selected store without consulting the other reader."""

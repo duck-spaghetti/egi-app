@@ -98,7 +98,50 @@
     "email_action": "Email",
     "social_action": "Social",
     "telegram_action": "Telegram",
-    "menu": "Menu"
+    "menu": "Menu",
+    "map3d": {
+      "label_3d": "vista 3D",
+      "label_2d": "mappa piana",
+      "open": "Apri la vista 3D (ricarica la pagina)",
+      "close": "Torna alla mappa piana (ricarica la pagina)",
+      "unavailable_webgl": "Vista 3D non disponibile: questo dispositivo o browser non supporta WebGL2.",
+      "unavailable_data": "Vista 3D non disponibile: i dati 3D della città non sono pronti.",
+      "unavailable_load": "Vista 3D non disponibile: caricamento non riuscito. Riprova più tardi.",
+      "rotate_left": "Ruota a sinistra",
+      "rotate_right": "Ruota a destra",
+      "tilt": "Inclina la vista",
+      "cluster": "{count} luoghi in quest'area: avvicina",
+      "look": "Guarda l'edificio",
+      "slow": "La vista 3D è lenta su questo dispositivo: puoi tornare alla mappa piana.",
+      "site_open": "{open}/{total} servizi aperti",
+      "hours_unknown": "Orario non disponibile",
+      "category_outside": "{category} · fuori dai filtri"
+    },
+    "walk": {
+      "action": "Vai a piedi",
+      "reference": "Scegli prima un punto di riferimento.",
+      "loading": "Calcolo il percorso indicativo…",
+      "no_route": "Nessun percorso pedonale trovato.",
+      "too_far": "Il percorso indicativo è disponibile entro 3 km in linea d’aria.",
+      "summary": "Percorso indicativo · {distance} · circa {minutes} min"
+    },
+    "buses": {
+      "toggle": "Bus in tempo reale",
+      "lines": "Linee (separate da virgole)",
+      "all": "Tutte le linee",
+      "zoom": "Avvicina per vedere i bus.",
+      "live": "Posizioni dei bus aggiornate.",
+      "empty": "Nessun bus in questa zona per le linee scelte.",
+      "stale": "Dati dei bus non aggiornati.",
+      "unavailable": "Bus in tempo reale non disponibili.",
+      "loading": "Carico le posizioni dei bus…"
+    },
+    "category_orientation": "Orientamento",
+    "directions": {
+      "choose": "Ottieni indicazioni",
+      "google": "Apri Google Maps",
+      "in_app": "Indicazioni in app · a piedi"
+    }
   },
   "contribute": {
     "title": "Nuovo servizio",

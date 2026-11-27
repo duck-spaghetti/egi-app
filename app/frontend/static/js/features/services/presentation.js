@@ -7,6 +7,15 @@ function t(key, params = {}, fallback = "") {
   return translate(key, params, fallback);
 }
 
+/** UI-only category choices; source taxonomy and stored labels remain unchanged. */
+function displayCategory(category) {
+ if(!category)return category;
+ const known=new Set(['mangiare','dormire','lavarsi','vestiti_coperte','multiservizi','salute','violenza','orientamento','documenti_diritti','istruzione','lavoro']);
+ return {...category,
+  label:category.slug==='orientamento'?t('map.category_orientation',{},'Orientamento'):category.label,
+  icon_path:known.has(category.slug)?`/static/assets/icons/categories/${category.slug}.svg`:category.icon_path};
+}
+
 function normalizeExternalHref(value) {
   const raw = String(value || "").trim();
   if (!raw) return null;
@@ -122,7 +131,7 @@ function applyCategoryLabels(categories) {
     ) || snapshot().categoryTranslations.find((item) => item.category_id === category.id);
     return {
       ...category,
-      label: translation?.label || category.label || category.slug,
+      ...displayCategory({...category,label:translation?.label || category.label || category.slug}),
     };
   });
 }
@@ -320,7 +329,7 @@ function renderServiceBar(poi) {
   const label={phone:"Chiama",email:"Scrivi",website:"Sito web"};
   const buttons=[
     reach ? `<a class="service-bar-btn primary ${reach.kind}" href="${escapeHtml(reach.href)}"${reach.external ? ' target="_blank" rel="noopener noreferrer"' : ""}><span class="contact-action-icon">${contactActionIcon(reach)}</span>${label[reach.kind]}</a>` : "",
-    go ? `<a class="service-bar-btn${reach ? "" : " primary"}" href="${escapeHtml(go.href)}" target="_blank" rel="noopener noreferrer"><span class="contact-action-icon">${contactActionIcon(go)}</span>Indicazioni</a>` : "",
+    go ? `<details class="service-directions"><summary class="service-bar-btn${reach ? "" : " primary"}"><span class="contact-action-icon">${contactActionIcon(go)}</span>${escapeHtml(t('map.directions.choose',{},'Ottieni indicazioni'))}</summary><div class="service-directions-options"><a href="${escapeHtml(go.href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(t('map.directions.google',{},'Apri Google Maps'))}</a><button type="button" data-walk-in-app${Number.isFinite(poi.latitude)&&Number.isFinite(poi.longitude)&&(context.view?.mode==='3d'||context.view?.available)?'':' disabled'}>${escapeHtml(t('map.directions.in_app',{},'Indicazioni in app · a piedi'))}</button></div></details>` : "",
   ].filter(Boolean);
   return buttons.join("");
 }
@@ -564,7 +573,7 @@ function serviceButton(poi, matches = true) {
 }
 
 function categoryBadge(category) {
-  const c=category || {};
+  const c=displayCategory(category) || {};
   const url=normalizeCategoryIconPath(c.icon_path);
   return `<span class="category-badge" style="background:${escapeHtml(c.color || "#555")}">${url?`<img src="${escapeHtml(url)}" alt="">`:""}<span>${escapeHtml(categoryCaption(c.label || c.slug))}</span></span>`;
 }
@@ -590,11 +599,16 @@ function renderCanonicalSources(poi) {
 }
 
 /** Refresh canonical opening results while retaining the visitor's filters and selection. */
+/** Calendar key for the current day in the service territory's timezone. */
+function localDayKey(now=new Date()) {
+ const day=new Intl.DateTimeFormat('en-GB',{timeZone:context.profile?.timezone||'UTC',weekday:'short'}).format(now);
+ return ['lun','mar','mer','gio','ven','sab','dom'][['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].indexOf(day)];
+}
+
 function todayHours(display, now=new Date()) {
   const structured=display?.days?.some(d=>d.intervals?.length);
   if (!structured) return display?.raw_text || display?.scoped?.length ? "Orari indicati come testo" : "";
-  const day=new Intl.DateTimeFormat("en-GB",{timeZone:context.profile?.timezone || "UTC",weekday:"short"}).format(now);
-  const key=["lun","mar","mer","gio","ven","sab","dom"][["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].indexOf(day)];
+  const key=localDayKey(now);
   const today=display.days.find(d=>d.day===key);
   return today?.intervals?.length ? `Oggi ${today.intervals.map(i=>i.label).join(", ")}` : "";  // closed today: the status says it
 }
@@ -611,7 +625,7 @@ function renderCourseHours(raw) {
   const enrol=raw.enrolment;
   const enrolState=enrol?.state==="aperte" ? "Iscrizioni aperte" : enrol?.state==="chiuse" ? "Iscrizioni chiuse" : "";
   // Week table like the other cards (r2): each lesson time with its levels as labels.
-  const week=display.kind==="lessons" ? `<div class="source-week lesson-week">${display.days.map(day=>`<div class="source-day"><strong>${escapeHtml(day.label)}</strong><span>${day.intervals.length ? day.intervals.map(v=>`<span class="lesson-slot"><span>${escapeHtml(v.label)}</span>${(v.levels || []).map(l=>`<span class="level-chip">${escapeHtml(l)}</span>`).join("")}</span>`).join("") : '<span class="unknown-value">Nessuna lezione</span>'}</span></div>`).join("")}</div>` : "";
+  const week=display.kind==="lessons" ? `<div class="source-week lesson-week">${display.days.map(day=>`<div class="source-day" data-calendar-day="${day.day}" data-today="${day.day===localDayKey()}"><strong>${escapeHtml(day.label)}</strong><span>${day.intervals.length ? day.intervals.map(v=>`<span class="lesson-slot"><span>${escapeHtml(v.label)}</span>${(v.levels || []).map(l=>`<span class="level-chip">${escapeHtml(l)}</span>`).join("")}</span>`).join("") : '<span class="unknown-value">Nessuna lezione</span>'}</span></div>`).join("")}</div>` : "";
   const notes=(display.courses || []).filter(c=>c.note || c.flags.length || !c.sessions.length).map(c=>`<li><span class="level-chip">${escapeHtml(c.level)}</span> ${escapeHtml([c.note, ...c.flags, c.sessions.length ? "" : "orario non indicato"].filter(Boolean).join(" · "))}</li>`).join("");
   return `${week ? `<h4>Orari delle lezioni</h4>${week}` : ""}${notes ? `<h4>Note dei corsi</h4><ul class="course-notes">${notes}</ul>` : ""}
     ${display.kind==="office" && display.cpia ? "<p>Iscrizioni e informazioni in segreteria.</p>" : ""}
@@ -655,7 +669,7 @@ function renderSourceHours(display) {
   if ("raw_text" in display) return `<p class="source-note">${escapeHtml(display.note)}</p>${display.raw_text?`<p class="source-hours-text">${escapeHtml(display.raw_text)}</p>`:""}`;
   // Days without hours are closed when the source declares other days (user, 2026-11-15).
   const empty=display.days.some(d=>d.intervals.length) ? '<span class="unknown-value">Chiuso</span>' : '<span class="unknown-value">Non indicato</span>';
-  return `${display.note ? `<p class="source-note">${escapeHtml(display.note)}</p>` : ""}<div class="source-week">${display.days.map(day=>`<div class="source-day"><strong>${escapeHtml(day.label)}</strong><span>${day.intervals.length ? day.intervals.map(v=>`<span>${escapeHtml(v.label)}${v.review_note ? ` <small>${escapeHtml(v.review_note)}</small>`:""}</span>`).join("<br>") : empty}${day.issues.length && !day.intervals.length ? `<small>${escapeHtml(day.issues.join("; "))}</small>`:""}</span></div>`).join("")}</div>${(display.warnings || []).map(w=>`<p class="source-note">${escapeHtml(w)}</p>`).join("")}`;
+  return `${display.note ? `<p class="source-note">${escapeHtml(display.note)}</p>` : ""}<div class="source-week">${display.days.map(day=>`<div class="source-day" data-calendar-day="${day.day}" data-today="${day.day===localDayKey()}"><strong>${escapeHtml(day.label)}</strong><span>${day.intervals.length ? day.intervals.map(v=>`<span>${escapeHtml(v.label)}${v.review_note ? ` <small>${escapeHtml(v.review_note)}</small>`:""}</span>`).join("<br>") : empty}${day.issues.length && !day.intervals.length ? `<small>${escapeHtml(day.issues.join("; "))}</small>`:""}</span></div>`).join("")}</div>${(display.warnings || []).map(w=>`<p class="source-note">${escapeHtml(w)}</p>`).join("")}`;
 }
 
 function nextLesson(display, now = new Date()) {
@@ -710,7 +724,7 @@ function sourceOpeningStatus(display, now = new Date()) {
   if (active && active[1]===1440) return {kind:"open",label:"Aperto ora",note:unknown.note};  // continues past midnight
   if (active) {
     const remaining=active[1]-minute;
-    return {kind:remaining<=60 ? "closing" : "open",label:remaining<=60?`Aperto ora · chiude alle ${String(Math.floor(active[1]/60)).padStart(2,"0")}:${String(active[1]%60).padStart(2,"0")}`:"Aperto ora",note:unknown.note};
+    return {kind:remaining<=60 ? "closing" : "open",label:`Aperto ora · chiude alle ${String(Math.floor(active[1]/60)).padStart(2,"0")}:${String(active[1]%60).padStart(2,"0")}`,note:unknown.note};
   }
   const upcoming=merged.find(([a])=>a>minute);
   if (upcoming) return {kind:"closed",label:`Chiuso ora · apre oggi alle ${String(Math.floor(upcoming[0]/60)).padStart(2,"0")}:${String(upcoming[0]%60).padStart(2,"0")}`,note:unknown.note};
@@ -732,20 +746,47 @@ function hoursVerification(display){
   return check?.outcome==="confirmed" && check.warning!=="review_due" ? check : null;
 }
 
+const openingFormats=new Map();
+/** Reuse formatters per schedule timezone across service refreshes. */
+function openingFormatters(timezone){
+ if(!openingFormats.has(timezone))openingFormats.set(timezone,{
+  civil:new Intl.DateTimeFormat('en-CA',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit'}),
+  day:new Intl.DateTimeFormat('it-IT',{timeZone:timezone,weekday:'long',day:'numeric',month:'numeric'}),
+  time:new Intl.DateTimeFormat('it-IT',{timeZone:timezone,hour:'2-digit',minute:'2-digit'})});
+ return openingFormats.get(timezone);
+}
+
+/** Format a known future boundary in the territory's civil day, including overnight/DST. */
+function openingBoundary(value,now,timezone){
+  const instant=value?new Date(value):null;
+  if(!instant||!Number.isFinite(instant.getTime())||instant<=now)return '';
+  const formats=openingFormatters(timezone);
+  const dateKey=date=>formats.civil.formatToParts(date)
+    .filter(p=>['year','month','day'].includes(p.type)).reduce((parts,p)=>({...parts,[p.type]:p.value}),{});
+  const civil=date=>{const p=dateKey(date);return Date.UTC(Number(p.year),Number(p.month)-1,Number(p.day));};
+  const days=Math.round((civil(instant)-civil(now))/86400000);
+  const day=days===0?'':days===1?'domani ':formats.day.format(instant)+' ';
+  return `${day}alle ${formats.time.format(instant)}`;
+}
+
 function canonicalOpeningStatus(display, now = new Date()) {
   const opening=display.canonical_opening || {};
   const check=hoursVerification(display);
-  const hint=check ? "" : " · da verificare";
+  const verificationLabel="";
   const note=check ? `Verifica registrata il ${String(check.checked_at).slice(0,10)}. Non è disponibilità in tempo reale.` : "Orari interpretati come verosimilmente completi, in attesa di verifica. Contatta il servizio per conferma.";
   const transition=opening.next_transition_at ? new Date(opening.next_transition_at) : null;
-  if (transition && transition.getTime()<=now.getTime()) return {kind:"unknown",label:"Aggiornamento degli orari in corso",note};
+  if (transition && transition.getTime()<=now.getTime()) return {verificationLabel,kind:"unknown",label:"Aggiornamento degli orari in corso",note};
   if (opening.status==="open") {
     const closes=opening.closes_at ? new Date(opening.closes_at) : null;
     const closing=closes && closes.getTime()>now.getTime() && closes.getTime()-now.getTime()<=3600000;
-    return {kind:closing?"closing":"open",label:closing ? `Aperto${hint} · chiude alle ${new Intl.DateTimeFormat("it-IT",{timeZone:opening.timezone || context.profile?.timezone || "UTC",hour:"2-digit",minute:"2-digit"}).format(closes)}` : `Aperto${hint}`,note};
+    const boundary=openingBoundary(opening.closes_at,now,opening.timezone || context.profile?.timezone || 'UTC');
+    return {verificationLabel,kind:closing?'closing':'open',label:`Aperto${boundary?` · chiude ${boundary}`:''}`,note};
   }
-  if (opening.status==="closed") return {kind:"closed",label:`Chiuso${hint}`,note};
-  return {kind:"unknown",label:"Orario da verificare",note};
+  if (opening.status==='closed') {
+    const boundary=opening.next_status==='open'?openingBoundary(opening.next_transition_at,now,opening.timezone || context.profile?.timezone || 'UTC'):'';
+    return {verificationLabel,kind:'closed',label:`Chiuso${boundary?` · apre ${boundary}`:''}`,note};
+  }
+  return {verificationLabel,kind:"unknown",label:"Orario non disponibile",note};
 }
 
 /** Show selected canonical conditions and preserve each supplementary field's source. */
@@ -755,13 +796,13 @@ function renderCanonicalHours(poi) {
   const rows=days.map(day=>{
     const intervals=(day.intervals || []).map(interval=>escapeHtml(interval.label)).join("<br>");
     const label=intervals || (day.state==="closed" ? `Chiuso${hoursVerification(poi.raw?.hours_display) ? "" : " · da verificare"}` : "Da verificare");
-    return `<tr><th scope="row">${escapeHtml(day.label)}</th><td>${label}</td></tr>`;
+    return `<tr><th scope="row" data-calendar-day="${escapeHtml(day.day)}"${day.day===localDayKey()?' aria-current="date"':''}>${escapeHtml(day.label)}</th><td>${label}</td></tr>`;
   }).join("");
   return `<section class="detail-section service-section" id="sec-orari"><h3>Orari dichiarati</h3><table class="hours-table"><tbody>${rows}</tbody></table><p class="service-advice">Calendario interpretato come completo, in attesa di verifica. Giorni e fasce incerti restano da verificare. Le fasce notturne proseguono nel giorno seguente; eccezioni e variazioni possono prevalere.</p></section>`;
 }
 
 function resolveCategory(poi) {
- return snapshot().categories.find(c=>c.id===poi.category_id)||normalizeEmbeddedCategory(poi.category)||null;
+ return displayCategory(snapshot().categories.find(c=>c.id===poi.category_id)||normalizeEmbeddedCategory(poi.category)||null);
 }
 function describe(poi, now=new Date()) {
  return {title:serviceTitle(poi),kind:serviceKind(poi),organiser:serviceOrganiser(poi),
@@ -770,5 +811,5 @@ function describe(poi, now=new Date()) {
   status:sourceOpeningStatus(poi.raw?.hours_display,now),today:todayHours(poi.raw?.hours_display,now)};
 }
 
-return {describe,normalizePublicService,normalizeArea,normalizeCategory,mergeServiceCategories,applyCategoryLabels,normalizeCategoryIconPath,resolveCategory,categoryBadge,serviceTitle,serviceKind,serviceOrganiser,sourceNames,formatDistance,sourceOpeningStatus,todayHours,renderServiceHeader,renderInfoSection,renderHoursSection,renderContactsSection,renderSourcesSection,renderServiceBar,serviceButton,SERVICE_SECTIONS,escapeHtml,t};
+return {localDayKey,displayCategory,describe,normalizePublicService,normalizeArea,normalizeCategory,mergeServiceCategories,applyCategoryLabels,normalizeCategoryIconPath,resolveCategory,categoryBadge,serviceTitle,serviceKind,serviceOrganiser,sourceNames,formatDistance,sourceOpeningStatus,todayHours,renderServiceHeader,renderInfoSection,renderHoursSection,renderContactsSection,renderSourcesSection,renderServiceBar,serviceButton,SERVICE_SECTIONS,escapeHtml,t};
 }

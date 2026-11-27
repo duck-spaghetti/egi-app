@@ -184,3 +184,47 @@
 .nearest-stop-lines { display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px; }
 
 .nearest-stop-link { font-size:13px;color:#266044;margin-top:6px !important; }
+
+/* Names are optional annotations; the original symbol remains the clickable target. */
+.tl-stop-name { position:absolute;display:block;box-sizing:border-box;height:24px;padding:3px 6px;border:1px solid #fff;border-radius:6px;background:#fffdf5f5;color:#243239;box-shadow:0 1px 4px #0002;font:600 12px/16px system-ui;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;text-align:start; }
+.tl-stop-name[hidden] { display:none; }
+
+/* At close zoom the foot, rather than an offset glyph, marks the source coordinate. */
+.tl-point-detail { overflow:visible;appearance:none;width:0!important;height:0!important;min-width:0;min-height:0;padding:0;line-height:0; }
+.tl-anchored { position:relative;display:block;width:0;height:0; }
+.tl-anchored>.tl-station,.tl-anchored>.tl-stop { position:absolute;left:0;top:-18px;transform:translate(-50%,-100%); }
+.tl-stem { position:absolute;left:-1px;top:-18px;width:2px;height:18px;background:#3d4a5c99; }
+.tl-ground { position:absolute;left:-3px;top:-3px;width:6px;height:6px;box-sizing:border-box;border:1px solid white;border-radius:50%;background:#3d4a5c; }
+.tl-point-detail:focus-visible .tl-station,.tl-point-detail:focus-visible .tl-stop { outline:3px solid #0570b5;outline-offset:3px; }
+
+/* Close-only Roman-inspired paline: yellow stop board/red cap, red metro M.
+   CSS faces reuse existing glyphs; no model, texture fetch or per-frame work. */
+.tl-palina-anchor>.tl-palina { top:-28px;opacity:1; }
+.tl-palina-anchor>.tl-stem { top:-28px;height:28px;width:3px;left:-1.5px;background:linear-gradient(90deg,#612329,#983b40 55%,#612329); }
+.tl-palina-anchor:has(.tl-palina-metro)>.tl-stem { background:linear-gradient(90deg,#303536,#657071 55%,#303536); }
+.tl-anchored>.tl-palina-bus,.tl-anchored>.tl-palina-tram { display:flex;flex-direction:column;justify-content:flex-start;width:26px;height:36px;box-sizing:border-box;padding:0;border:1px solid #a4761e;border-radius:9px 9px 2px 2px;background:#f5d66c;color:#332f28;gap:0;box-shadow:2px 1px 0 #9a702d,0 2px 4px #0003; }
+.tl-palina-cap { display:block;flex:none;width:100%;height:7px;background:#a62d35;border-radius:7px 7px 0 0; }
+.tl-palina-mode { display:grid;place-items:center;height:17px;width:100%;font:800 14px/17px system-ui; }
+.tl-palina-mode svg { width:14px;height:14px; }
+.tl-palina-board { display:block;width:16px;height:7px;border-top:1px solid #9b813e;background:repeating-linear-gradient(0deg,transparent 0 2px,#9b813e 2px 3px);opacity:.65; }
+.tl-anchored>.tl-palina-metro { display:inline-flex;flex-direction:column;gap:3px;min-width:28px;padding:0;border-radius:2px;background:transparent;box-shadow:none; }
+.tl-palina-metro>.tl-roundel { width:28px;height:26px;border-radius:1px;background:#c4161c;font:900 22px/1 system-ui;box-shadow:2px 1px 0 #791a20,0 2px 4px #0003; }
+.tl-palina-metro>.tl-codes { gap:2px; }
+.tl-palina-metro .tl-chip { min-width:13px;height:14px;padding:0 2px;border-radius:2px;font-size:9px; }
+.tl-anchored>.tl-palina.tl-near { outline:2px solid #ffcd20;outline-offset:3px; }
+
+/* Crossfade over one continuous zoom level; the maximum sign + pole is ~42px. */
+.tl-compact { display:block;width:0;height:0;opacity:calc(1 - var(--tl-progress,0));transition:opacity .18s linear; }
+.tl-palina-metro-anchor { --tl-progress:var(--tl-metro-progress,0);--tl-scale:var(--tl-metro-scale,.32); }
+.tl-palina-road-anchor { --tl-progress:var(--tl-road-progress,0);--tl-scale:var(--tl-road-scale,.32); }
+.tl-palina-anchor { opacity:var(--tl-progress,0);transform:scale(var(--tl-scale,.32));transform-origin:0 0;transition:opacity .18s linear; }
+@media(prefers-reduced-motion:reduce) { .tl-compact,.tl-palina-anchor { transition:none; } }
+
+@starting-style { .tl-palina-anchor { opacity:0; } }
+
+/* Retain readable, clickable transport overlays even when native signs are behind buildings. */
+.tl-native-stop { pointer-events:none; }
+.tl-native-stop .tl-compact { opacity:1;pointer-events:auto;transition:none; }
+.tl-native-stop:focus-visible .tl-compact { opacity:1;outline:3px solid #0570b5;outline-offset:3px; }
+
+.tl-stop-count { position:absolute;top:-16px;left:5px;min-width:12px;padding:1px 3px;border-radius:8px;background:#fff;color:#243239;box-shadow:0 1px 3px #0004;font:700 9px/12px system-ui; }

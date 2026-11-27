@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse
 from .dependencies import owner
 from .service import Transport
-from .schemas import Origin, TransportViewport
+from .schemas import Origin, TransportViewport, VehicleViewport
 router = APIRouter()
 
 @router.post('/api/preview/transport')
@@ -34,3 +34,15 @@ def transit_origin(body: Origin, owner: Transport=Depends(owner)):
 def transit_departures(stops: str=Query(min_length=1, max_length=2000), routes: str | None=Query(default=None, max_length=2000), limit: int=Query(default=3, ge=1, le=10), owner: Transport=Depends(owner)):
     """Next scheduled departures at stops (comma-separated stop_ids, at most 40)."""
     return owner.transit_departures(stops, routes, limit)
+
+
+@router.post('/api/preview/transit/vehicles')
+def transit_vehicles(body: VehicleViewport, request: Request):
+    """Read latest positions without a database dependency, request log or persistent state."""
+    cfg = request.app.state.resources.configuration
+    west, south, east, north = cfg.policy.search_extent
+    if not (west <= body.west < body.east <= east and south <= body.south < body.north <= north):
+        from .exceptions import TransportError
+        raise TransportError(422, code='invalid_request')
+    from .vehicles import positions
+    return positions(cfg.transport_roots[0], (body.west, body.south, body.east, body.north), body.lines)

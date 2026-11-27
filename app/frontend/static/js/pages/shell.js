@@ -16,7 +16,7 @@ const suggestions=document.getElementById("suggestions");
 const toast=document.getElementById("toast");
 const settingsBackHead=document.getElementById("settings-back-head");
 const t=i18n.t;
-const {refresh,renderFilters,renderSearchOptions,resetFilters,chooseReferencePoint,geocodeAddress,loadOriginTransit,locateUser}=actions;
+const {refresh,renderFilters,resetFilters,chooseReferencePoint,geocodeAddress,loadOriginTransit,locateUser}=actions;
 
 function bindUi() {
   document.getElementById("open-now-filter").addEventListener("change",event=>{state.filters.openNow=event.target.checked; refresh();}, {signal: scope.signal});
@@ -24,7 +24,6 @@ function bindUi() {
   for (const [id,key] of [["source-filter","source"],["issue-filter","issue"],["access-filter","access"],["audience-filter","audience"],["section-filter","section"],["sort-services","order"]]) {
     document.getElementById(id).addEventListener("change",event=>{
       state.filters[key]=event.target.value;
-      if (key==="source") renderSearchOptions();
       if (key==="order" && event.target.value==="distance" && !state.userLoc) openSheet("sheet-location");
       refresh();
     }, {signal: scope.signal});
@@ -45,14 +44,13 @@ function bindUi() {
     document.getElementById("service-query").value="";
     document.getElementById("open-now-filter").checked=false;
     renderFilters(); closeSheets();
-    if (state.view!=="list") toggleView();
-    refresh();
+    if (state.view!=="list") toggleView();else refresh();
   }, {signal: scope.signal});
   document.getElementById("origin-transit").addEventListener("toggle", event => {
     if (event.target.open) void loadOriginTransit();
   }, {signal: scope.signal});
   document.addEventListener("keydown", event => {
-    if (event.key==="Escape") closeSheets();
+    if (event.key==="Escape") dismissSheets();
     if (event.key!=="Tab") return;
     const sheet=document.querySelector(".sheet.shown");
     if (!sheet) return;
@@ -78,11 +76,11 @@ function bindUi() {
     button.addEventListener("click", () => openSheet(`sheet-${button.dataset.sheetOpen}`), {signal: scope.signal});
   });
   document.querySelectorAll("[data-close]").forEach((button) => {
-    button.addEventListener("click", closeSheets, {signal: scope.signal});
+    button.addEventListener("click", dismissSheets, {signal: scope.signal});
   });
-  backdrop.addEventListener("click", closeSheets, {signal: scope.signal});
+  backdrop.addEventListener("click", dismissSheets, {signal: scope.signal});
 
-  viewToggle.addEventListener("click", toggleView, {signal: scope.signal});
+  viewToggle.addEventListener("click", ()=>{emit("cancelReference");toggleView();}, {signal: scope.signal});
   updateViewToggle();
   document.getElementById("reset-filters").addEventListener("click", resetFilters, {signal: scope.signal});
   document.getElementById("filters-search").addEventListener("click", () => {
@@ -115,6 +113,9 @@ function openSheet(id) {
   if (id === "sheet-settings") document.querySelector('[data-sheet="settings"]').classList.add("active");
 }
 
+/** User dismissal abandons reference selection; programmatic sheet changes keep it. */
+function dismissSheets() {emit('cancelReference');closeSheets();}
+
 function closeSheets() {
   document.querySelectorAll(".sheet").forEach((sheet) => sheet.classList.remove("shown"));
   backdrop.classList.remove("shown");
@@ -130,6 +131,7 @@ function toggleView() {
   updateViewToggle();
   syncFilterLayout();
   closeSheets();
+  emit("refresh");
   if (state.view === "map") requestAnimationFrame(() => emit("invalidateMap"));
 }
 
@@ -159,7 +161,6 @@ function renderLanguageList() {
     button.className = `pill${state.lang === code ? " active" : ""}`;
     button.textContent = code.toUpperCase();
     button.addEventListener("click", () => {
-      state.lang = code;
       emit("language",{language:code});
     }, {signal: scope.signal});
     wrap.append(button);

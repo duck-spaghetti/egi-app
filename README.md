@@ -78,6 +78,28 @@ rail and cycle runtime paths (`EGI_TRANSPORT_ROOT`, `EGI_RAIL_ROOT`,
 canonical reads; the preview store is not consulted. These layers do not select
 public-launch transport or authorize fresh acquisition/job changes.
 
+The optional 3D mode of the map reads the 3D data set built by
+`../egi-importer/scripts/map3d.py` (format in `../egi-importer/docs/map3d/`). `EGI_MAP3D_ROOT`
+(default `.local/map3d` in the workspace) is its runtime root: the app reads
+`active.json` and serves only the active version's listed files at
+`/map3d/<version>/<path>`, with HTTP Range (PMTiles) and a one-year immutable cache;
+`/map3d/active` reports availability. A missing or invalid active version disables the
+3D mode; the current map is unaffected. The "3D" map control reloads the page with
+`?vista=3d` (back with `?vista=2d`); without WebGL2 or an active version it is disabled
+and explains why. Filters, search text and reference point cross the switch in
+sessionStorage only. While moving the 3D map, the page measures frames per second (and JS
+memory where the browser reports it); below 30 fps or above 150 MB over three moves, the 3D
+control shows a warning and a one-time message, and stays usable.
+
+Ordinary buildings use the same muted terracotta family in plan, aggregate blocks
+and detailed parts. Volumes are opaque, with their height providing the gradual
+appearance; the underlying 2D building fill fades away by z15.5. Ordinary walls
+omit the extra vertical gradient while retaining directional illumination.
+Monument/tall-building classifications retain their distinct colors.
+Detailed volumes no longer draw a second roof extrusion; the shared
+building vector source, geometry heights and loading contract are unchanged.
+See [R1 rendering verification](docs/r1-rendering.md) for measured costs and limits.
+
 For native verification set `EGI_DATABASE_REPO` to the explicit database worktree,
 `EGI_SQITCH` to Sqitch and, if necessary, `PERL5LIB` to its local runtime library.
 Use the A3 Python environment for `python -m unittest discover -s tests -v` and run
@@ -111,7 +133,9 @@ B1 (workspace plan `.scratch/mvp/b1-plan.md`) keeps the A3 behavior and changes:
   Launch with `--no-access-log`.
 - **Geocoder cache.** Process memory only, HMAC-keyed with a random per-process key
   and provider/profile scope, 300 s TTL, at most 128 entries.
-- **Local assets.** Leaflet 1.9.4, Leaflet.markercluster 1.5.3 and the Fraunces/IBM
+- **Local assets.** Leaflet 1.9.4, Leaflet.markercluster 1.5.3, MapLibre GL JS 6.19.0
+  (ES module and worker, BSD-3-Clause), the PMTiles reader 4.3.0 (BSD-3-Clause, licence
+  stated in its `package.json`; loaded only by the 3D mode) and the Fraunces/IBM
   Plex typefaces are served from `/static/vendor/` and `/static/fonts/` with their
   licences and `static/vendor/manifest.json` integrity hashes; no CDN or Google
   Fonts request remains. Map tiles and an explicit address search still contact
@@ -718,3 +742,178 @@ The app also reads `web_pages` and `document` sources from the importer:
 
 Services without an address-based position stay hidden from the map and list, as for the
 other sources (`?debug=1` shows them).
+
+## Live vehicle positions (M2, local 3D mode)
+
+`POST /api/preview/transit/vehicles` reads `<EGI_TRANSPORT_ROOT>/realtime/vehicles.json`
+(`egi-vehicles/1`, provided by the importer). JSON body: `west`, `south`, `east`,
+`north`, optional `lines` (up to 80 line codes, each at most 32 characters).
+The viewport must lie within the configured search extent and be no wider or
+higher than 0.15 degrees. The response includes `availability`, `stale`,
+`feed_timestamp`, server `now`, compact `vehicles` with vehicle `age` in seconds
+(or null), `licence: CC BY-SA` and `attribution: Roma Mobilità`.
+Both acquisition and publisher timestamps must be within 180 seconds; a stale
+snapshot returns no vehicles. Missing/corrupt snapshots are unavailable. The
+endpoint reads files only, never calls a database or upstream feed, retains no
+request state and puts area/line selections only in the POST body, never the URL.
+Access logging remains disabled and responses use `Cache-Control: no-store`.
+The assumed vehicle licence/version must be re-verified before launch.
+
+### Indicative walking routes
+
+A located service's sheet offers **Get directions**, with a choice of Google Maps
+or the in-app walking route. The latter uses 3D; choosing it from the flat map
+carries the service/reference into 3D in this tab. Without a reference point it opens
+the existing reference-choice flow, then continues the requested walk. Routing reads z15 roads from
+the active local basemap, excludes highways/rail/ferries, repairs simplified tile
+junctions and limits straight-line distance to 3 km. Snapping to the main connected
+network is capped at 100 m; absent coverage yields an explicit no-route message.
+The device computes distance and time at 4.5 km/h. This is an indicative route,
+without verified crossings, stairs/accessibility or turn-by-turn instructions.
+The camera shows the whole route top-down, oriented from start at the bottom,
+then paints the line. Reduced motion shows it immediately; Escape cancels and
+clears it. Reference points stay on the device, never in a request to a router.
+Vendored vector-tile 2.0.3, pbf 4.0.1 and vector-tile's required point-geometry
+1.1.0 are checked against npm SHA512 and the vendor manifest's file SHA256.
+The vector-tile bare point-geometry import alone is rewritten to a relative import.
+
+### Live buses in 3D
+
+The keyboard-operable **Live buses** control is inside **Layers**, off initially. It polls the local
+vehicles endpoint every 20 seconds only while enabled, the page is visible and
+MapLibre zoom is at least 15. Area/line selections travel only in POST bodies.
+Comma-separated line codes restrict the viewed area. Vehicles use deliberately enlarged 18 × 4 × 4.8 m
+yellow map symbols, oriented by supplied bearing or observed movement; labels start at
+zoom 16. Snapshots interpolate for one second without extrapolation. Reduced motion
+updates immediately. Positions older than 120 seconds (or with unknown age) fade;
+a feed older than 180 seconds is cleared and announced, including while waiting
+for a slow response. Turning off, hiding the page and disposal cancel requests and
+timers. Unchanged geometry is not resubmitted, and fresh buses remain visible during
+a viewport refresh. Roma Mobilità / CC BY-SA remains in the map attribution.
+
+M2 remains a local candidate: the user deferred Catalan support and legal-notice
+updates; those five-language/notice criteria are explicitly unsatisfied. M1 phone
+acceptance remains pending. This feature does not install offline/PWA caching;
+walking works on locally available basemap tiles and never calls an external router.
+
+### Local M2 map review
+
+3D starts at 45° pitch. Layers and the view switch share a toolbar. Screen-space
+clusters merge neighbours across cells, with translucent teal symbols sized and
+shaded by site count. At z14 service pins gain ground stems and an integrated label with name, category
+icons and existing opening-status text/dots, when space permits. Clusters end at z15.
+For sites with one category the label shows the card's service type below the
+name instead of repeating the category icon. Sites with multiple categories show
+every category; categories outside active filters are dimmed. Labels avoid one another and other service buttons, and can extend to either
+side of the anchor. Unknown, course and unverified hours
+retain their existing meaning. Category icons share a stroke style (plain shield,
+compass, graduation cap and briefcase); Orientation has a short UI label. Stored
+source taxonomy and the 2D map behavior remain unchanged.
+
+The 3D renderer caches service presentation between camera moves and mounts only
+sites near the viewport, with a 120 px edge margin. Opening a detail from Map mode
+automatically centres its point (3D also sets z17.5 and tilt); List mode leaves the
+camera alone. There is no separate building-focus action. Opening-calendar day labels
+are left-aligned and only the current day in the territory timezone is bold. Category
+SVG ink is dark by default; coloured badges/pins and active filters apply white ink.
+
+Local browser comparison on 594 service records at the same centre/z17: marker
+redraw median 66 ms → 0.1 ms, mounted markers 365 → 4; the 1.6-second movement probe
+reported 41 → 60 fps. This is a desktop preview measurement, not phone acceptance.
+
+Directions are available in app only for finite public coordinates; address-only
+services keep Google's address fallback. Changing the selected target cancels both
+a pending reference intent and an in-flight route. Explicit cancellation also drops
+the intent. Cached legacy opening labels and current-day calendar emphasis refresh
+on the existing 30-second timer and when the page becomes visible. Narrow labels
+wrap the status qualification, adapt their width and avoid the map toolbar.
+
+Transport stop/station names are optional annotations shared by flat and 3D maps.
+Station names start at Leaflet-equivalent z16 (3D uses one zoom level less);
+highlighted nearby stations may be named earlier. Bus/tram names and extra
+information are click-only at every zoom, including nearby highlighted stops.
+Focused stations take priority. Names try either side, above/below and a narrower width;
+they are suppressed when they cannot fit around other stop symbols/line-code
+boxes, names, service heads, controls or open popups. Full names remain in the
+existing accessible/title text and departure popup. Raster/canvas basemap text
+is outside this DOM collision planner. Labels update after settled camera changes,
+resize/data refresh, with one owned animation-frame callback for DOM positioning;
+there are no per-frame rebuilds or additional feed/network requests.
+
+
+Current 3D transport presentation (2026-11-27):
+
+- Metro overlays summarise nearby (150 m) same-named GTFS platforms at every zoom,
+  including S./San spelling. Interchanges keep all line chips in one marker.
+  Their sorted constituent-ID identity survives overview/detail zoom changes.
+- Physical metro signs use the bundled OSM surface entrance snapshot in
+  `static/data/metro-entrances.geojson`, compiled by the importer's manual
+  `scripts/metro_entrances.py`. Only explicit stop-area memberships with an exact
+  normalised station name, one unique station candidate and a 500 m sanity bound
+  are associated. Line-specific areas (Termini A/B, San Giovanni Linea A/C) keep
+  their GTFS route filters. Shared entrances produce one sign. Missing/ambiguous
+  evidence leaves only the station summary; platform centres never become fake
+  entrances. Visitor browsers fetch the local snapshot once, never OSM/Overpass.
+- All entrances are prepared before the trees' shared 16–16.6 zoom appearance.
+  From GL zoom15, viewport acquisition requests full source detail with a .006°
+  station margin; an overview centroid cannot appear as one pole and split later.
+  This increases the bounded nearby data workload; unchanged meshes remain cached.
+- Bus/tram signs retain exact source-stop positions. Their compact overlays group
+  same-mode symbols less than32px apart and split when there is room. Grouped
+  clicks request all constituent stops; native signs keep their individual IDs.
+  Optional road symbols are hidden where service heads, station symbols, controls,
+  popups or other retained road symbols occupy their footprint. No automatic
+  bus/tram names or route text; rail/Leaflet representation is unchanged.
+- Native signs use one batched GeoJSON source/two depth-tested extrusion layers,
+  scale6.4 (max17.28m), original base0, schematic two-sided glyphs, no model/texture
+  dependency. Metro sign coordinates equal the retained OSM nodes; bus/tram signs
+  equal GTFS source points. Compact overlays remain available through buildings
+  subject to collision suppression. Hidden native geometry cannot be selected.
+- Metro lines are continuous at42% opacity; 3D GPU width grows3→7.5px from zoom13
+  to19. Focused routes retain stronger styling. Timetable popups have a bounded
+  scrolling height and pan into the viewport after initial opening, asynchronous
+  timetable growth and resize, with up to12 post-projection frame checks on tilted maps. Mobile popups fit below both top rails. Camera/rotation/tilt controls occupy the left rail in vertical stacks;
+  layers/view and visitor actions stay right (opposing rails mirror in RTL).
+
+OSM entrances are community evidence, not a field survey or accessibility guarantee.
+The snapshot retains source node/area IDs, exact coordinates, capture SHA-256 and
+OSM base timestamp with © OpenStreetMap contributors / ODbL credit. Source captures
+and receipts remain local and outside Git. Refresh is manual; no new job is installed.
+Opening-hour restrictions are retained as evidence; the visual sign does not assert
+that an entrance is open now. GTFS still owns every timetable/platform/route ID.
+
+3D reloads reconcile stable marker IDs and reuse unchanged DOM/event handlers;
+identical line/mesh data is not resent to the renderer worker. Explicit wrapper
+stacking is transport10, service20, popup30, navigation40. Service label backgrounds
+are white80%, text/status/icons opaque. Source feet stay fixed while service heads
+try stable screen offsets up to56px (leaders at most64px), connected by leaders.
+Heads try a bounded fan of directions for POI collisions and retain each valid
+offset exactly, even when a shorter path becomes available. UI overlays and
+viewport edges do not redirect heads; controls remain above them. Existing zoom-out
+clustering is unchanged. Source-space proximity prioritizes the selected site's
+neighbours. Secondary labels retain their side when possible and may be clipped
+or suppressed for viewport/POI collisions without moving the head.
+One bounded collision pass updates existing heads/SVG endpoints in MapLibre's
+own render frame during zoom, rotation and pan; there is no second layout RAF loop
+or service-content rebuild. The spatial index uses numeric cells and a capped
+local repair can relocate at most two blocking heads. Labels that become unsafe
+are temporarily suppressed, retaining accessible names. Full grouping and label
+placement still run after settling. Settled layout, visibility changes and disposal
+cancel pending layout. Arbitrarily saturated views can still exceed bounded space.
+Native transport sign orientation remains schematic.
+
+Service opening labels show known closing times and the next known opening using
+the schedule timezone, without inventing boundaries for incomplete/24h schedules.
+The verification qualifier is omitted per user choice; provenance remains in cards.
+
+## R2 readable transport
+
+The approved [shared renderer](docs/r2-renderer-proposal.md) uses one map-owned
+WebGL2 scene for original Roman-inspired sign boards and low-poly bus instances.
+Boards face the camera; poles and source coordinates stay fixed. Native depth
+blocks physical selection behind buildings; keyboard/HTML discovery and existing
+popups remain. Native representations provide recovery without duplicate drawing.
+No new library, font, model acquisition, feed or prediction behavior is introduced.
+[R2 execution and evidence](docs/r2-rendering.md) records budgets, ownership,
+asset provenance, desktop/lifecycle checks and pending physical-phone acceptance.
+Work is local-commit only and remains subject to final R2 review before C.
