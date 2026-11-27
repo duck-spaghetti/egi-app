@@ -1,3 +1,3 @@
 --no-index
 --only-binary=:all:
-egi-reviewer==0.5.0 --hash=sha256:4c8d035e129790971cba6c5db610597f0ad748f19762a2bb3abf14eed467138a
+egi-reviewer==0.5.1 --hash=sha256:252e39b1ea10e0a3bf7f129833f462e9c42969cdc899f996e14778038d072b8c

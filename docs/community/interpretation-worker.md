@@ -17,9 +17,9 @@ Install the normal runtime lock, then the approved reproducible Reviewer artifac
   -r requirements-community.lock.txt
 ```
 
-The internal extra is `community`, pinned to egi-reviewer 0.5.0. The separate hash
+The internal extra is `community`, pinned to egi-reviewer 0.5.1. The separate hash
 lock requires wheel SHA-256
-`4c8d035e129790971cba6c5db610597f0ad748f19762a2bb3abf14eed467138a`.
+`252e39b1ea10e0a3bf7f129833f462e9c42969cdc899f996e14778038d072b8c`.
 It must not import a mutable neighboring checkout. The ordinary web application
 can still run without the extra; local ranked suggestions return a safe unavailable response, while manual catalog browsing/selection remains available. Community worker/provider tests require it.
 
@@ -129,7 +129,7 @@ excludes canonical organization/classification components. Null cleaning preserv
 required fact metadata for independent Reviewer rejection; it cannot repair missing
 claims or turn model keys into canonical IDs. Existing pending v1 jobs stay compatible.
 
-EGI-116 verified the0.3.1 artifact offline. The current0.5.0 pin is listed above;
+EGI-116 verified the0.3.1 artifact offline. The current0.5.1 pin is listed above;
 no new dependency or live model/configuration is seeded. Native worker+HTTP tests use MockTransport
 only and prove extraction→server fact IDs→manual edit→selective moderation, known
 usage settlement and rejection of an old-client downgrade. Real model quality and
@@ -151,7 +151,7 @@ manual/cleared values and confirmed/ignored decisions survive refresh.
 
 ## Declared workbench plans — EGI-153
 
-Reviewer0.5.0 adds the separate `workbench.request.v1` profile for
+Reviewer0.5.1 adds the separate `workbench.request.v1` profile for
 `classify_cards` and `group_labels`. Existing extraction jobs still select their
 original v1/v2 request, prompt, schema and nullable cleanup. Workbench jobs use the
 Reviewer's generated instructions, strict output schema and independent result
