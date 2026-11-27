@@ -1,7 +1,7 @@
 /** Keep an asynchronously growing timetable inside the map's usable viewport. */
 export function popupShift(box,viewport){
  const narrow=viewport.width<=600;
- const left=viewport.left+12,right=viewport.right-12,top=narrow?Math.min(viewport.top+270,viewport.bottom-200):viewport.top+12,bottom=viewport.bottom-120;
+ const left=viewport.left+12,right=viewport.right-12,top=narrow?Math.min(viewport.top+330,viewport.bottom-200):viewport.top+12,bottom=viewport.bottom-120;
  const x=narrow?box.left-left:box.left<left?box.left-left:box.right>right?box.right-right:0;
  const y=box.top<top?box.top-top:box.bottom>bottom?box.bottom-bottom:0;
  return [x,y];

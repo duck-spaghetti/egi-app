@@ -863,7 +863,7 @@ Current 3D transport presentation (2026-11-27):
 - Metro lines are continuous at42% opacity; 3D GPU width grows3→7.5px from zoom13
   to19. Focused routes retain stronger styling. Timetable popups have a bounded
   scrolling height and pan into the viewport after initial opening, asynchronous
-  timetable growth and resize, with up to12 post-projection frame checks on tilted maps. Mobile popups fit below both top rails. Camera/rotation/tilt controls occupy the left rail;
+  timetable growth and resize, with up to12 post-projection frame checks on tilted maps. Mobile popups fit below both top rails. Camera/rotation/tilt controls occupy the left rail in vertical stacks;
   layers/view and visitor actions stay right (opposing rails mirror in RTL).
 
 OSM entrances are community evidence, not a field survey or accessibility guarantee.
@@ -877,7 +877,7 @@ that an entrance is open now. GTFS still owns every timetable/platform/route ID.
 identical line/mesh data is not resent to the renderer worker. Explicit wrapper
 stacking is transport10, service20, popup30, navigation40. Service label backgrounds
 are white80%, text/status/icons opaque. Source feet stay fixed while service heads
-try stable screen offsets up to96px, connected by leaders; in fully saturated views
+try stable screen offsets up to56px (leaders at most64px), connected by leaders; in fully saturated views
 overlap cannot be ruled out. Native sign orientation remains schematic.
 
 Service opening labels show known closing times and the next known opening using

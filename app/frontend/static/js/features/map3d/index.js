@@ -119,13 +119,16 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   const next=new Map(),labels=[];
   if(visible){
    const viewport=map.getContainer?.(),screenWidth=viewport?.clientWidth||Infinity,screenHeight=viewport?.clientHeight||Infinity;
+   // Read the actual UI once before writing markers; safe areas/RTL/stack heights cannot drift from layout.
+   const originBox=viewport?.getBoundingClientRect?.(),scene=viewport?.parentElement||viewport;
+   const controls=originBox&&scene?.querySelectorAll?[...scene.querySelectorAll('.maplibregl-ctrl,.map-mode-tools,.map-brand,.map-city-tag,.floating-actions .nav-btn,.floating-actions .view-toggle')].map(el=>el.getBoundingClientRect()).filter(b=>b.width>0&&b.height>0).map(b=>({left:b.left-originBox.left,right:b.right-originBox.left,top:b.top-originBox.top,bottom:b.bottom-originBox.top})):null;
    const onscreen=screenWidth===Infinity?entries:entries.filter(site=>{const p=map.project([site.lng,site.lat]);return p.x>=-120&&p.x<=screenWidth+120&&p.y>=-120&&p.y<=screenHeight+120;});
    const layout=cluster(onscreen).map(group=>{
     const {site,members}=group,count=members.length;
     const lngLat=count>1?[members.reduce((a,m)=>a+m.lng,0)/count,members.reduce((a,m)=>a+m.lat,0)/count]:[site.lng,site.lat];
     return {...group,lngLat,point:map.project(lngLat)};
    });
-   const heads=placeSiteHeads(layout,{width:screenWidth,height:screenHeight,zoom:map.getZoom(),selectedId:state.selectedId,rtl:document.documentElement?.dir==='rtl'});
+   const heads=placeSiteHeads(layout,{width:screenWidth,height:screenHeight,zoom:map.getZoom(),selectedId:state.selectedId,rtl:document.documentElement?.dir==='rtl',controls});
    for(const group of layout){const head=heads.get(group);group.headPoint=head?{x:group.point.x+head.dx,y:group.point.y+head.dy}:group.point;}
    for(const group of layout){
     const {site,members,lngLat,point}=group,count=members.length;
@@ -173,7 +176,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
        const box={left,right,top:headPoint.y-24-Math.max(44,labelHeight),bottom:headPoint.y-20};
        const inFrame=box.left>=0&&box.right<=screenWidth&&box.top>=0&&box.bottom<=screenHeight;
        const hitsPin=layout.some(other=>other!==group&&intersects(box,{left:other.headPoint.x-25,right:other.headPoint.x+25,top:other.headPoint.y-82,bottom:other.headPoint.y-20}));
-       const hitsTools=hitsMapControls(box,{width:screenWidth,height:screenHeight,rtl});
+       const hitsTools=hitsMapControls(box,{width:screenWidth,height:screenHeight,rtl,controls});
        if(inFrame&&!hitsTools&&!hitsPin&&!labels.some(b=>intersects(box,b))){placement={width,leftSide,box};break;}
       }
       if(placement)break;

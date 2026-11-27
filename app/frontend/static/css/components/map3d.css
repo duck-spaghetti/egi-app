@@ -62,10 +62,10 @@ html[dir="rtl"] #map .maplibregl-ctrl-top-right { right:auto;left:calc(var(--map
 .map3d-site-status i { display:inline-block;width:7px;height:7px;border-radius:50%;margin-inline-end:5px;background:#6b7280; }
 .map3d-site-status.open i { background:#237443; }.map3d-site-status.closed i { background:#b83938; }.map3d-site-status.closing i { background:#ae7900; }
 
-/* Keep rotation controls in one row, leaving the lower reference action clear. */
+/* Stack rotation/tilt controls vertically, sharing the zoom control rail. */
 #map .maplibregl-ctrl-top-right { width:90px;right:calc(var(--map-edge-x) - 1px);display:flex;flex-direction:column;align-items:center; }
 #map .maplibregl-ctrl-top-right .maplibregl-ctrl { margin:10px 0 0; }
-#map .map3d-controls { display:flex; }
+#map .map3d-controls { display:flex;flex-direction:column; }
 #map .map3d-controls button { border:0; }
 html[dir="rtl"] #map .maplibregl-ctrl-top-right { right:auto;left:calc(var(--map-edge-x) - 1px); }
 @media (max-height:700px) {
@@ -108,7 +108,7 @@ html[dir="rtl"] .map3d-site-label { direction:rtl; }
 
 @media (max-width:600px) {
  /* Leave the camera/mode rails above the mobile timetable; the remaining content scrolls. */
- #map .maplibregl-popup-content { max-height:max(48px,calc(100dvh - 450px)); }
+ #map .maplibregl-popup-content { max-height:max(48px,calc(100dvh - 510px)); }
 }
 
 /* Mirror the two distinct rails in RTL, preserving separation from mode/view controls. */
