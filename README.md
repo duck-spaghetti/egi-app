@@ -91,6 +91,12 @@ sessionStorage only. While moving the 3D map, the page measures frames per secon
 memory where the browser reports it); below 30 fps or above 150 MB over three moves, the 3D
 control shows a warning and a one-time message, and stays usable.
 
+Ordinary buildings use the same muted terracotta family in plan, aggregate blocks
+and detailed parts. Monument/tall-building classifications retain their distinct
+colors. Detailed volumes no longer draw a second roof extrusion; the shared
+building vector source, geometry heights and loading contract are unchanged.
+See [R1 rendering verification](docs/r1-rendering.md) for measured costs and limits.
+
 For native verification set `EGI_DATABASE_REPO` to the explicit database worktree,
 `EGI_SQITCH` to Sqitch and, if necessary, `PERL5LIB` to its local runtime library.
 Use the A3 Python environment for `python -m unittest discover -s tests -v` and run

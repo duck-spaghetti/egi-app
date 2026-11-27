@@ -101,7 +101,8 @@ const live=c=>c.markers.filter(m=>!m.removed&&m.options.element.children?.[0]);
  assert.equal(takeHandoff(storage),null,'the handoff is read once');
  // 3D layers only in the 3D style, removed with the map; attributions; decorative canvas.
  const style=gl.options.style;const ids=style.layers.map(l=>l.id);
- for(const id of ['blocks-3d','parts-3d','roofs-3d','landmarks-3d','decks-3d','parapets-3d','piers-3d','fountains-3d','trees-3d','embankments','landmark-label'])assert(ids.includes(id),id);
+ for(const id of ['blocks-3d','parts-3d','landmarks-3d','decks-3d','parapets-3d','piers-3d','fountains-3d','trees-3d','embankments','landmark-label'])assert(ids.includes(id),id);
+ assert(!ids.includes('roofs-3d'),'ordinary buildings no longer duplicate their footprints as roof extrusions');
  assert.match(style.sources.buildings.attribution,/CTRN Regione Lazio/);assert.match(style.sources.basemap.attribution,/OpenStreetMap.*Protomaps/);
  assert.equal(gl.options.attributionControl.compact,false);
  // Service focus is automatic; there is no separate building button.

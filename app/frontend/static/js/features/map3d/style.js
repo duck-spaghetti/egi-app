@@ -9,7 +9,7 @@
 export const COLORS = {
   land: "#f4f1ea", water: "#b8d4dd", waterLine: "#9cc3cf", hospital: "#f3dfdc", school: "#ece6d6",
   road: "#ffffff", roadCase: "#ddd4c2", major: "#fffaf0", majorCase: "#cdbf9f", highway: "#f6e7c4", highwayCase: "#c9ac70",
-  rail: "#a59f94", building: "#e5dfd2", buildingLine: "#d3cbbb",
+  rail: "#a59f94", building: "#df9277", buildingLine: "#c5826b",
   park: "#c2dda0", wood: "#a9ca86", grass: "#d5e7bf", cemetery: "#cfdcbd", greenEdge: "#8fb064", greenLabel: "#3f6b2a",
   paving: "#ede4d2", pavingEdge: "#ddd0b8", label: "#4a4a4a", labelSoft: "#7a7366", halo: "#fbf9f3", waterLabel: "#4f7f8f",
   landmarkLabel: "#6b4f2a",
@@ -119,7 +119,7 @@ export function labelLayers(C = COLORS) {
 }
 
 export const COLORS_3D = {
-  roof: "#df9277", extrude: "#ddd5c4", tall: "#d6d3cc", monument: "#ece3cf", iconic: "#efe2c4", iconicEdge: "#c9b385",
+  extrude: COLORS.building, tall: "#d6d3cc", monument: "#ece3cf", iconic: "#efe2c4", iconicEdge: "#c9b385",
   iconicLabel: "#5a3d1a", bridge: "#f1ece2", bridgeCase: "#b9ad94", parapet: "#d6c9ae", pier: "#cbbfa6",
   treeA: "#9fbd7e", treeB: "#8fb273", treeC: "#adc68c", tree2d: "#a9c98a", wall: "#d9cdb4",
   fountainStone: "#e7e0cf", fountainWater: "#7fbfd6", fountainJet: "#dff3fa",
@@ -132,7 +132,7 @@ const grow = (value, z0 = Z0, z1 = Z1) => ["interpolate", ["linear"], ["zoom"], 
 
 /** Sources and layers of the 3D components: buildings, landmarks, bridges, fountains, trees. */
 export function layers3d(base, C = COLORS_3D) {
-  const blockColor = cls => ["match", cls, "monument", C.monument, "tall", C.tall, C.roof];
+  const blockColor = cls => ["match", cls, "monument", C.monument, "tall", C.tall, C.extrude];
   const partColor = ["match", ["get", "class"], "monument", C.monument, "tall", C.tall, C.extrude];
   const morph = (from, to) => ["interpolate", ["linear"], ["zoom"], M0, from, M1, to];
   const osm = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
@@ -166,11 +166,6 @@ export function layers3d(base, C = COLORS_3D) {
         filter: ["!=", ["get", "class"], "replaced"],
         paint: {"fill-extrusion-color": morph(blockColor(["get", "cb"]), partColor), "fill-extrusion-opacity": 0.6,
           "fill-extrusion-base": 0, "fill-extrusion-height": morph(["get", "hb"], ["get", "h"])}},
-      {id: "roofs-3d", type: "fill-extrusion", source: "buildings", "source-layer": "parts", minzoom: M0 + 0.3,
-        filter: ["==", ["get", "class"], "home"],
-        paint: {"fill-extrusion-color": C.roof, "fill-extrusion-opacity": fade(0.8, M0 + 0.3, M1),
-          "fill-extrusion-base": morph(["get", "hb"], ["get", "h"]),
-          "fill-extrusion-height": morph(["+", ["get", "hb"], 0.6], ["+", ["get", "h"], 0.6])}},
       {id: "landmarks-3d", type: "fill-extrusion", source: "landmarks", minzoom: 13,
         paint: {"fill-extrusion-color": C.iconic, "fill-extrusion-opacity": fade(0.85, 13, 14.5),
           "fill-extrusion-base": grow(["get", "b"], 13, 14.5), "fill-extrusion-height": grow(["get", "t"], 13, 14.5),

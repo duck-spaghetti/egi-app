@@ -47,3 +47,50 @@ Run the existing Node suites with `node --experimental-vm-modules`.
 frame scheduling, exact coordinates, reversed zoom, settled cancellation,
 selection, layer visibility and disposal. The existing site/layout and map
 performance suites retain close-address, mobile/RTL and compact-leader coverage.
+
+## EGI-121: coherent terracotta volumes without duplicate roofs
+
+Ordinary building plans, aggregate blocks and detailed parts share the existing
+terracotta value `#df9277`; the plan outline is a darker related shade. The
+aggregate/detail height morph remains intact. Monument/tall color branches and
+iconic-landmark layers are preserved. The separate ordinary-building roof
+extrusion is removed, not made transparent. Building sources, heights, tile
+loading and dataset artifacts are unchanged.
+
+Across the retained dataset, detailed volume/roof candidates fall from 515,134
+to 261,224: 253,910 fewer, or approximately 49.3%. These are dataset-wide layer
+candidates, not simultaneously drawn triangles or a measured GPU/memory saving.
+Both old layers read the same vector source, so network bytes are not reduced by
+this layer removal. No GPU buffer/triangle instrumentation is available in the
+retained browser probe; queried feature counts include tile duplicates and are
+not used as a GPU-memory proxy.
+
+### Combined R1 verification
+
+- The real MapLibre style loaded and rendered at z13, 14, 15, 15.9, 16, 16.3,
+  17.2, 18 and 19 without console errors. Recorded layer colors show the same
+  ordinary-building terracotta before/after the block/detail boundary; the roof
+  layer is absent. Visual comparison covered the dense Repubblica/Termini scene.
+- Lighting remains MapLibre's existing default. Volume opacity remains 0.6 after
+  growth, and the existing planar/growth opacity transitions remain unchanged.
+  Transparent surfaces retain normal lighting/overlap variation; this change does
+  not promise uniform screen pixels across different orientations and depths.
+- Matched dense-scene pan/bearing runs: 1280 × 676 map viewport, DPR 2,
+  100 synthetic service markers at start, same 1.8-second path and retained map
+  dataset, three runs per variant. Baseline frame p95 **16.8 / 17.5 / 16.8 ms**;
+  combined R1 **16.8 / 16.8 / 17.3 ms**. Both had zero measured gaps >33.4 ms.
+  This supports no observed frame regression, not a proven frame-rate speedup.
+  Both retained 77 visible markers after the same pan due to viewport culling.
+- Repeated combined-state zoom: added update p95 **0.30 / 0.30 / 0.30 ms**;
+  frame p95 **17.0 / 17.0 / 17.6 ms**. Button/body content and identity, leader
+  alignment and source coordinates remained stable mid-gesture. Peak observed
+  JS heap in these matched R1 samples was 58.6 MiB; collection timing varies and
+  this excludes GPU/RSS, so no memory reduction is inferred from these samples.
+- Exploratory runs with a different viewport or DPR are retained separately but
+  excluded from these matched comparisons. Benchmark code/results are local
+  verification artifacts, not production telemetry or product test hooks.
+
+Real-phone acceptance remains pending, along with its separately agreed budgets.
+R2, feed acquisition/polling, importer artifacts, metadata caching and monument
+expansion are outside this change. Verification uses a temporary isolated server;
+the existing M2 preview and port 4317 are not changed.
