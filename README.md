@@ -875,6 +875,24 @@ DOM and event handlers. Only changed markup/coordinates update; missing IDs are
 removed. Existing popup holding remains in force. Optional station-name nodes
 are reused (and reattached after changed glyph markup), and identical network
 line data is not resent to the renderer worker. This prevents the close-sign
-entry fade restarting on unchanged viewport reloads. Physical depth occlusion
-of HTML paline behind buildings remains a known presentation limitation pending
-a native3D rendering decision; source coordinates are not moved to fake sidewalks.
+entry fade restarting on unchanged viewport reloads. Native3D paline now replace physical HTML signs in the3D view; source coordinates
+are not moved to fake sidewalks.
+
+
+Native3D stop signs use one GeoJSON source/two existing-renderer extrusion layers:
+pole base0m, board2.05–2.7m, schematic two-faced metro/bus/tram glyphs. Geometry is
+prepared onezoom before close appearance (metro17→18,road18→19), grows naturally
+with camera scale and uses scene depth. No model/texture dependency. Source maxzoom22
+and tolerance0 retain small prisms; productcamera max19/APIcap19 unchanged.
+At max19 the physical signs are intentionally small. Orientation is schematic;
+the feed does not provide a sign heading or certified sidewalk/access position.
+Compact symbols/keyboard buttons persist, with pointer picking on visible native
+geometry and foreground extrusion intersections blocking hidden selections.
+Reference selection takes precedence. Rail and Leaflet drawing are unchanged.
+
+Close3D service heads try stable offsets up to96px while their feet remain at the
+original source coordinates. Inclined SVG leaders connect each displaced head to
+its own foot. Exact co-location grouping stays unchanged. Head placement uses a
+small screen-space grid, prioritises the selected site and avoids other heads/feet
+and maincontrols; optional labels use the displaced positions. In saturated views
+with no bounded slot every site remains reachable, but overlap cannot be ruled out.

@@ -78,3 +78,12 @@ html[dir="rtl"] #map .maplibregl-ctrl-top-right { right:auto;left:calc(var(--map
 html[dir="rtl"] .map3d-site-label { direction:rtl; }
 
 .map3d-site-kind { margin-block:3px;color:#49565c;font-size:12px; }
+
+/* Move only the head. The wrapper/ground anchor retain the source coordinate. */
+.map3d-pin { position:relative;pointer-events:none; }
+.map3d-pin-body { transform:translate(var(--site-head-x,0px),var(--site-head-y,0px));pointer-events:auto; }
+.map3d-ground { pointer-events:auto; }
+.map3d-pin[data-anchored="true"] .map3d-stem { background:transparent; }
+.map3d-leader { position:absolute;left:50%;bottom:3px;overflow:visible;pointer-events:none;fill:none;stroke:#455a64b3;stroke-width:1.5;stroke-linecap:round; }
+.map3d-pin:focus-visible { outline:none; }
+.map3d-pin:focus-visible .map3d-pin-body { outline:3px solid #0570b5;outline-offset:3px;border-radius:24px; }

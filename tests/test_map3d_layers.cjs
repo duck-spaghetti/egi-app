@@ -20,7 +20,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
   const bounds={getWest:()=>12.45,getSouth:()=>41.88,getEast:()=>12.52,getNorth:()=>41.92};
   return {container,sources:{},layers:[],handlers:[],zoom:14.4,
    getContainer(){return container;},getBounds(){return bounds;},getZoom(){return this.zoom;},isStyleLoaded:()=>true,
-   getStyle(){return {layers:[{id:'background',type:'background'},{id:'water-label',type:'symbol'}]};},
+   getStyle(){return {layers:[{id:'background',type:'background'},...this.layers,{id:'water-label',type:'symbol'}]};},queryRenderedFeatures(){return this.hits||[];},
    addSource(id,s){this.sources[id]={...s,setData(d){this.data=d;this.updates=(this.updates||0)+1;}};},getSource(id){return this.sources[id];},removeSource(id){delete this.sources[id];},
    addLayer(l,before){this.layers.push({...l,before});},getLayer(id){return this.layers.find(l=>l.id===id);},removeLayer(id){this.layers=this.layers.filter(l=>l.id!==id);},
    on(...args){this.handlers.push(args);},once(){},off(){},fitBounds(b){this.fitted=b;}};
@@ -35,7 +35,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
  responses['/api/preview/transport']={availability:'available',features:[line,rail,stop],service_date:'2026-11-26',refresh:{},manifest:{}};
  responses['/api/preview/transit/departures']={availability:'available',departures:[{code:'A',mode:'metro',color:'#e27439',route_id:'MA',headsign:'Battistini',times:[{time:'15:00',in_min:3}]}],alerts:[],now:'14:57'};
  const transit=TransportLayerGL.create(map,{toggle,status},maplibre);
- assert.equal(map.layers.length,2);assert(map.layers.every(l=>l.before==='water-label'),'lines under the labels');
+ assert.equal(map.layers.length,4);assert(map.layers.every(l=>l.before==='water-label'),'lines under the labels');
  toggle.click();await wait(250);
  const request=calls.find(c=>c.url==='/api/preview/transport');
  const expected=TransportLayer.viewportQuery({x:800,y:600},map.getBounds(),15,new Set(['metro','rail','tram','bus']));
@@ -65,8 +65,12 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
  const highMap=fakeMap();highMap.zoom=17.4;const second=TransportLayerGL.create(highMap,{},maplibre);second.setVisible(true);await second.reload();
  const highStop=created.markers.filter(m=>!m.removed).at(-1);
  const count=created.markers.length,requests=calls.length;highMap.zoom=17.75;highMap.handlers.find(h=>h[0]==='zoom')[1]();assert.equal(highMap.container.style['--tl-metro-progress'],'0.75');assert.equal(created.markers.length,count,'continuous zoom does not rebuild markers');assert.equal(calls.length,requests,'continuous zoom does not fetch');
- assert(highStop.options.element.innerHTML.includes('tl-ground'));assert(highStop.options.element.innerHTML.includes('tl-palina-metro')); assert(highStop.options.element.className.includes('tl-point-detail'));same(highStop.lngLat,individual.geometry.coordinates,'ground anchor keeps source coordinates');
- created.markers.filter(m=>!m.removed).at(-1).options.element.click();await wait(20);assert(calls.filter(c=>c.url.startsWith('/api/preview/transit/departures?')).at(-1).url.includes('stops=platform-a'),'individual platform requests its own departures');second.dispose();assert.equal(frames.size,0,'popup teardown without held data must not queue name work');
+ assert(!highStop.options.element.innerHTML.includes('tl-palina-metro'),'no HTML palina remains');assert(highStop.options.element.className.includes('tl-native-stop'));assert(highMap.sources['egi-transport-paline'].data.features.some(f=>f.properties.base===0)); assert(highStop.options.element.className.includes('tl-point-detail'));same(highStop.lngLat,individual.geometry.coordinates,'ground anchor keeps source coordinates');
+ created.markers.filter(m=>!m.removed).at(-1).options.element.click();await wait(20);assert(calls.filter(c=>c.url.startsWith('/api/preview/transit/departures?')).at(-1).url.includes('stops=platform-a'),'individual platform requests its own departures');
+ const sharedEvent={point:{x:100,y:100},features:[{properties:line.properties}],lngLat:[12.49,41.9]};highMap.hits=[{layer:{id:'egi-transport-paline-metro'},properties:{key:'stop:platform-a',mode:'metro'}}];const popupCount=created.popups.length;
+ highMap.handlers.find(h=>h[0]==='click'&&h.length===2)[1](sharedEvent);highMap.handlers.find(h=>h[0]==='click'&&h[1]==='egi-transport-lines-solid')[2](sharedEvent);assert.equal(created.popups.length,popupCount+1,'native selection is not overwritten by the route hit');
+ const referenceEvent={...sharedEvent,egiStopPicked:false,egiReferencePicked:true};const beforeReference=created.popups.length;highMap.handlers.find(h=>h[0]==='click'&&h[1]==='egi-transport-lines-solid')[2](referenceEvent);assert.equal(created.popups.length,beforeReference,'route click respects reference selection');
+ second.dispose();assert.equal(frames.size,0,'popup teardown without held data must not queue name work');
  // Cycleways: same body as the current map's layer, features drawn, same status text.
  const cmap=fakeMap();cmap.zoom=13.2;const ctoggle=element(),cstatus=element();
  const way={type:'Feature',geometry:{type:'LineString',coordinates:[[12.46,41.89],[12.5,41.9]]},properties:{kind:'track',label:'Pista su carreggiata',name:'Tevere'}};

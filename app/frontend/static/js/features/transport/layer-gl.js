@@ -1,11 +1,12 @@
+import {createPaline,nativeMode,stopKey} from './paline-gl.js';
 import {createStopNames} from './stop-names.js';
 import {TransportLayer} from "./layer.js";
 /* Transit layer of the 3D mode: the scheduled metro/rail/tram/bus layer on MapLibre.
  *
  * TransportLayerGL.create(map, elements, maplibre) behaves like TransportLayer.create on the
  * current map: same endpoint, viewport query, debounce, modes, toggle, status, focus chip and
- * popups with departures. Lines are a GeoJSON source under the labels; stops are HTML markers
- * with the same markup. Presentation helpers come from TransportLayer (single source).
+ * popups with departures. Lines use a GeoJSON source under labels; close paline are native metre-sized
+ * extrusions. Compact symbols and keyboard access remain retained HTML markers. Presentation helpers come from TransportLayer (single source).
  * MapLibre zoom z shows the scale of Leaflet zoom z + 1 (512 px tiles): requests and detail
  * thresholds use that equivalent zoom, so they match the current map.
  */
@@ -41,9 +42,10 @@ function create(map, elements, maplibre) {
   const modes = new Set(elements.modes ? ["metro", "rail", "tram", "bus"].filter(mode => elements.modes[mode]?.checked) : ["metro", "rail", "tram", "bus"]);
   let visible = false, features = [], request = null, timer = null, focused = null, popup = null, held = null;
   let markers = new Map(),lineData=null;
+  const paline=createPaline(map,key=>{const entry=markers.get(key);if(entry)selectStop(entry);});
   const names=createStopNames(map.getContainer());
   const refreshNames=()=>names.refresh(leafletZoom(map));
-  const scale=()=>TransportLayer.scalePaline(map.getContainer(),map.getZoom()+1);
+  const scale=()=>{const root=map.getContainer(),zoom=map.getZoom();TransportLayer.scalePaline(root,zoom+1);root.style.setProperty('--tl-native-metro-pointer',zoom>=TransportLayer.STOP_POINT_ZOOM?'none':'auto');root.style.setProperty('--tl-native-road-pointer',zoom>=TransportLayer.ROAD_STOP_POINT_ZOOM?'none':'auto');};
   ownMap("zoom",scale);
   const chip = document.createElement("div");
   chip.className = "tl-focus-chip"; chip.hidden = true;
@@ -62,10 +64,11 @@ function create(map, elements, maplibre) {
     map.addLayer({id: LINE_LAYERS[1], type: "line", source: LINES, filter: ["get", "_dashed"],
       paint: {...paint, "line-dasharray": [3, 1.5]}}, before);
     for (const id of LINE_LAYERS) ownMap("click", id, event => {
+      if(event.egiReferencePicked||event.egiStopPicked)return;
       const p = event.features?.[0]?.properties;
       if (p) openPopup(event.lngLat, TransportLayer.routePopupHtml(p));
     });
-    render();
+    paline.ensure();render();
   });
 
   function setStatus(text) { if (elements.status) elements.status.textContent = text; }
@@ -82,6 +85,8 @@ function create(map, elements, maplibre) {
     current.on?.("close", () => { if (popup === current) { popup = null; release(); } });
     refreshNames();onOpen?.(current);
   }
+
+  function selectStop(entry){openPopup(entry.lngLat,TransportLayer.popupHtml(entry.props),current=>{if(!entry.props.untimed)loadDepartures(current,entry.ids,entry.props);});}
 
   function release() {
     if(disposed)return;
@@ -119,27 +124,27 @@ function create(map, elements, maplibre) {
       const ids = props.stop_ids || [props.stop_id];
       const near = Boolean(focused && ids.some(id => focused.stopIds.has(id)));
       const anchored=TransportLayer.pointDetail(props,leafletZoom(map));
-      const key=String(feature.id||JSON.stringify([props.transport_type,ids]));
+      const key=stopKey(feature),native=anchored&&nativeMode(props);
       let entry=previous.get(key);
       if(!entry){
         const el=document.createElement('button');el.type='button';
         entry={element:el,marker:new maplibre.Marker({element:el,anchor:'center'}).setLngLat([lng,lat]).addTo(map)};
         el.addEventListener('click',event=>{
           event.stopPropagation?.();
-          openPopup(entry.lngLat,TransportLayer.popupHtml(entry.props),current=>{if(!entry.props.untimed)loadDepartures(current,entry.ids,entry.props);});
+          selectStop(entry);
         });
       }
       const el=entry.element,signature=JSON.stringify([props,near,anchored]);
       entry.props=props;entry.ids=ids;entry.lngLat=[lng,lat];
       if(entry.signature!==signature){
-        el.className=`tl-icon tl-gl-stop${anchored?' tl-point-detail':''}`;el.title=props.name;el.setAttribute('aria-label',props.name);
-        el.innerHTML=TransportLayer.stopIconHtml(props,near,anchored);entry.signature=signature;
+        el.className=`tl-icon tl-gl-stop${anchored?' tl-point-detail':''}${native?` tl-native-stop tl-native-${props.transport_type==='metro'?'metro':'road'}-stop`:''}`;el.title=props.name;el.setAttribute('aria-label',props.name);
+        el.innerHTML=native?`<span class="tl-compact" style="--tl-progress:var(--tl-${props.transport_type==='metro'?'metro':'road'}-progress,0)">${TransportLayer.stopIconHtml(props,near,false)}</span>`:TransportLayer.stopIconHtml(props,near,anchored);entry.signature=signature;
       }
       const position=JSON.stringify([lng,lat]);if(entry.position!==position){entry.marker.setLngLat([lng,lat]);entry.position=position;}
       stops.push({element:el,props,near});next.set(key,entry);
     }
     for(const [key,entry] of previous)if(!next.has(key))entry.marker.remove();
-    markers=next;
+    markers=next;paline.update(shown,map.getZoom(),focused);
     names.update(stops,leafletZoom(map));
   }
 
@@ -249,7 +254,7 @@ function create(map, elements, maplibre) {
       disposed = true; visible = false; listeners.abort(); request?.abort(); clearTimeout(timer); clearInterval(interval);
       for (const clean of cleanup) clean();
       for (const entry of markers.values()) entry.marker.remove();
-      names.dispose();markers.clear(); popup?.remove(); popup = null; chip.remove?.();
+      paline.dispose();names.dispose();markers.clear(); popup?.remove(); popup = null; chip.remove?.();
       for (const id of LINE_LAYERS) if (map.getLayer?.(id)) map.removeLayer(id);
       if (map.getSource?.(LINES)) map.removeSource(LINES);
     }};

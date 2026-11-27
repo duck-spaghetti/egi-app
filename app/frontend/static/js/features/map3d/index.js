@@ -1,5 +1,5 @@
 import {siteMarkers,USER_DOT_HTML,USER_DOT_LABEL} from "../map/pins.js";
-import {clusterSites,clusterAppearance,siteLabel,CLUSTER_DISTANCE,STEM_ZOOM,NAME_ZOOM,DETAIL_ZOOM} from "./sites.js";
+import {clusterSites,clusterAppearance,siteLabel,placeSiteHeads,CLUSTER_DISTANCE,STEM_ZOOM,NAME_ZOOM,DETAIL_ZOOM} from "./sites.js";
 import {egiStyle,liftBridgeLabels} from "./style.js";
 /** createMap3d: the 3D mode's map module, on MapLibre GL JS, with the current map's interface.
  *
@@ -54,6 +54,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   map.addControl(controls(),"top-right");
   map.on("click",event=>{
    if(!state.choosingReference)return;
+   event.egiReferencePicked=true;
    emit("pickedReference",{lat:event.lngLat.lat,lng:event.lngLat.lng,label:"Punto scelto sulla mappa"});
   });
   map.on("moveend",render);
@@ -124,9 +125,11 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
     const lngLat=count>1?[members.reduce((a,m)=>a+m.lng,0)/count,members.reduce((a,m)=>a+m.lat,0)/count]:[site.lng,site.lat];
     return {...group,lngLat,point:map.project(lngLat)};
    });
+   const heads=placeSiteHeads(layout,{width:screenWidth,height:screenHeight,zoom:map.getZoom(),selectedId:state.selectedId,rtl:document.documentElement?.dir==='rtl'});
+   for(const group of layout){const head=heads.get(group);group.headPoint=head?{x:group.point.x+head.dx,y:group.point.y+head.dy}:group.point;}
    for(const group of layout){
     const {site,members,lngLat,point}=group,count=members.length;
-    const key=`${lngLat[0].toFixed(6)},${lngLat[1].toFixed(6)},${count}`;
+    const key=count===1?`site:${site.serviceIds.slice().sort().join(',')}`:`${lngLat[0].toFixed(6)},${lngLat[1].toFixed(6)},${count}`;
     let entry=runtime.markers.get(key);
     if(!entry){
      entry={data:null};
@@ -145,8 +148,11 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
      entry.marker=new maplibre.Marker({element:wrap(el),anchor:count>1?"center":"bottom",
       pitchAlignment:"viewport",rotationAlignment:"viewport"}).setLngLat(lngLat).addTo(map);
     }
+    if(entry.data&&(entry.data.lngLat[0]!==lngLat[0]||entry.data.lngLat[1]!==lngLat[1]))entry.marker.setLngLat(lngLat);
     entry.data={site,lngLat};
     if(count===1){
+     const offset=heads.get(group)||{dx:0,dy:0},headPoint=group.headPoint;
+     entry.el.style.setProperty?.('--site-head-x',`${offset.dx}px`);entry.el.style.setProperty?.('--site-head-y',`${offset.dy}px`);
      const selected=site.serviceIds.includes(String(state.selectedId));
      const anchored=map.getZoom()>=STEM_ZOOM,detail=selected||map.getZoom()>=DETAIL_ZOOM;
      const maxWidth=Math.min(detail?260:200,Math.max(130,(screenWidth-50)/2-30));
@@ -161,12 +167,12 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
       const categoryCount=(site.allCategories||site.categories||[]).length;
       const secondaryHeight=categoryCount>1?23*Math.ceil(categoryCount/columns):site.kinds?.length?20:0;
       const labelHeight=detail?33+secondaryHeight+14*statusLines:44;
-      const preferred=point.x+30+width>screenWidth-140;
+      const preferred=headPoint.x+30+width>screenWidth-140;
       for(const leftSide of [preferred,!preferred]){
-       const left=leftSide?point.x-30-width:point.x-24,right=leftSide?point.x+24:point.x+30+width;
-       const box={left,right,top:point.y-24-Math.max(44,labelHeight),bottom:point.y-20};
+       const left=leftSide?headPoint.x-30-width:headPoint.x-24,right=leftSide?headPoint.x+24:headPoint.x+30+width;
+       const box={left,right,top:headPoint.y-24-Math.max(44,labelHeight),bottom:headPoint.y-20};
        const inFrame=box.left>=0&&box.right<=screenWidth&&box.top>=0&&box.bottom<=screenHeight;
-       const hitsPin=layout.some(other=>other!==group&&intersects(box,{left:other.point.x-24,right:other.point.x+24,top:other.point.y-70,bottom:other.point.y}));
+       const hitsPin=layout.some(other=>other!==group&&intersects(box,{left:other.headPoint.x-25,right:other.headPoint.x+25,top:other.headPoint.y-82,bottom:other.headPoint.y-20}));
        const toolSide=rtl?box.left<140:box.right>screenWidth-140;
        const hitsTools=toolSide&&box.top<470;
        if(inFrame&&!hitsTools&&!hitsPin&&!labels.some(b=>intersects(box,b))){placement={width,leftSide,box};break;}
@@ -177,7 +183,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
      const labelled=(selected||map.getZoom()>=NAME_ZOOM)&&Boolean(placement);
      if(labelled)labels.push(placement.box);
      entry.el.dataset.labelSide=placement?.leftSide?'left':'right';
-     const html=`<span class="map3d-pin-body">${site.html}${labelled?siteLabel(site,detail,translate):''}</span><span class="map3d-stem" aria-hidden="true"></span><span class="map3d-ground" aria-hidden="true"></span>`;
+     const html=`<span class="map3d-pin-body">${site.html}${labelled?siteLabel(site,detail,translate):''}</span><span class="map3d-stem" aria-hidden="true"></span><span class="map3d-ground" aria-hidden="true"></span>${anchored?`<svg class="map3d-leader" width="1" height="1" aria-hidden="true"><path d="M0 0 L${offset.dx} ${offset.dy-21}"></path></svg>`:''}`;
      entry.el.dataset.anchored=String(anchored);entry.el.dataset.labelled=String(labelled);entry.el.dataset.selected=String(selected);
      const accessible=[selected?`${site.name} · ${site.label}`:site.label,...(site.allCategories||[]).filter(c=>c.matched===false).map(c=>c.label||c.slug),...detail?(site.statuses||[]).map(s=>s?.label):[]].filter(Boolean).join(" · ");
      if(entry.el.dataset.html!==html+accessible){
