@@ -1263,8 +1263,9 @@ avoids constructing hidden result rows. Neither local consolidation nor automati
 fixture success closes the existing human/device/live-model acceptance gates.
 
 Map-mode handoffs retain the selected named collection and its label in tab-local
-session storage, never the URL. Presentation memoization uses the normalized card
-object, so independent saved snapshots of the same service keep their own content.
+session storage, never the URL. Presentation memoization uses the source snapshot
+object, so shallow normalized views share work while independent saved copies of
+the same service keep their own content.
 The changed transport contract selects the exact consolidated importer fixture
 through `.checks/integration.json` and `EGI_IMPORTER_REPO` for its byte comparison.
 The private importer is not automatically published or given new CI credentials;

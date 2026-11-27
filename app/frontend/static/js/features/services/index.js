@@ -16,7 +16,8 @@ let descriptions=new Map(),refreshTime=null;
 function beginRefresh(snapshot,now=new Date()){state=snapshot;refreshTime=now;descriptions=new Map();}
 function describe(poi,now=refreshTime||new Date()){
  if(!refreshTime||now.getTime()!==refreshTime.getTime())return model.describe(poi,now);
- const key=poi;if(!descriptions.has(key))descriptions.set(key,model.describe(poi,now));return descriptions.get(key);
+ // Shallow normalized views share their source snapshot; saved copies own distinct raw cards.
+ const key=poi.raw||poi;if(!descriptions.has(key))descriptions.set(key,model.describe(poi,now));return descriptions.get(key);
 }
 const closeSheets=()=>emit('closeSheets');
 const favorites=context.canonical ? createFavorites({territory:context.profile?.territory_code || 'roma',prepare:prepareOffline}) : null;
