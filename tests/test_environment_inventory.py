@@ -136,3 +136,10 @@ class EnvironmentInventoryTests(unittest.TestCase):
             status=cli.main(['status','--workspace',str(self.workspace),'--json'])
         self.assertEqual(status,2)
         self.assertEqual(json.loads(output.getvalue()),result)
+
+    def test_matching_prefix_file_is_not_an_environment(self):
+        """A diagnostic file sharing the run prefix is not mistaken for a run directory."""
+        (self.temporary/'egi-resource-output.json').write_text('{}')
+        result=Inventory(self.workspace,self.temporary).collect()
+        self.assertEqual(result['entries'],[])
+        self.assertEqual(result['errors'],[])

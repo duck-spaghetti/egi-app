@@ -155,6 +155,8 @@ class Inventory:
                 if worktree.is_dir() and not worktree.is_symlink() and (worktree / '.local').exists():
                     self.local(worktree / '.local')
         for path in self.children(self.temporary_root):
+            if not path.is_dir() and not path.is_symlink():
+                continue
             if path.name.startswith('egi-resource-'):
                 if path.is_symlink():
                     self.add(path)
