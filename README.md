@@ -912,4 +912,7 @@ The verification qualifier is omitted per user choice; provenance remains in car
 shared ownership, original asset plan, depth-aware picking experiment and proposed
 budgets. R2 is authorized whole-set with local commits; concrete architecture,
 asset and test-boundary approval remains required before EGI-123/124 adoption.
-This documentation does not change the current renderer or preview.
+The user approved the concrete proposal and isolated experiment; the experiment
+passed. [R2 execution/evidence](docs/r2-rendering.md) records the shared scene,
+original atlas, depth-aware selection and native recovery. Whole-set execution
+continues to buses before final milestone review.

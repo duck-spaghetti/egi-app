@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="128" viewBox="0 0 256 128">
+<!-- Original app-owned vector paths. No font, transport logo or third-party artwork. -->
+<path fill="#f5cf36" d="M0 0h128v64H0z"/><path fill="#185b9b" d="M6 6h116v52H6z"/>
+<path fill="#205c44" d="M128 0h128v64H128z"/><path fill="#c4161c" d="M0 64h128v64H0z"/>
+<g fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M29 17v29m0-15c17-17 23 20 7 15l-7-4M55 26v14q0 11 15 3V26m0 0v20M98 28c-20-12-25 9-8 9s8 17-8 7"/>
+<path d="M142 17v24q0 8 9 4m-14-19h15M160 45V27m0 7q5-10 11-7M193 28q-21-10-20 8t20 5V27m0 0v18M204 45V27m0 5q11-12 13 4v9m0-13q12-12 13 3v10"/>
+<path stroke-width="8" d="M39 111V81l25 23 25-23v30"/>
+</g><path fill="#fff" d="M128 64h128v64H128z"/>
+</svg>

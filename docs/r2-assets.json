@@ -1,0 +1,16 @@
+{
+  "atlas": {
+    "source": "app/frontend/static/img/transport/boards.svg",
+    "provenance": "Original app-owned path artwork; no font, logo, third-party texture or acquisition",
+    "width": 256,
+    "height": 128,
+    "source_bytes": 807,
+    "sha256": "cbb1e51068636d7eb55e3fe74e4189620852e8005ce7295f0d3b29b492088b1c",
+    "conversion": "Browser SVG Image decoder, texImage2D once per scene, generateMipmap; no build dependency",
+    "rgba_bytes_without_mipmaps": 131072
+  },
+  "meshes": {
+    "source": "app/frontend/static/js/features/transport-scene/geometry.js",
+    "provenance": "Original procedural metre-space geometry, no downloaded model"
+  }
+}

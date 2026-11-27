@@ -8,8 +8,7 @@ import {TransportLayer} from "./layer.js";
  *
  * TransportLayerGL.create(map, elements, maplibre) behaves like TransportLayer.create on the
  * current map: same endpoint, viewport query, debounce, modes, toggle, status, focus chip and
- * popups with departures. Lines use a GeoJSON source under labels; close paline are native metre-sized
- * extrusions. Compact symbols and keyboard access remain retained HTML markers. Presentation helpers come from TransportLayer (single source).
+ * popups with departures. Lines use a GeoJSON source under labels; close paline use the map-owned instanced scene with native extrusion recovery. Compact symbols and keyboard access remain retained HTML markers. Presentation helpers come from TransportLayer (single source).
  * MapLibre zoom z shows the scale of Leaflet zoom z + 1 (512 px tiles): requests and detail
  * thresholds use that equivalent zoom, so they match the current map.
  */
@@ -38,7 +37,7 @@ function beforeLabels(map) {
   return map.getStyle?.().layers?.find(l => l.type === "symbol")?.id;
 }
 
-function create(map, elements, maplibre) {
+function create(map, elements, maplibre, transportScene=null) {
   let disposed = false;
   const listeners = new AbortController(), cleanup = [];
   const ownMap = (event, ...args) => { map.on(event, ...args); cleanup.push(() => map.off?.(event, ...args)); };
@@ -46,11 +45,20 @@ function create(map, elements, maplibre) {
   let visible = false, features = [], request = null, timer = null, focused = null, popup = null, held = null;
   let markers = new Map(),lineData=null,entrances=null,nativeFeatures=[];
   const popupFitter=createPopupFitter(map);
-  const paline=createPaline(map,key=>{
+  let paline=null;
+  const selectPhysical=key=>{
     if(disposed||!visible)return;
     const source=nativeFeatures.find(f=>f.geometry.type==='Point'&&stopKey(f)===key);
     if(source)selectStop({lngLat:source.geometry.coordinates,props:source.properties,ids:source.properties.stop_ids||[source.properties.stop_id]});
-  });
+  };
+  function physicalSigns(){
+    if(disposed||map.isStyleLoaded?.()===false)return;
+    const records=nativeFeatures.filter(f=>f.geometry.type==='Point'&&nativeMode(f.properties)).map(f=>({key:stopKey(f),mode:f.properties.transport_type,coordinates:f.geometry.coordinates,focused:Boolean(focused&&(f.properties.stop_ids||[f.properties.stop_id]).some(id=>focused.stopIds.has(id)))}));
+    if(transportScene?.setSigns(records)){paline?.dispose();paline=null;}
+    else {paline??=createPaline(map,selectPhysical);paline.ensure();paline.update(nativeFeatures,map.getZoom(),focused);}
+  }
+  ownMap('egi:stopselect',event=>selectPhysical(event.key));
+  ownMap('egi:transport-scene',physicalSigns);
   const names=createStopNames(map.getContainer());
   const refreshNames=()=>names.refresh(leafletZoom(map));
   const chip = document.createElement("div");
@@ -80,7 +88,7 @@ function create(map, elements, maplibre) {
       const p = event.features?.[0]?.properties;
       if (p) openPopup(event.lngLat, TransportLayer.routePopupHtml(p));
     });
-    paline.ensure();render();
+    render();
   });
 
   function setStatus(text) { if (elements.status) elements.status.textContent = text; }
@@ -159,7 +167,7 @@ function create(map, elements, maplibre) {
     for(const [key,entry] of previous)if(!next.has(key))entry.marker.remove();
     markers=next;
     nativeFeatures=[...shown.filter(f=>f.properties.transport_type!=='metro'),...entranceSigns(stations,entrances)];
-    paline.update(nativeFeatures,map.getZoom(),focused);
+    physicalSigns();
     names.update(stops,leafletZoom(map));
   }
 
@@ -277,7 +285,7 @@ function create(map, elements, maplibre) {
       disposed = true; visible = false; listeners.abort(); request?.abort(); clearTimeout(timer); clearInterval(interval);
       for (const clean of cleanup) clean();
       for (const entry of markers.values()) entry.marker.remove();
-      paline.dispose();names.dispose();popupFitter.dispose();markers.clear(); popup?.remove(); popup = null; chip.remove?.();
+      transportScene?.setSigns([]);paline?.dispose();names.dispose();popupFitter.dispose();markers.clear(); popup?.remove(); popup = null; chip.remove?.();
       for (const id of LINE_LAYERS) if (map.getLayer?.(id)) map.removeLayer(id);
       if (map.getSource?.(LINES)) map.removeSource(LINES);
     }};

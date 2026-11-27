@@ -210,7 +210,7 @@ async function loadOriginTransit() {
   } catch(error) {if (!scope.signal.aborted && !current.signal.aborted) node.textContent="Mezzi vicini non disponibili al momento. La ricerca servizi resta disponibile.";}
 }
 
-function mount(attach){runtime.transport=attach((map,engine)=>(engine?.maplibre?(m,e)=>TransportLayerGL.create(m,e,engine.maplibre):TransportLayer.create)(map,{
+function mount(attach){runtime.transport=attach((map,engine)=>(engine?.maplibre?(m,e)=>TransportLayerGL.create(m,e,engine.maplibre,engine.transportScene):TransportLayer.create)(map,{
  toggle:document.getElementById('transport-toggle'),status:document.getElementById('transport-status'),
  modes:Object.fromEntries(['metro','rail','tram','bus'].map(mode=>[mode,document.getElementById('transport-'+mode)]))}));}
 function update(snapshot){state=snapshot;}

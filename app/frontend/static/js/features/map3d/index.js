@@ -1,3 +1,4 @@
+import {createTransportScene} from '../transport-scene/index.js';
 import {siteMarkers,USER_DOT_HTML,USER_DOT_LABEL} from "../map/pins.js";
 import {clusterSites,clusterAppearance,siteLabel,placeSiteHeads,siteHeadBox,CLUSTER_DISTANCE,STEM_ZOOM,NAME_ZOOM,DETAIL_ZOOM} from "./sites.js";
 import {egiStyle,liftBridgeLabels} from "./style.js";
@@ -28,7 +29,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   devicePixelRatio=globalThis.devicePixelRatio||1,origin=globalThis.location?.origin||"",
   frame=globalThis.requestAnimationFrame?.bind(globalThis),cancelFrame=globalThis.cancelAnimationFrame?.bind(globalThis),
   clock=()=>globalThis.performance?.now?.()??Date.now(),heap=()=>globalThis.performance?.memory?.usedJSHeapSize??null}) {
- let state={},entries=[],visible=true,disposed=false,headsDirty=false;
+ let state={},entries=[],visible=true,disposed=false,headsDirty=false,transportScene=null;
  const runtime={map:null,markers:new Map(),user:null,bounds:null,cleanups:[],layout:[],screen:null};
  const t=(key,fallback)=>translate(key,{},fallback);
  const bounds=()=>[[Number(context.boundsWest),Number(context.boundsSouth)],[Number(context.boundsEast),Number(context.boundsNorth)]];
@@ -61,6 +62,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   map.on("move",queueHeadLayout);
   map.on("render",flushHeadLayout);
   runtime.cleanups.push(()=>{map.off("move",queueHeadLayout);map.off("render",flushHeadLayout);cancelHeadLayout();});
+  if(maplibre.MercatorCoordinate)transportScene=createTransportScene({map,maplibre,onStopSelect:key=>map.fire("egi:stopselect",{key})});
   watchBudget(map);
   map.on("load",()=>{if(map.getStyle)runtime.cleanups.push(liftBridgeLabels(map));render();});
   // The drawing itself is decorative: services, controls and attributions are separate HTML.
@@ -265,7 +267,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   render();
  }
  /** Layer factories receive the MapLibre map and the engine (so they pick their MapLibre version). */
- function attach(factory){return factory(runtime.map,{maplibre});}
+ function attach(factory){return factory(runtime.map,{maplibre,transportScene});}
  function center(lat,lng){if(runtime.map&&contains(lat,lng))move({center:[lng,lat],zoom:Math.max(runtime.map.getZoom(),15)});}
  /** Centre an opened service at z17.5, tilted; reduced motion jumps immediately. */
  function focusService(lat,lng){if(runtime.map&&contains(lat,lng))move({center:[lng,lat],zoom:17.5,pitch:TILT,duration:reduceMotion?0:650});}
@@ -276,6 +278,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   for(const entry of runtime.markers.values())entry.marker.remove();
   runtime.markers.clear();runtime.user?.remove();runtime.user=null;
   runtime.layout=[];runtime.screen=null;
+  transportScene?.dispose();transportScene=null;
   runtime.map?.remove();runtime.map=null;
  }
  return {mount,update,attach,center,contains,focusService,invalidate:()=>runtime.map?.resize(),servicesVisible,dispose,

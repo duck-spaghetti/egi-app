@@ -82,6 +82,13 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
  summaries[0].options.element.click();await wait(20);assert(calls.at(-1).url.includes('stops=platform-a%2Cplatform-b'),'summary requests both platforms');
  groupedMap.hits=[{layer:{id:'egi-transport-paline-metro'},properties:{key:'osm:entrance:2'}}];groupedMap.handlers.find(h=>h[0]==='click'&&h.length===2)[1]({point:{x:100,y:100}});await wait(20);assert(calls.at(-1).url.includes('stops=platform-a%2Cplatform-b'),'entrance requests its station platforms rather than pretending to be a platform');const beforeOff=created.popups.length;grouped.setVisible(false);groupedMap.handlers.find(h=>h[0]==='click'&&h.length===2)[1]({point:{x:100,y:100}});assert.equal(created.popups.length,beforeOff,'stale native worker hit cannot reopen a hidden layer');grouped.dispose();
 
+ // Shared-scene handoff preserves entrance selection, native recovery and independent ownership.
+ let sceneAvailable=false,sceneRecords=[];const sharedScene={setSigns(records){sceneRecords=records;return sceneAvailable;}};
+ const sceneMap=fakeMap();sceneMap.zoom=18;const custom=TransportLayerGL.create(sceneMap,{},maplibre,sharedScene);custom.setVisible(true);await custom.reload();
+ assert(sceneMap.sources['egi-transport-paline'],'native recovery while custom scene is pending');sceneAvailable=true;sceneMap.handlers.find(h=>h[0]==='egi:transport-scene')[1]();
+ assert(!sceneMap.sources['egi-transport-paline'],'no duplicate native geometry after custom readiness');assert.equal(sceneRecords.length,2,'real entrances remain separate custom instances');
+ const beforeCustom=created.popups.length;sceneMap.handlers.find(h=>h[0]==='egi:stopselect')[1]({key:sceneRecords[0].key});assert.equal(created.popups.length,beforeCustom+1,'custom pick uses existing station popup owner');
+ sceneAvailable=false;sceneMap.handlers.find(h=>h[0]==='egi:transport-scene')[1]();assert(sceneMap.sources['egi-transport-paline'],'failed scene restores native representation');custom.setVisible(false);assert.equal(sceneRecords.length,0);custom.dispose();
  const lateMap=fakeMap();let styleReady=false;lateMap.isStyleLoaded=()=>styleReady;const late=TransportLayerGL.create(lateMap,{},maplibre);assert(!lateMap.sources['egi-transport-paline']);styleReady=true;lateMap.handlers.find(h=>h[0]==='idle')[1]();assert(lateMap.sources['egi-transport-paline'],'idle initializes late-composed layers without waiting forever for load');late.dispose();
  // Cycleways: same body as the current map's layer, features drawn, same status text.
  const cmap=fakeMap();cmap.zoom=13.2;const ctoggle=element(),cstatus=element();

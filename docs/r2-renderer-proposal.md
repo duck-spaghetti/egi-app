@@ -1,6 +1,8 @@
 # R2 shared transport rendering proposal — EGI-122
 
-Status: proposed for the explicit architecture gate; not an adopted ADR.
+Status: approved by the user on 2026-11-27; isolated experiment passed.
+See [execution/evidence](r2-rendering.md). Original proposal and cost estimates
+remain below as the decision baseline, not measured product claims.
 Date: 2026-11-27. Owner: app. Tickets: EGI-122 → EGI-123 → EGI-124.
 Specification: [rendering/catalogue r0.3](https://linear.app/aquaradja/document/map-rendering-and-catalogue-performance-specification-r03-f07ab117ab7c).
 
