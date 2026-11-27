@@ -223,8 +223,8 @@ function renderSearchOptions() {
 
 /** Recount facets and update the filter sheet: total, need tiles and selects. */
 
-function renderFacets() {
-  facets = facetCounts();
+function renderFacets(now=new Date()) {
+  facets = facetCounts(now);
   const total = document.getElementById("filter-total");
   if (total) {
     const all = state.pois.length;
@@ -236,7 +236,7 @@ function renderFacets() {
 
 /** Source of a service row: Helpinet or one of the map exports (see app/backend/preview.py). */
 
-function update(snapshot){state=snapshot;renderFacets();renderActiveFilters();}
+function update(snapshot,now=new Date()){state=snapshot;renderFacets(now);renderActiveFilters();}
 function select(snapshot,now=new Date()){state=snapshot;return filteredPois(now);}
 
 return {update,select,matches:(poi,now)=>passesFilters(poi,null,now),dispose(){}};

@@ -21,11 +21,20 @@ function siteGroups(list) {
   return [...groups.values()];
 }
 
+let indexed=null,points=new Map(),sources=new Map();
+/** Rebuild exact source relationships once per refresh; never merge approximate positions. */
+function reset(){
+ indexed=snapshot().pois;points=new Map();sources=new Map();
+ for(const poi of indexed){const key=sourceSiteKey(poi),source=poi.raw?.source_group?.external_key;
+  if(key){if(!points.has(key))points.set(key,[]);points.get(key).push(poi);}
+  if(source){if(!sources.has(source))sources.set(source,[]);sources.get(source).push(poi);}
+ }
+}
 function sameSourceGroup(poi) {
-  if (context.canonical) { const key=sourceSiteKey(poi); return key ? snapshot().pois.filter(p=>sourceSiteKey(p)===key) : [poi]; }
-  const id = poi.raw?.source_group?.external_key;
-  return id ? snapshot().pois.filter(p=>p.raw?.source_group?.external_key === id) : [poi];
+ if(indexed!==snapshot().pois)reset();
+ if(context.canonical){const key=sourceSiteKey(poi);return key?points.get(key)||[]:[poi];}
+ const id=poi.raw?.source_group?.external_key;return id?sources.get(id)||[]:[poi];
 }
 
-return {key:sourceSiteKey,groups:siteGroups,siblings:sameSourceGroup};
+return {key:sourceSiteKey,groups:siteGroups,siblings:sameSourceGroup,reset,dispose(){indexed=null;points.clear();sources.clear();}};
 }

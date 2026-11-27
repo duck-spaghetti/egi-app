@@ -3,7 +3,14 @@ import {createPresentation} from "./presentation.js";
 export function createServices({context,scope,loader,sites,transit,translate,emit}) {
 let state={pois:[],categories:[],languages:[],categoryTranslations:[],taxonomy:{course_levels:[]},filters:{cats:new Set(),offersOff:new Set()},lang:context.languageCode||'it',matchedIds:new Set()};
 const model=createPresentation({snapshot:()=>state,context,translate});
-const {describe,normalizePublicService,normalizeArea,normalizeCategory,mergeServiceCategories,applyCategoryLabels,normalizeCategoryIconPath,resolveCategory,categoryBadge,serviceTitle,serviceKind,serviceOrganiser,sourceNames,formatDistance,sourceOpeningStatus,todayHours,renderServiceHeader,renderInfoSection,renderHoursSection,renderContactsSection,renderSourcesSection,renderServiceBar,serviceButton,SERVICE_SECTIONS,escapeHtml,t}=model;
+const {normalizePublicService,normalizeArea,normalizeCategory,mergeServiceCategories,applyCategoryLabels,normalizeCategoryIconPath,resolveCategory,categoryBadge,serviceTitle,serviceKind,serviceOrganiser,sourceNames,formatDistance,sourceOpeningStatus,todayHours,renderServiceHeader,renderInfoSection,renderHoursSection,renderContactsSection,renderSourcesSection,renderServiceBar,serviceButton,SERVICE_SECTIONS,escapeHtml,t}=model;
+let descriptions=new Map(),refreshTime=null;
+/** Memoization belongs to one coherent refresh, including its clock/reference/language context. */
+function beginRefresh(snapshot,now=new Date()){state=snapshot;refreshTime=now;descriptions=new Map();}
+function describe(poi,now=refreshTime||new Date()){
+ if(!refreshTime||now.getTime()!==refreshTime.getTime())return model.describe(poi,now);
+ const key=poi.id??poi;if(!descriptions.has(key))descriptions.set(key,model.describe(poi,now));return descriptions.get(key);
+}
 const closeSheets=()=>emit('closeSheets');
 
 async function openDetail(id) {
@@ -167,7 +174,7 @@ async function load(language) {
   cityOptions:bundle.areas.map(projection.normalizeArea),categoryTranslations:bundle.categoryTranslations,taxonomy:{...bundle.taxonomy,needs:(bundle.taxonomy.needs||[]).map(projection.displayCategory)}};
 }
 function update(snapshot,list) {state=snapshot;if(list)renderList(list);}
-function dispose(){document.getElementById('detail-body').onscroll=null;}
+function dispose(){descriptions.clear();refreshTime=null;state={pois:[]};document.getElementById('detail-body').onscroll=null;}
 
-return {load,update,show:openDetail,choose:openServiceChooser,refreshHours:updateOpeningBadges,describe:model.describe,dispose};
+return {load,update,beginRefresh,show:openDetail,choose:openServiceChooser,refreshHours:updateOpeningBadges,describe,dispose};
 }

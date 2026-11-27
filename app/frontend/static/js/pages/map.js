@@ -111,9 +111,10 @@ export function createMapPage(context, dependencies={}) {
  }
  function refresh(){
   if(scope.signal.aborted)return;
-  let view=snapshot();services.update(view);transit.update(view);origin.update(view);
-  const list=search.select(view);state.matchedIds=new Set(list.map(row=>row.id));view=snapshot();
-  services.update(view,list);search.update(view);
+  const now=new Date();sites.reset();let view=snapshot();
+  if(services.beginRefresh)services.beginRefresh(view,now);else services.update(view);transit.update(view);origin.update(view);
+  const list=search.select(view,now);state.matchedIds=new Set(list.map(row=>row.id));view=snapshot();
+  services.update(view,list);search.update(view,now);
   map.update(view,state.focusSiteKey?state.pois.filter(row=>sites.key(row)===state.focusSiteKey):list);
   shell.update();
  }
@@ -195,7 +196,7 @@ export function createMapPage(context, dependencies={}) {
   loading=(async()=>{
    try{
     await i18n.setLanguage(state.lang);scope.check();
-    map.mount();mounted=true;scope.own(map.dispose);
+    map.mount();mounted=true;scope.own(map.dispose);scope.own(sites.dispose);
     scope.own(services.dispose);scope.own(origin.dispose);scope.own(transit.dispose);scope.own(cycle.dispose);
     shell.bind();shell.layout();shell.translate();bindView();
     if(walking){walking.mount(map.attach);scope.own(walking.dispose);}
