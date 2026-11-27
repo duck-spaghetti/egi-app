@@ -254,9 +254,12 @@ with ResourceRun(Path.cwd()).activate() as run:
         import importlib.util
         spec=importlib.util.spec_from_file_location('direct_app_fixture',ROOT/'tests/native.py')
         fixture=importlib.util.module_from_spec(spec);spec.loader.exec_module(fixture)
-        with parent_runs() as allocated:
-            with patch.object(fixture,'REPOSITORY','/private/tmp/selected-schema-provider'),patch.object(fixture.Cluster,'sql',side_effect=RuntimeError('controlled schema failure')):
-                with self.assertRaisesRegex(RuntimeError,'controlled schema'):
-                    fixture.Cluster(65479,'egi_direct_fixture')
+        with patch.dict(os.environ):
+            os.environ.pop('EGI_RESOURCE_RUN',None)
+            os.environ.pop('EGI_RESOURCE_CAPABILITY',None)
+            with parent_runs() as allocated:
+                with patch.object(fixture,'REPOSITORY','/private/tmp/selected-schema-provider'),patch.object(fixture.Cluster,'sql',side_effect=RuntimeError('controlled schema failure')):
+                    with self.assertRaisesRegex(RuntimeError,'controlled schema'):
+                        fixture.Cluster(65479,'egi_direct_fixture')
         self.assertEqual(allocated[0].record['repository'],str(ROOT))
         self.assertFalse(allocated[0].path.exists())
