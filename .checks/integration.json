@@ -12,7 +12,7 @@
       "name": "database",
       "environment": "EGI_DATABASE_PROVIDER",
       "path": "../egi_database-development-checks",
-      "revision": "b570c2003fb68ed71e11bfe7445f0dc4433a1b5f"
+      "revision": "e92b40c4f0b2a54fb23693d5787d8a1e076191a6"
     },
     {
       "name": "reviewer",
