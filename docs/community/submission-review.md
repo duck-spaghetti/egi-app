@@ -38,6 +38,8 @@ attached to every field. Contacts need explicit visibility.
 Acceptance creates or updates only a draft. Every source actually used in canonical evidence, including the original source
 and editorial observations, needs separate Admin admission before publication. Admin controls
 are shown individually; enabling an unrelated source cannot bypass this check.
+The canonical publication refusal explains when evidence sources need Admin admission,
+alongside the existing completeness diagnostics.
 The existing canonical compare/approve/publish action is reused, as is generic
 contribution closure. SQL requires a publication of the resolved service descended
 from that proposal's accepted revision; unrelated or older publications cannot close

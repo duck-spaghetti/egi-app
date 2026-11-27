@@ -346,7 +346,7 @@
       "stale": "Qualcuno ha salvato o pubblicato una versione più recente. Non è stato sovrascritto nulla: i tuoi valori sono qui sotto, non salvati. Ricarica la scheda per ripartire dalla versione attuale.",
       "no_changes": "Non hai modificato nulla.",
       "summary_required": "Scrivi un riepilogo delle modifiche.",
-      "publication_incomplete": "La bozza non si può pubblicare: mancano dati obbligatori (per esempio descrizione o contatti).",
+      "publication_incomplete": "La bozza non si può pubblicare: controlla i requisiti indicati nel confronto.",
       "invalid_hours": "Orari non validi: controlla le fasce (apertura e chiusura), i giorni aperti senza fasce e le date.",
       "schedule_overlap": "Due orari per lo stesso pubblico valgono negli stessi giorni, e “aperto ora” non saprebbe quale usare. Cambia le date di validità o rimuovine uno.",
       "schedule_contact": "Per gli orari di una linea di contatto scegli un contatto già salvato.",
@@ -622,7 +622,8 @@
         "unpublished_location": "il luogo non è pubblicato",
         "unidentifiable_location": "il luogo non ha né nome né indirizzo",
         "unpublished_organization": "un ente collegato non è pubblicato",
-        "invalid_shared_contact": "un contatto condiviso non è più pubblico"
+        "invalid_shared_contact": "un contatto condiviso non è più pubblico",
+        "community_source_not_admitted": "l’abilitazione di un Admin per una o più fonti usate nelle evidenze; puoi richiederla dalla proposta Community"
       },
       "created_note": "Servizio creato dalla redazione"
     },

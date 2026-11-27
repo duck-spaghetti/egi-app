@@ -119,7 +119,9 @@ class CommunityReviewTests(unittest.TestCase):
         self.assertIn('Proposta accettata',linked.text)
         self.assertNotIn('id="community-accept-form"',linked.text)
         publish_path='/moderazione/servizio/'+service+'/pubblica'
-        self.assertEqual(self.form(admin,publish_path,working=revision,public='',summary='Synthetic publish').status_code,400)
+        blocked=self.form(admin,publish_path,working=revision,public='',summary='Synthetic publish')
+        self.assertEqual(blocked.status_code,400)
+        self.assertIn('una o più fonti usate nelle evidenze',blocked.text)
         wrong_source=self.post(admin,BASE+'/fonti',{'metadata':{'name':'Unrelated source','source_kind':'directory'},'request_key':str(uuid4())},'admin').json()['source_id']
         self.assertEqual(self.post(admin,BASE+'/fonti/'+wrong_source+'/ammetti',{'reason':'Different source'},'admin').status_code,200)
         self.assertEqual(self.form(admin,publish_path,working=revision,public='',summary='Still blocked').status_code,400)

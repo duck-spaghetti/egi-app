@@ -513,7 +513,8 @@ EXPLAINED = ('no_changes', 'summary_required', 'publication_incomplete', 'sessio
              'schedule_contact', 'location_not_found', 'location_required', 'location_incomplete', 'territory_required',
              'method_required', 'note_too_long', 'invalid_point', 'name_required', 'mode_required')
 MISSING = ('missing_name', 'missing_description', 'missing_channel', 'missing_place', 'missing_evidence', 'missing_area_description',
-           'unpublished_location', 'unidentifiable_location', 'unpublished_organization', 'invalid_shared_contact')
+           'unpublished_location', 'unidentifiable_location', 'unpublished_organization', 'invalid_shared_contact',
+           'community_source_not_admitted')
 
 
 def workspace_error(code: str) -> str:
