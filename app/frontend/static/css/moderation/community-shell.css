@@ -22,6 +22,12 @@
 .community-desk button:hover, .community-desk .button:hover { border-color:var(--ink-faint); background:#eee9dd; }
 .community-desk button.link { border:0; background:transparent; padding:0; color:var(--ink-soft); font-size:11px; }
 .community-desk #submit-card, .community-desk .publish button, .community-desk #community-accept-form>button { background:var(--accent); border-color:var(--accent); color:var(--paper); }
+/* Shared content links and controls also cover queue filters and inline forms. */
+.community-main a:not(.button), .community-main a:not(.button):visited { color:var(--accent); text-decoration-thickness:1px; text-underline-offset:3px; }
+.community-main a:not(.button):hover { color:var(--ink); }
+.community-desk .community-main :is(input:not([type=checkbox], [type=radio], [type=hidden]), select, textarea) { font:inherit; color:var(--ink); background:var(--paper); border:1px solid var(--line); border-radius:7px; padding:8px 10px; max-width:100%; }
+.community-desk .community-main fieldset { border-radius:10px; }
+.community-desk .community-main :is(a, button, input, select, textarea):focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
 .community-desk .desk-form { font-size:12px; }
 .community-desk .desk-form input, .community-desk .desk-form select, .community-desk .desk-form textarea { font-size:12px; }
 .community-desk .hint { font-size:11px; line-height:1.7; }

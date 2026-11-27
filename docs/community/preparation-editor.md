@@ -170,3 +170,8 @@ continuing an obsolete offset. A pending request makes its current reference pan
 inert without restoring outdated button states. Database change029 makes undo
 restore a literal while leaving a changed-value or stale-head resolution unresolved;
 it preserves the immutable earlier decision and the undo receipt.
+
+Shared Community content links use the accent palette, including visited links.
+Queue/inline/editor form controls share rounded borders and visible keyboard focus;
+transparent card editing remains intact. Styling is scoped to authenticated editorial
+content and does not change public-map controls.
