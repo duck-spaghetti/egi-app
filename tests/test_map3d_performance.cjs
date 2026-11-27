@@ -2,9 +2,10 @@
 const assert=require('node:assert/strict');const {performance}=require('node:perf_hooks');const {environment}=require('./module_fixture.cjs');
 (async()=>{
  const env=environment(),{createMap3d}=await env.load('features/map3d/index.js');
+ const createElement=env.document.createElement;env.document.createElement=()=>{const el=createElement();el.style.setProperty=(name,value)=>el.style[name]=value;return el;};
  const {createSites}=await env.load('features/map/sites.js');let gl,described=0;const markers=[];
  const container={clientWidth:1280,clientHeight:720};
- class Map {constructor(){gl=this;this.handlers={};}on(k,f){(this.handlers[k]||=[]).push(f);}fire(k){for(const f of this.handlers[k]||[])f();}addControl(c){c.onAdd?.(this);}getPitch(){return 45;}getZoom(){return 17;}project([x,y]){return {x:640+(x-12.5)*30000,y:360+(y-41.9)*30000};}getContainer(){return container;}remove(){} }
+ class Map {constructor(){gl=this;this.handlers={};}on(k,f){(this.handlers[k]||=[]).push(f);}off(k,f){this.handlers[k]=(this.handlers[k]||[]).filter(h=>h!==f);}fire(k){for(const f of this.handlers[k]||[])f();}addControl(c){c.onAdd?.(this);}getPitch(){return 45;}getZoom(){return 17;}project([x,y]){return {x:640+(x-12.5)*30000,y:360+(y-41.9)*30000};}getContainer(){return container;}remove(){} }
  class Marker {constructor(o){this.o=o;markers.push(this);}setLngLat(){return this;}addTo(){return this;}remove(){this.removed=true;}getElement(){return this.o.element;} }
  const pois=Array.from({length:600},(_,i)=>({id:i,title:'Service '+i,longitude:12.2+i%30*.02,latitude:41.7+Math.floor(i/30)*.02}));
  const state={pois},sites=createSites({context:{canonical:true},snapshot:()=>state});
@@ -33,6 +34,6 @@ const assert=require('node:assert/strict');const {performance}=require('node:per
  env.document.documentElement.dir='rtl';map.update({pois:state.pois,selectedId:'b'},state.pois);
  assert.equal(mobile.dataset.labelled,'true');// Control collision geometry is covered by the shared planner tests.
  const adjacent=[{id:'near-a',title:'Via Uno 10',longitude:12.5,latitude:41.9},{id:'near-b',title:'Via Uno 12',longitude:12.50001,latitude:41.9}];
- state.pois=adjacent;map.update(state,adjacent);const nearButtons=markers.filter(m=>!m.removed).map(m=>m.getElement().children[0]);assert.equal(nearButtons.length,2);assert(nearButtons.some(b=>/L-?56 /.test(b.innerHTML)),'close separate sites get an inclined leader');assert.equal(adjacent[1].longitude,12.50001,'head separation preserves source coordinates');
+ state.pois=adjacent;map.update(state,adjacent);const nearButtons=markers.filter(m=>!m.removed).map(m=>m.getElement().children[0]);assert.equal(nearButtons.length,2);assert(nearButtons.some(b=>Math.abs(parseFloat(b.style['--site-head-x']))===56),'close separate sites get an inclined leader');assert.equal(adjacent[1].longitude,12.50001,'head separation preserves source coordinates');
  map.dispose();
 })().catch(e=>{console.error(e);process.exitCode=1;});

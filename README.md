@@ -877,8 +877,14 @@ that an entrance is open now. GTFS still owns every timetable/platform/route ID.
 identical line/mesh data is not resent to the renderer worker. Explicit wrapper
 stacking is transport10, service20, popup30, navigation40. Service label backgrounds
 are white80%, text/status/icons opaque. Source feet stay fixed while service heads
-try stable screen offsets up to56px (leaders at most64px), connected by leaders; in fully saturated views
-overlap cannot be ruled out. Native sign orientation remains schematic.
+try stable screen offsets up to56px (leaders at most64px), connected by leaders.
+Offsets shrink continuously from full separation at z17 to zero extra displacement
+at z14. During zoom, one coalesced animation-frame write updates the existing head
+and SVG endpoint together; source anchors and candidate directions stay fixed.
+Full clustering/collision and label placement run after the gesture settles,
+without reformatting service data during gesture updates. Pending gesture writes
+are canceled on settled layout, visibility changes and disposal. In fully saturated
+views overlap cannot be ruled out. Native sign orientation remains schematic.
 
 Service opening labels show known closing times and the next known opening using
 the schedule timezone, without inventing boundaries for incomplete/24h schedules.

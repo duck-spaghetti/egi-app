@@ -1,5 +1,5 @@
 import {siteMarkers,USER_DOT_HTML,USER_DOT_LABEL} from "../map/pins.js";
-import {clusterSites,clusterAppearance,siteLabel,placeSiteHeads,hitsMapControls,CLUSTER_DISTANCE,STEM_ZOOM,NAME_ZOOM,DETAIL_ZOOM} from "./sites.js";
+import {clusterSites,clusterAppearance,siteLabel,placeSiteHeads,headOffsetScale,hitsMapControls,CLUSTER_DISTANCE,STEM_ZOOM,NAME_ZOOM,DETAIL_ZOOM} from "./sites.js";
 import {egiStyle,liftBridgeLabels} from "./style.js";
 /** createMap3d: the 3D mode's map module, on MapLibre GL JS, with the current map's interface.
  *
@@ -28,7 +28,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   devicePixelRatio=globalThis.devicePixelRatio||1,origin=globalThis.location?.origin||"",
   frame=globalThis.requestAnimationFrame?.bind(globalThis),cancelFrame=globalThis.cancelAnimationFrame?.bind(globalThis),
   clock=()=>globalThis.performance?.now?.()??Date.now(),heap=()=>globalThis.performance?.memory?.usedJSHeapSize??null}) {
- let state={},entries=[],visible=true,disposed=false;
+ let state={},entries=[],visible=true,disposed=false,zoomFrame=null;
  const runtime={map:null,markers:new Map(),user:null,bounds:null,cleanups:[]};
  const t=(key,fallback)=>translate(key,{},fallback);
  const bounds=()=>[[Number(context.boundsWest),Number(context.boundsSouth)],[Number(context.boundsEast),Number(context.boundsNorth)]];
@@ -58,6 +58,8 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
    emit("pickedReference",{lat:event.lngLat.lat,lng:event.lngLat.lng,label:"Punto scelto sulla mappa"});
   });
   map.on("moveend",render);
+  map.on("zoom",queueHeadZoom);
+  runtime.cleanups.push(()=>{map.off("zoom",queueHeadZoom);cancelHeadZoom();});
   watchBudget(map);
   map.on("load",()=>{if(map.getStyle)runtime.cleanups.push(liftBridgeLabels(map));render();});
   // The drawing itself is decorative: services, controls and attributions are separate HTML.
@@ -113,7 +115,34 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
 
  function wrap(el){const box=document.createElement("div");box.className="map3d-marker";box.append(el);return box;}
 
+ /** Cancel the pending gesture write before settled layout or teardown takes ownership. */
+ function cancelHeadZoom(){if(zoomFrame!==null){cancelFrame?.(zoomFrame);zoomFrame=null;}}
+
+ /** Move the existing head and its SVG endpoint together, without replacing content or the anchor. */
+ function positionHead(entry,dx,dy){
+  if(entry.dx===dx&&entry.dy===dy)return;
+  entry.el.style.setProperty?.('--site-head-x',`${dx}px`);entry.el.style.setProperty?.('--site-head-y',`${dy}px`);
+  entry.leader?.setAttribute('d',`M0 0 L${dx} ${dy-21}`);
+  entry.dx=dx;entry.dy=dy;
+ }
+
+ /** Coalesce zoom events; keep each settled candidate's direction until full collision layout at moveend. */
+ function queueHeadZoom(){
+  if(disposed||!visible||zoomFrame!==null)return;
+  if(!frame){zoomHeads();return;}
+  zoomFrame=frame(()=>{zoomFrame=null;zoomHeads();});
+ }
+ function zoomHeads(){
+  if(disposed||!runtime.map)return;
+  const zoom=runtime.map.getZoom(),scale=headOffsetScale(zoom);
+  for(const entry of runtime.markers.values())if(entry.head){
+   positionHead(entry,entry.head.dx*scale,entry.head.dy*scale);
+   entry.el.dataset.anchored=String(zoom>=STEM_ZOOM);
+  }
+ }
+
  function render() {
+  cancelHeadZoom();
   const map=runtime.map;
   if(!map||disposed)return;
   const next=new Map(),labels=[];
@@ -155,7 +184,8 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
     entry.data={site,lngLat};
     if(count===1){
      const offset=heads.get(group)||{dx:0,dy:0},headPoint=group.headPoint;
-     entry.el.style.setProperty?.('--site-head-x',`${offset.dx}px`);entry.el.style.setProperty?.('--site-head-y',`${offset.dy}px`);
+     const scale=headOffsetScale(map.getZoom());
+     entry.head={dx:scale?offset.dx/scale:0,dy:scale?offset.dy/scale:0};
      const selected=site.serviceIds.includes(String(state.selectedId));
      const anchored=map.getZoom()>=STEM_ZOOM,detail=selected||map.getZoom()>=DETAIL_ZOOM;
      const maxWidth=Math.min(detail?260:200,Math.max(130,(screenWidth-50)/2-30));
@@ -185,12 +215,14 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
      const labelled=(selected||map.getZoom()>=NAME_ZOOM)&&Boolean(placement);
      if(labelled)labels.push(placement.box);
      entry.el.dataset.labelSide=placement?.leftSide?'left':'right';
-     const html=`<span class="map3d-pin-body">${site.html}${labelled?siteLabel(site,detail,translate):''}</span><span class="map3d-stem" aria-hidden="true"></span><span class="map3d-ground" aria-hidden="true"></span>${anchored?`<svg class="map3d-leader" width="1" height="1" aria-hidden="true"><path d="M0 0 L${offset.dx} ${offset.dy-21}"></path></svg>`:''}`;
+     const html=`<span class="map3d-pin-body">${site.html}${labelled?siteLabel(site,detail,translate):''}</span><span class="map3d-stem" aria-hidden="true"></span><span class="map3d-ground" aria-hidden="true"></span><svg class="map3d-leader" width="1" height="1" aria-hidden="true"><path d="M0 0 L0 -21"></path></svg>`;
      entry.el.dataset.anchored=String(anchored);entry.el.dataset.labelled=String(labelled);entry.el.dataset.selected=String(selected);
      const accessible=[selected?`${site.name} · ${site.label}`:site.label,...(site.allCategories||[]).filter(c=>c.matched===false).map(c=>c.label||c.slug),...detail?(site.statuses||[]).map(s=>s?.label):[]].filter(Boolean).join(" · ");
      if(entry.el.dataset.html!==html+accessible){
       entry.el.innerHTML=html;entry.el.setAttribute("aria-label",accessible);entry.el.title=selected?accessible:site.label;entry.el.dataset.html=html+accessible;
+      entry.leader=entry.el.querySelector('.map3d-leader path');entry.dx=entry.dy=null;
      }
+     positionHead(entry,offset.dx,offset.dy);
     }
     next.set(key,entry);
    }

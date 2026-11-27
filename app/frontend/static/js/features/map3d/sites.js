@@ -14,6 +14,9 @@ import {escapeHtml,categoryCaption} from '../../format.js';
 export const CLUSTER_DISTANCE=64, STEM_ZOOM=14, NAME_ZOOM=14, DETAIL_ZOOM=14;
 export const MAX_HEAD_OFFSET=56;
 
+/** Pixel displacement follows map scale: no extra offset at z14, full separation at z17. */
+export const headOffsetScale=zoom=>Math.max(0,Math.min(1,(2**(zoom-STEM_ZOOM)-1)/7));
+
 /** Separate nearby site heads in screen space; feet and source grouping never move. */
 export function placeSiteHeads(layout,{width,height,zoom,selectedId,rtl=false,controls=null}){
  const result=new Map();if(zoom<STEM_ZOOM)return result;
@@ -27,7 +30,8 @@ export function placeSiteHeads(layout,{width,height,zoom,selectedId,rtl=false,co
  // Feet are small obstacles; clusters keep their established, undisplaced positions.
  for(const group of layout){const p=group.point;add({left:p.x-5,right:p.x+5,top:p.y-5,bottom:p.y+5});if(group.members.length>1)add({left:p.x-25,right:p.x+25,top:p.y-25,bottom:p.y+25});}
  const ordered=layout.filter(g=>g.members.length===1).sort((a,b)=>Number(selected(b))-Number(selected(a))||identity(a).localeCompare(identity(b)));
- const candidates=[[0,0],[-56,0],[56,0],[0,-36],[-52,-16],[52,-16]];
+ const scale=headOffsetScale(zoom);
+ const candidates=[[0,0],[-56,0],[56,0],[0,-36],[-52,-16],[52,-16]].map(([dx,dy])=>[dx*scale,dy*scale]);
  for(const group of ordered){
   let placed=null;
   for(const [dx,dy] of candidates){
