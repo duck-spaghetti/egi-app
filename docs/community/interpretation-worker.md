@@ -19,7 +19,7 @@ Install the normal runtime lock, then the approved reproducible Reviewer artifac
 
 The internal extra is `community`, pinned to egi-reviewer 0.5.1. The separate hash
 lock requires wheel SHA-256
-`252e39b1ea10e0a3bf7f129833f462e9c42969cdc899f996e14778038d072b8c`.
+`4846451fd899b586882ec0a7ce6180a9e866531bc516b645b399a5f49a0302ee`.
 It must not import a mutable neighboring checkout. The ordinary web application
 can still run without the extra; local ranked suggestions return a safe unavailable response, while manual catalog browsing/selection remains available. Community worker/provider tests require it.
 

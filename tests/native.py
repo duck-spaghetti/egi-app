@@ -2,8 +2,8 @@
 
 EGI_DATABASE_REPO selects the database worktree. With EGI_SQITCH the schema is
 deployed by Sqitch; without it the plan's deploy scripts run with psql in plan
-order (same SQL, without Sqitch's registry). EGI_RESOURCE_TOOLS_REPO selects the
-reviewed resource checkout. The owning run supervises only its own clusters.
+order (same SQL, without Sqitch's registry). Consolidated checks use the app-owned
+resource module directly. The owning run supervises only its own clusters.
 """
 import os
 from pathlib import Path

@@ -5,6 +5,7 @@ The input is the vendored contract fixture `fixtures/transport-root`, a copy of
 """
 
 import json
+import os
 import shutil
 import tempfile
 import unittest
@@ -22,10 +23,9 @@ from app.backend.api.transport.network import (
 )
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "transport-root"
-PRODUCER = (
-    Path(__file__).resolve().parents[2]
-    / "egi-importer/tests/fixtures/transport-root"
-)
+PRODUCER = Path(os.environ.get('EGI_IMPORTER_REPO',
+    Path(__file__).resolve().parents[2] / 'egi-importer')) / 'tests/fixtures/transport-root'
+
 SERVICE_DAY = "2026-01-05"
 EXCEPTION_DAY = "2026-01-06"
 

@@ -4,7 +4,8 @@ export const SERVICE='00000000-0000-0000-0000-000000000001';
 export async function openMap(page, language='it') {
   await page.route('https://**/*', route=>route.abort());
   await page.goto('/map?lang='+language);
-  await expect(page.locator('#poi-list .poi-item').first()).toBeAttached();
+  // Catalogue mode deliberately creates rows only after selecting the list.
+  await expect(page.locator('#list-count')).not.toHaveText('0');
   await page.locator('#view-toggle').click();
   await expect(page.locator('#poi-list .poi-item').first()).toBeVisible();
 }

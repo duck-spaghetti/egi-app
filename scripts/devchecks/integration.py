@@ -70,6 +70,7 @@ def prepare(root):
     sources = {entry['name']: provider(root, entry) for entry in policy['providers']}
     artifact = wheel(root, policy['consumer_wheel'])
     excluded, optional = {}, {}
+    importer = None
     pilot_changed = any(name.startswith(('app/backend/api/preview/', 'app/backend/api/transport/',
         'app/backend/api/cycleways/', 'app/backend/api/map_sources/')) for name in changed)
     if not pilot_changed and not os.environ.get('EGI_APP_BASE_URL'):
@@ -80,8 +81,10 @@ def prepare(root):
         'app/backend/api/transport/network.py')) for name in changed)
     if not importer_changed:
         optional[IMPORTER_TEST] = IMPORTER_REASON
-    elif not (root.parent / 'egi-importer/tests/fixtures/transport-root').is_dir():
-        raise PrerequisiteError('Changed transport contract requires the identified sibling importer fixture')
+    else:
+        importer = provider(root, policy['importer_fixture'])
+        if not (importer / 'tests/fixtures/transport-root').is_dir():
+            raise PrerequisiteError('Changed transport contract requires the identified importer fixture')
     return {'policy': policy, 'sources': sources, 'native_schema': native, 'wheel': artifact,
-            'excluded_files': excluded, 'optional_skips': optional,
+            'excluded_files': excluded, 'optional_skips': optional, 'importer_source': importer,
             'changed_contract_files': sorted(set(changed))}

@@ -23,6 +23,8 @@ def checks(root, profile):
         try:
             context = prepare(root)
             os.environ['EGI_DATABASE_REPO'] = str(context['native_schema'])
+            if context.get('importer_source'):
+                os.environ['EGI_IMPORTER_REPO'] = str(context['importer_source'])
             selection = {key: context[key] for key in ('excluded_files', 'optional_skips')}
             yield Check('integration-selection', 'passed', json.dumps({
                 'native_schema': str(context['native_schema']), 'excluded_files': context['excluded_files'],

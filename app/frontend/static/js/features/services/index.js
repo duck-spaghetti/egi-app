@@ -16,7 +16,7 @@ let descriptions=new Map(),refreshTime=null;
 function beginRefresh(snapshot,now=new Date()){state=snapshot;refreshTime=now;descriptions=new Map();}
 function describe(poi,now=refreshTime||new Date()){
  if(!refreshTime||now.getTime()!==refreshTime.getTime())return model.describe(poi,now);
- const key=poi.id??poi;if(!descriptions.has(key))descriptions.set(key,model.describe(poi,now));return descriptions.get(key);
+ const key=poi;if(!descriptions.has(key))descriptions.set(key,model.describe(poi,now));return descriptions.get(key);
 }
 const closeSheets=()=>emit('closeSheets');
 const favorites=context.canonical ? createFavorites({territory:context.profile?.territory_code || 'roma',prepare:prepareOffline}) : null;
@@ -191,7 +191,6 @@ function renderList(list) {
   const wrap=document.getElementById("poi-list");
   if (!list.length) {
     reconcileMarkup(wrap,`<div class="empty-state"><p>${state.filters.favoritesOnly ? escapeHtml(t('favorites.empty')) : state.filters.section==="directory" ? "Nessun servizio esplicitamente a distanza nei dati selezionati. I servizi senza coordinate restano nell’elenco da localizzare." : "Nessun servizio per questa ricerca."}</p>${state.filters.favoritesOnly ? `<button type="button" class="btn" data-favorites-empty-all>${escapeHtml(t('favorites.showAll'))}</button>` : ''}</div>`);
-    wrap.querySelector('[data-favorites-empty-all]')?.addEventListener('click',()=>emit('allServices'),{signal:scope.signal});
     return;
   }
   reconcileRows(wrap,list.map(poi=>({id:poi.id,html:renderListItem(poi)})));
@@ -248,7 +247,7 @@ async function load(language, targetTranslate=translate) {
  return {categories,pois:bundle.rows.map(projection.normalizePublicService).filter(Boolean),languages:bundle.languages,
   cityOptions:bundle.areas.map(projection.normalizeArea),categoryTranslations:bundle.categoryTranslations,taxonomy:{...bundle.taxonomy,needs:(bundle.taxonomy.needs||[]).map(projection.displayCategory)}};
 }
-const listHost=document.getElementById('poi-list');listHost.addEventListener('click',event=>{if(event.target.closest('[data-favorite-id]'))return;const row=event.target.closest('.poi-item[data-id]');if(row&&listHost.contains(row))emit('select',{id:row.dataset.id});},{signal:scope.signal});
+const listHost=document.getElementById('poi-list');listHost.addEventListener('click',event=>{if(event.target.closest('[data-favorites-empty-all]')){emit('allServices');return;}if(event.target.closest('[data-favorite-id]'))return;const row=event.target.closest('.poi-item[data-id]');if(row&&listHost.contains(row))emit('select',{id:row.dataset.id});},{signal:scope.signal});
 function update(snapshot,list) {state=snapshot;if(list){document.getElementById('list-count').textContent=String(list.length);if(state.view==='list')renderList(list);else if(listHost.childNodes.length){listHost.replaceChildren();forgetMarkup(listHost);}}}
 function dispose(){descriptions.clear();refreshTime=null;state={pois:[]};listHost.replaceChildren();forgetMarkup(listHost);document.getElementById('detail-body').onscroll=null;}
 

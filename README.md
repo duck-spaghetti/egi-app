@@ -1249,3 +1249,23 @@ confirmed private cards to selective queue snapshots and editable acceptance int
 canonical drafts. Source admission and the existing approve/publish action remain
 separate. Database change 021 preserves component proof across collection edits.
 Change 022 keeps selected proof in the correct contact/address/schedule context.
+
+
+## Local workspace consolidation
+
+`ms/workspace-consolidation` combines the completed map/catalogue line, private
+Community workbench, saved collections and development checks. The checked provider
+and artifact identities are in `.checks/integration.json`; see
+[Integration verification](docs/integration-verification.md). Native fixtures use
+the app-owned resource module directly. Browser checks wait for the catalogue count
+and enter list mode through its visible control, because map mode intentionally
+avoids constructing hidden result rows. Neither local consolidation nor automatic
+fixture success closes the existing human/device/live-model acceptance gates.
+
+Map-mode handoffs retain the selected named collection and its label in tab-local
+session storage, never the URL. Presentation memoization uses the normalized card
+object, so independent saved snapshots of the same service keep their own content.
+The changed transport contract selects the exact consolidated importer fixture
+through `.checks/integration.json` and `EGI_IMPORTER_REPO` for its byte comparison.
+The private importer is not automatically published or given new CI credentials;
+remote verification requires that identified fixture to be provided explicitly.

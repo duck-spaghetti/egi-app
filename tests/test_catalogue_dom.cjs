@@ -8,6 +8,8 @@ const assert=require('node:assert/strict');const {environment}=require('./module
  services.beginRefresh(state);services.update(state,rows);assert.equal(env.get('poi-list').children.length,0);
  state.view='list';services.beginRefresh(state);services.update(state,rows);assert.equal(env.get('poi-list').children.length,2);const first=env.get('poi-list').children[0];
  services.beginRefresh(state);services.update(state,rows);assert.equal(env.get('poi-list').children[0],first);
+ const copyA={id:'saved-copy',title:'Saved A',raw:{service_title:'Saved A'}},copyB={id:'saved-copy',title:'Saved B',raw:{service_title:'Saved B'}};
+ assert.equal(services.describe(copyA).title,'Saved A');assert.equal(services.describe(copyB).title,'Saved B','independent saved copies retain their own title despite a shared service ID');
  state.view='map';services.update(state,rows);assert.equal(env.get('poi-list').children.length,0);services.dispose();
  console.log('PASS: keyed node reuse/reordering/text/scroll and list lazy creation/release');
 })().catch(e=>{console.error(e);process.exitCode=1});

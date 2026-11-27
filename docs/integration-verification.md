@@ -19,11 +19,13 @@ artifact hash in the manifest. Locally, the Reviewer build can use the manifest'
 success report produce a non-success result. Supervised resource runs retain exact
 ownership and teardown; paid IA and arbitrary live database selection are excluded.
 
-Two Reviewer identities are deliberate: the dev provider verifies its current
-package/source/build, while the Community consumer uses its separately approved
-immutable0.4.0 wheel from151888f. The native Community schema is947487f, separate
-from the dev database provider's SQL/Sqitch checks. This consumes preserved feature
-contracts without merging unrelated database/Reviewer product work into this effort.
+The consolidated database provider and native-schema selections now identify the
+same integrated branch revision. Reviewer source/build checks and the Community
+consumer likewise share the integrated Reviewer source; the exact rebuilt0.5.1
+wheel, fixed source epoch and installed-file hash are pinned in the manifest.
+The consumer lock is refreshed to that artifact without changing the selected
+package version or adding a dependency. Local builds/installations use only an
+ignored task-owned target; other worktrees' environments remain unchanged.
 
 ## Applicability
 
@@ -40,7 +42,9 @@ changes are included when checking a candidate.
   not run against an arbitrary current canonical demo or replaced by synthetic data.
 - The private sibling importer byte-drift case is optional for unchanged transport
   payload fixtures/network contracts and remains named with its prerequisite reason.
-  A changed transport contract requires the sibling fixture instead of waiving it.
+  A changed transport contract requires the exact clean importer checkout pinned in
+  `importer_fixture`; `EGI_IMPORTER_REPO` selects its location for both the orchestrator
+  and actual byte-drift test. Its fixture is required instead of waiving it.
   Importer/source enforcement is outside this milestone's initial repository scope.
 - Every other unexpected skip in a selected suite still blocks. No historical
   skip count, blanket test exception or permissive mock replaces native properties.
@@ -68,7 +72,7 @@ The app workflow checks out each exact provider/schema/consumer source from the
 manifest under ignored `.local/providers/` paths. It installs the existing app
 locks, selected setuptools75.1.0/wheel0.43.0 and pinned npm lock; Chromium comes
 from the selected Playwright version. Rebuilding the Community consumer uses its
-original fixed SOURCE_DATE_EPOCH=315532800 and the hash-locked wheel requirement.
+manifest-pinned SOURCE_DATE_EPOCH and the hash-locked wheel requirement.
 PostgreSQL18/PostGIS and Sqitch run against disposable owned fixtures. Reports,
 provider output, browser traces and PDFs are retained with the PR head identity.
 These automatic checks need no API keys and do not dispatch paid model requests.

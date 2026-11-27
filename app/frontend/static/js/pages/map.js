@@ -29,7 +29,7 @@ export function createMapPage(context, dependencies={}) {
   cityOptions: [],
   filters: {
     cats: new Set(), offersOff: new Set(),
-    q: "", source: "", issue: "", access: "", audience: "", meal: "", level: "", section: "all", order: "name", openNow: false, favoritesOnly: false,
+    q: "", source: "", issue: "", access: "", audience: "", meal: "", level: "", section: "all", order: "name", openNow: false, favoritesOnly: false, savedCollection: null,
   },
   taxonomy: {needs: [], offers: [], audiences: [], access: [], meal_times: [], paths: [], course_levels: []},
   view: "map",

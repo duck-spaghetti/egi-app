@@ -32,7 +32,7 @@ jobs:
           import json, os
           policy = json.load(open('.checks/integration.json'))
           pins = {entry['name']: entry['revision'] for entry in policy['providers']}
-          pins.update(schema=policy['native_schema']['revision'], consumer=policy['consumer_wheel']['source_revision'])
+          pins.update(schema=policy['native_schema']['revision'], consumer=policy['consumer_wheel']['source_revision'], consumer_epoch=policy['consumer_wheel']['source_date_epoch'], consumer_version=policy['consumer_wheel']['version'])
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               for name, revision in pins.items():
                   output.write(name + '=' + revision + '\n')
@@ -64,7 +64,7 @@ jobs:
       - name: Install locked app and browser dependencies
         run: |
           python -m pip install -r requirements-dev.lock.txt setuptools==75.1.0 wheel==0.43.0
-          SOURCE_DATE_EPOCH=315532800 python -m pip wheel --no-build-isolation --no-deps .local/providers/consumer --wheel-dir .local/artifacts/community
+          SOURCE_DATE_EPOCH=${{ steps.inputs.outputs.consumer_epoch }} python -m pip wheel --no-build-isolation --no-deps .local/providers/consumer --wheel-dir .local/artifacts/community
           python -m pip install --require-hashes --find-links .local/artifacts/community -r requirements-community.lock.txt
           npm ci
           npx playwright install --with-deps chromium
@@ -72,7 +72,7 @@ jobs:
           echo "EGI_DATABASE_SCHEMA=$GITHUB_WORKSPACE/.local/providers/schema" >> "$GITHUB_ENV"
           echo "EGI_REVIEWER_PROVIDER=$GITHUB_WORKSPACE/.local/providers/reviewer" >> "$GITHUB_ENV"
           echo "EGI_REVIEWER_PYTHON=$(command -v python)" >> "$GITHUB_ENV"
-          echo "EGI_COMMUNITY_WHEEL=$GITHUB_WORKSPACE/.local/artifacts/community/egi_reviewer-0.4.0-py3-none-any.whl" >> "$GITHUB_ENV"
+          echo "EGI_COMMUNITY_WHEEL=$GITHUB_WORKSPACE/.local/artifacts/community/egi_reviewer-${{ steps.inputs.outputs.consumer_version }}-py3-none-any.whl" >> "$GITHUB_ENV"
       - name: Install selected PostgreSQL18/PostGIS and Sqitch prerequisites
         run: |
           sudo install -d /usr/share/postgresql-common/pgdg

@@ -4,30 +4,37 @@
   "native_schema": {
     "name": "Community schema",
     "environment": "EGI_DATABASE_SCHEMA",
-    "path": "../egi_database-community-text",
-    "revision": "947487fe2145c0000456a594ac3039216198ae0c"
+    "path": "../egi_database-consolidation",
+    "revision": "f5d619311a6fb0b5b3a07b48dfc4d81db614f533"
   },
   "providers": [
     {
       "name": "database",
       "environment": "EGI_DATABASE_PROVIDER",
-      "path": "../egi_database-development-checks",
-      "revision": "151cd95b119d380fc44c20dd6677bfa114ca0dfb"
+      "path": "../egi_database-consolidation",
+      "revision": "f5d619311a6fb0b5b3a07b48dfc4d81db614f533"
     },
     {
       "name": "reviewer",
       "environment": "EGI_REVIEWER_PROVIDER",
-      "path": "../egi-reviewer-development-checks",
-      "revision": "da09a21f08e74ae3dd86daaceca637f5bab7af2d",
-      "wheel_sha256": "9c216628e52103b3c2f423dde890c7e84de6dbea71f13af56d121e9fa431981a",
+      "path": "../egi-reviewer-consolidation",
+      "revision": "929b4dd4e61df9d15d45e9cdd549f209bfb5135f",
+      "wheel_sha256": "4846451fd899b586882ec0a7ce6180a9e866531bc516b645b399a5f49a0302ee",
       "python_environment": "EGI_REVIEWER_PYTHON",
       "python": "../egi-reviewer-community-text/.venv/bin/python"
     }
   ],
   "consumer_wheel": {
-    "path": "../../../.local/artifacts/community/egi_reviewer-0.4.0-py3-none-any.whl",
-    "version": "0.4.0",
-    "source_revision": "151888f5477dac2e2393a482ec7019a45c34081e",
-    "sha256": "226f7c9d88e3052e133cf37d41054330eb58d079f2e04075926f1dab477e3bf8"
+    "path": "../egi-reviewer-consolidation/.local/artifacts/egi_reviewer-0.5.1-py3-none-any.whl",
+    "version": "0.5.1",
+    "source_revision": "929b4dd4e61df9d15d45e9cdd549f209bfb5135f",
+    "sha256": "4846451fd899b586882ec0a7ce6180a9e866531bc516b645b399a5f49a0302ee",
+    "source_date_epoch": "1795797011"
+  },
+  "importer_fixture": {
+    "name": "importer transport fixture",
+    "environment": "EGI_IMPORTER_REPO",
+    "path": "../egi-importer-consolidation",
+    "revision": "929f81fbd496eff2393dbd958cd01c6b36285481"
   }
 }
