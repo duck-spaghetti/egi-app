@@ -2,10 +2,10 @@
 const assert=require('node:assert/strict'),{performance}=require('node:perf_hooks');
 const {environment}=require('./module_fixture.cjs');
 (async()=>{
- const {signGeometry,createPaline,PALINE_SOURCE,PALINE_LAYERS}=await environment().load('features/transport/paline-gl.js');
+ const {signGeometry,createPaline,PALINE_SOURCE,PALINE_LAYERS,SIGN_SCALE,nativeFade,nativeProgress}=await environment().load('features/transport/paline-gl.js');
  const point=[12.510318,41.89909],stops=['bus','tram','metro'].map(mode=>({key:mode,mode,coordinates:point,near:false}));
  const geometry=signGeometry(stops);assert(geometry.features.length>9);
- assert.equal(Math.min(...geometry.features.map(f=>f.properties.base)),0);assert.equal(Math.max(...geometry.features.map(f=>f.properties.height)),2.7);
+ assert.equal(Math.min(...geometry.features.map(f=>f.properties.base)),0);assert.equal(Math.max(...geometry.features.map(f=>f.properties.height)),2.7*SIGN_SCALE);
  for(const mode of ['bus','tram','metro']){
   const pole=geometry.features.find(f=>f.properties.key===mode&&f.properties.base===0);
   const ring=pole.geometry.coordinates[0];assert(Math.abs((ring[0][0]+ring[2][0])/2-point[0])<1e-12);assert(Math.abs((ring[0][1]+ring[2][1])/2-point[1])<1e-12);
@@ -21,9 +21,10 @@ const {environment}=require('./module_fixture.cjs');
  hits=[{layer:{id:PALINE_LAYERS[1]},properties:{key:'stop:a',mode:'bus'}}];listeners.get('click')({point:{x:100,y:100}});assert.equal(selected.at(-1),'stop:a');
  hits.unshift({layer:{id:'parts-3d'},properties:{}});listeners.get('click')({point:{x:100,y:100}});assert.equal(selected.length,1,'foreground building blocks native selection');
  hits.shift();listeners.get('click')({point:{x:100,y:100},egiReferencePicked:true});assert.equal(selected.length,1,'reference choice does not also open a stop');
- zoom=18;listeners.get('click')({point:{x:100,y:100}});assert.equal(selected.length,1,'fully transparent onset is not picked');
+ zoom=nativeFade('bus')[0];listeners.get('click')({point:{x:100,y:100}});assert.equal(selected.length,1,'fully transparent onset is not picked');
  hits.push({layer:{id:PALINE_LAYERS[0]},properties:{key:'metro',mode:'metro'}});const overlapEvent={point:{x:100,y:100}};listeners.get('click')(overlapEvent);assert.equal(selected.at(-1),'metro','invisible road onset does not mask an opaque metro');assert.equal(overlapEvent.egiStopPicked,true,'successful native pick consumes overlapping route clicks');
  owner.update([],19,null);assert.equal(sources[PALINE_SOURCE].data.features.length,0);owner.dispose();assert.equal(layers.length,0);assert(!sources[PALINE_SOURCE]);assert(!listeners.size);
+ const ramp=nativeFade('bus');assert.equal(ramp[0],17.5);assert.equal(ramp.at(-2),19);assert.equal(nativeProgress('bus',17.5),0);assert.equal(nativeProgress('bus',18.25),.5);assert.equal(nativeProgress('bus',19),1);assert(nativeProgress('bus',17.6)<.1,'eased onset avoids an opacity jump');
  const many=Array.from({length:100},(_,i)=>({...stops[i%3],key:String(i)}));const start=performance.now();const dense=signGeometry(many);console.log(JSON.stringify({signs:100,prisms:dense.features.length,milliseconds:performance.now()-start}));
  console.log('PASS: physical sign coordinates, dimensions, zoom preparation, source reuse, depth picking, reference and disposal');
 })().catch(e=>{console.error(e);process.exitCode=1;});

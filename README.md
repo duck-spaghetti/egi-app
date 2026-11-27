@@ -896,3 +896,11 @@ its own foot. Exact co-location grouping stays unchanged. Head placement uses a
 small screen-space grid, prioritises the selected site and avoids other heads/feet
 and maincontrols; optional labels use the displaced positions. In saturated views
 with no bounded slot every site remains reachable, but overlap cannot be ruled out.
+
+
+Native sign legibility refinement: all prism dimensions are multiplied by1.6
+(4.32m maximum height), intentionally schematic. The source-centred base remains0.
+The shared eased fade spans1.5zoom levels (metro16.5–18,road17.5–19); native paint
+and compact-symbol opacity use the same stops, with a slower onset/completion.
+Compact wrappers exist at every zoom, avoiding markup replacement at the fade or
+point-detail thresholds. Geometry is still cached; source counts/topology unchanged.

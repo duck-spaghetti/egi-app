@@ -1,4 +1,4 @@
-import {createPaline,nativeMode,stopKey} from './paline-gl.js';
+import {createPaline,nativeMode,nativeProgress,stopKey} from './paline-gl.js';
 import {createStopNames} from './stop-names.js';
 import {TransportLayer} from "./layer.js";
 /* Transit layer of the 3D mode: the scheduled metro/rail/tram/bus layer on MapLibre.
@@ -45,7 +45,13 @@ function create(map, elements, maplibre) {
   const paline=createPaline(map,key=>{const entry=markers.get(key);if(entry)selectStop(entry);});
   const names=createStopNames(map.getContainer());
   const refreshNames=()=>names.refresh(leafletZoom(map));
-  const scale=()=>{const root=map.getContainer(),zoom=map.getZoom();TransportLayer.scalePaline(root,zoom+1);root.style.setProperty('--tl-native-metro-pointer',zoom>=TransportLayer.STOP_POINT_ZOOM?'none':'auto');root.style.setProperty('--tl-native-road-pointer',zoom>=TransportLayer.ROAD_STOP_POINT_ZOOM?'none':'auto');};
+  const scale=()=>{
+    const root=map.getContainer(),zoom=map.getZoom();TransportLayer.scalePaline(root,zoom+1);
+    for(const [mode,group] of [['metro','metro'],['bus','road']]){
+      const progress=nativeProgress(mode,zoom);root.style.setProperty(`--tl-${group}-progress`,progress);
+      root.style.setProperty(`--tl-native-${group}-pointer`,progress>=1?'none':'auto');
+    }
+  };
   ownMap("zoom",scale);
   const chip = document.createElement("div");
   chip.className = "tl-focus-chip"; chip.hidden = true;
@@ -124,7 +130,7 @@ function create(map, elements, maplibre) {
       const ids = props.stop_ids || [props.stop_id];
       const near = Boolean(focused && ids.some(id => focused.stopIds.has(id)));
       const anchored=TransportLayer.pointDetail(props,leafletZoom(map));
-      const key=stopKey(feature),native=anchored&&nativeMode(props);
+      const key=stopKey(feature),native=nativeMode(props);
       let entry=previous.get(key);
       if(!entry){
         const el=document.createElement('button');el.type='button';
@@ -134,10 +140,10 @@ function create(map, elements, maplibre) {
           selectStop(entry);
         });
       }
-      const el=entry.element,signature=JSON.stringify([props,near,anchored]);
+      const el=entry.element,signature=JSON.stringify([props,near,native?null:anchored]);
       entry.props=props;entry.ids=ids;entry.lngLat=[lng,lat];
       if(entry.signature!==signature){
-        el.className=`tl-icon tl-gl-stop${anchored?' tl-point-detail':''}${native?` tl-native-stop tl-native-${props.transport_type==='metro'?'metro':'road'}-stop`:''}`;el.title=props.name;el.setAttribute('aria-label',props.name);
+        el.className=`tl-icon tl-gl-stop${anchored||native?' tl-point-detail':''}${native?` tl-native-stop tl-native-${props.transport_type==='metro'?'metro':'road'}-stop`:''}`;el.title=props.name;el.setAttribute('aria-label',props.name);
         el.innerHTML=native?`<span class="tl-compact" style="--tl-progress:var(--tl-${props.transport_type==='metro'?'metro':'road'}-progress,0)">${TransportLayer.stopIconHtml(props,near,false)}</span>`:TransportLayer.stopIconHtml(props,near,anchored);entry.signature=signature;
       }
       const position=JSON.stringify([lng,lat]);if(entry.position!==position){entry.marker.setLngLat([lng,lat]);entry.position=position;}
