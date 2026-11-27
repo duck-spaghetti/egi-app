@@ -1,7 +1,23 @@
 # Native desktop print acceptance — EGI-137
 
-Status: **pending actual native saved-file evidence**. Generated Chromium PDFs
-pass separately; this document does not treat that as a native-dialog result.
+Status: **native desktop save observed and artifact verified, 2026-11-27**.
+The user reported using the Codex built-in browser and saving in Downloads.
+Actual file: `/Users/marco-macbook/Downloads/EGI — Le tue liste.pdf`.
+PDF metadata identifies Chromium158/Skia158 on the macOS host; no exact OS version
+or universal browser support is asserted. Italian, two A4 pages,158922 bytes.
+`pdfinfo`, full `pdftotext` extraction and both rendered pages confirm the intended
+collection, service/address, source dates2026-11-20/2026-11-19, revision000…002 and
+copy update27/11/2026. Text is readable; the source section continues onto page2.
+Default browser headers/footers show the synthetic origin; no other list or app
+controls appear. Paper size is observed from the file; other print settings were
+not independently recorded.
+
+Durable artifact, SHA256 receipt and rendered pages are under workspace
+`.scratch/agent-workflow-improvements/session3-evidence/native-print/`.
+The receipt distinguishes the preview's recorded startup sourcefe13614 from
+artifact/input evidence. Production print assets are unchanged from that checkpoint.
+Generated Italian/Arabic Chromium PDFs remain separate evidence; only this Italian
+user-operated save establishes native-dialog acceptance.
 
 The owned synthetic preview is `http://127.0.0.1:4340`, configured with
 `checks.fixture_app:app` through `scripts/preview.py`. It uses neither a database
@@ -20,14 +36,15 @@ nor a provider. Existing Community 4328 and saved-list 4335 profiles/data are pr
    pagination and no leaked page controls or other lists. Preserve the observed
    output and source/print input identity with the milestone evidence.
 
+## Earlier automation attempt — historical
+
 The Codex browser runtime successfully initialized, listed the existing Community
 tab and returned bounded DOM observations. A new synthetic print tab loaded the
 collection. Clicking Print timed out at Input.dispatchMouseEvent; a subsequent
 AX snapshot still exposed the page, not a native save dialog. No native desktop
-control tools are exposed in this chat. A user save is therefore pending, rather
+control tools are exposed in this chat. A user save was requested, rather
 than inferring that browser automation or printing is globally unavailable.
 
-The user was asked to save this exact synthetic file and identify the browser.
-After it exists, use `pdfinfo`/`pdftotext` and render its pages to verify the actual
-artifact. Do not mark EGI-137 verified until that evidence is present. This is the
-explicit task acceptance step, not an additional intermediate review gate.
+That requested user action is now complete, as recorded above. The ticket remains
+subject to the milestone's one final review and user acceptance; native evidence
+adds no extra intermediate review gate.
