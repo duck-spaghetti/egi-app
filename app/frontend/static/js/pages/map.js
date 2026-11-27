@@ -29,7 +29,7 @@ export function createMapPage(context, dependencies={}) {
   cityOptions: [],
   filters: {
     cats: new Set(), offersOff: new Set(),
-    q: "", source: "", issue: "", access: "", audience: "", meal: "", level: "", section: "all", order: "name", openNow: false,
+    q: "", source: "", issue: "", access: "", audience: "", meal: "", level: "", section: "all", order: "name", openNow: false, favoritesOnly: false,
   },
   taxonomy: {needs: [], offers: [], audiences: [], access: [], meal_times: [], paths: [], course_levels: []},
   view: "map",
@@ -46,7 +46,7 @@ export function createMapPage(context, dependencies={}) {
  const services=factories.services({context,scope,loader,sites,transit,translate:i18n.t,emit});
  const map=factories.map({context,sites,describe:services.describe,emit,leaflet:dependencies.leaflet||globalThis.L,translate:i18n.t});
  const browser=dependencies.browser||{location:globalThis.location,local:storage('localStorage'),session:storage('sessionStorage')};
- const search=factories.search({scope,describe:services.describe,emit,debug});
+ const search=factories.search({scope,describe:services.describe,emit,debug,translate:i18n.t});
  const origin=factories.origin({context,scope,http,contains:map.contains,translate:i18n.t,emit});
  const cycle=factories.cycleways();
  const walking=context.view?.mode==='3d'&&factories.walking?factories.walking({context,scope,translate:i18n.t}):null;
@@ -58,6 +58,11 @@ export function createMapPage(context, dependencies={}) {
   chooseReferencePoint:origin.choose,geocodeAddress:origin.search,locateUser:origin.locate,loadOriginTransit:transit.origin}});
 
  function snapshot(){return structuredClone(state);}
+ function discoverySnapshot(){
+  const view=snapshot();
+  if(view.filters.favoritesOnly){view.catalogPois=view.pois;view.pois=services.savedServices(view);}
+  return view;
+ }
  function storage(name){try{return globalThis[name]||null;}catch{return null;}}
  /** The 3D/current-map control: switch by reloading, carrying state in this tab only. */
  function bindView(){
@@ -117,7 +122,7 @@ export function createMapPage(context, dependencies={}) {
   rendering=true;
   try{do{
    refreshAgain=false;
-   const now=new Date();sites.reset();const view=snapshot();
+   const now=new Date();sites.reset();const view=discoverySnapshot();
    if(services.beginRefresh)services.beginRefresh(view,now);else services.update(view);
    const list=search.select(view,now);state.matchedIds=new Set(list.map(row=>row.id));view.matchedIds=state.matchedIds;
    transit.update(view);origin.update(view);services.update(view,list);search.update(view,now);
@@ -127,7 +132,8 @@ export function createMapPage(context, dependencies={}) {
  }
  function renderFilters(){shell.languages();shell.cities();}
  function resetFilters(){
-  Object.assign(state.filters,{cats:new Set(),offersOff:new Set(),q:'',issue:'',access:'',audience:'',meal:'',level:'',section:'all',openNow:false});
+  Object.assign(state.filters,{cats:new Set(),offersOff:new Set(),q:'',issue:'',access:'',audience:'',meal:'',level:'',section:'all',openNow:false,favoritesOnly:false,savedCollection:null});
+  state.savedEntries=null;state.savedListName=null;
   document.getElementById('service-query').value='';document.getElementById('open-now-filter').checked=false;
   document.getElementById('section-filter').value='all';refresh();
  }
@@ -157,7 +163,7 @@ export function createMapPage(context, dependencies={}) {
   const generation=languageGeneration,code=state.lang,key=`${generation}:${code}`;
   if(openingRequests.has(key))return openingRequests.get(key);
   const request=(async()=>{
-   try{const data=await services.load(code);scope.check();if(generation!==languageGeneration||code!==state.lang)return;Object.assign(state,data);refresh();services.refreshHours();}
+   try{if(state.filters.favoritesOnly)await services.reloadFavorites();const data=await services.load(code);scope.check();if(generation!==languageGeneration||code!==state.lang)return;Object.assign(state,data);refresh();services.refreshHours();}
    catch(error){if(!scope.signal.aborted&&generation===languageGeneration)services.refreshHours();}
    finally{if(openingRequests.get(key)===request)openingRequests.delete(key);}
   })();openingRequests.set(key,request);return request;
@@ -165,6 +171,25 @@ export function createMapPage(context, dependencies={}) {
  function emit(type,payload={}){
   if(scope.signal.aborted)return;
   switch(type){
+   case 'favoritesChanged':{
+    const unavailable=new Set(payload.unavailable || []);
+    const closeSelected=unavailable.has(String(state.selectedId));
+    if(unavailable.size)state.pois=state.pois.filter(poi=>!unavailable.has(String(poi.id)));
+    if(mounted && (state.filters.favoritesOnly || unavailable.size))refresh();
+    if(closeSelected){
+      const shown=document.getElementById('sheet-detail').classList.contains('shown');
+      if(shown)shell.close();services.clearDetail();state.selectedId=null;
+      if(shown)document.getElementById('list-title')?.focus();
+    }
+    break;}
+
+   case 'showFavorites':void services.openSaved?.();break;
+   case 'savedMap':resetFilters();state.filters.favoritesOnly=true;state.filters.savedCollection=payload.id;
+    state.savedEntries=payload.entries;state.savedListName=payload.name;state.focusSiteKey=null;
+    shell.close();if(state.view!=='map')shell.toggle();refresh();
+    if(payload.selectId)select(payload.selectId);break;
+   case 'allServices':shell.close();resetFilters();
+    document.getElementById(state.view==='list' ? 'list-title' : 'view-toggle')?.focus();break;
    case 'filter':state.filters[payload.key]=payload.value;refresh();break;
    case 'toggleNeed':{
     const slug=payload.slug;
@@ -227,6 +252,7 @@ export function createMapPage(context, dependencies={}) {
     if(context.localLayers!==false){void transit.summaries();scope.every(transit.summaries,300000);}
     scope.every(()=>{refresh();services.refreshHours();void refreshOpening();},30000);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden){refresh();services.refreshHours();void refreshOpening();}},{signal:scope.signal});
+    globalThis.addEventListener?.('online',()=>{if(state.filters.favoritesOnly)void services.reloadFavorites();},{signal:scope.signal});
    }catch(error){
     if(scope.signal.aborted)return;
     document.getElementById('poi-list').innerHTML='<div class="empty-state"><p>Catalogo temporaneamente non disponibile. Riprova.</p></div>';

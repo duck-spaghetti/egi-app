@@ -16,7 +16,9 @@
     <div id="map"></div>
     <div class="list-view" id="list-view">
       <div class="list-header">
-        <h2 data-i18n="map.nearby_places">Luoghi vicini</h2>
+        <button type="button" id="saved-list-back" class="favorites-show-all" hidden data-i18n="lists.back">Torna alle liste</button>
+        <h2 id="list-title" tabindex="-1" data-i18n="map.nearby_places">Luoghi vicini</h2>
+        <button type="button" id="favorites-show-all" class="favorites-show-all" hidden data-i18n="favorites.showAll">Tutti i servizi</button>
         <div class="sub"><span id="list-count">0</span> <span data-i18n="map.results_count_label">risultati</span></div>
         <div class="list-toolbar" role="toolbar" aria-label="Filtri e ordinamento">
           <button type="button" class="list-filter-btn" data-sheet-open="filters" aria-controls="sheet-filters"><img src="/static/assets/icons/ui/filters.svg" alt="" aria-hidden="true" /><span data-i18n="map.filters">Filtri</span><span class="list-filter-count" id="list-filter-count" hidden></span></button>
@@ -36,6 +38,7 @@
     <button type="button" class="nav-btn layers-trigger" data-sheet="layers" aria-label="Livelli della mappa"><span class="control-icon"><img src="/static/assets/icons/ui/layers.svg" alt="" aria-hidden="true" /></span><span class="control-label">Livelli</span></button>
     <button type="button" class="nav-btn view3d-trigger" id="view3d-toggle" aria-pressed="false"><span class="control-icon view3d-icon" aria-hidden="true"><span class="view3d-to-3d">3D</span><span class="view3d-to-2d">2D</span></span><span class="control-label view3d-to-3d" data-i18n="map.map3d.label_3d">vista 3D</span><span class="control-label view3d-to-2d" data-i18n="map.map3d.label_2d">mappa piana</span></button>
     </div>
+    <div id="saved-map-nav" class="saved-map-nav" hidden><strong id="saved-map-name"></strong><div><button type="button" id="saved-map-back" data-i18n="lists.back">Torna alle liste</button><button type="button" id="saved-map-exit" hidden data-i18n="favorites.showAll">Tutti i servizi</button></div></div>
     <span class="map-city-tag" id="city-label">{{ city.name if city else "Territorio" }}</span>
 
     <div class="floating-actions" aria-label="Controlli mappa">
@@ -74,6 +77,15 @@
   </div>
 </div>
 
+<div id="saved-print"></div>
+<div class="sheet" id="sheet-saved" inert aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="saved-title">
+  <div class="grabber"></div><div class="sheet-head"><h2 id="saved-title" data-i18n="lists.savedTitle">Preferiti e liste</h2><button type="button" class="sheet-close" data-close data-i18n="common.close">Chiudi</button></div>
+  <div class="sheet-body"><div id="saved-groups"></div>
+    <form id="saved-create" class="saved-create" hidden><label><span data-i18n="lists.name">Nome della lista</span><input name="name" maxlength="80" required autocomplete="off"></label><button class="btn" type="submit" data-i18n="lists.create">Crea lista</button></form>
+    <p id="saved-status" role="status" aria-live="polite"></p>
+  </div>
+  <div class="saved-footer"><button type="button" class="btn saved-new" id="saved-new" data-i18n="lists.createNew">Crea una nuova lista</button></div>
+</div>
 <div class="sheet-backdrop" id="backdrop"></div>
 
 <div class="sheet" id="sheet-sos">
@@ -191,6 +203,11 @@
       <div class="menu-directory"><button class="btn" id="open-emergency">Numeri di emergenza</button><button class="btn" id="open-directory">Servizi a distanza</button></div>
       <div class="settings-section-title" data-i18n="map.preferences">Preferenze</div>
       <div class="settings-list">
+        {% if canonical %}<button type="button" class="row favorites-menu" id="open-favorites">
+          <span class="left"><span class="icon"><svg class="bookmark-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/static/assets/icons/ui/bookmark.svg#bookmark"></use></svg></span><span class="text"><span class="name" data-i18n="favorites.title">Preferiti</span><span class="desc" data-i18n="favorites.device">Salvati sul tuo dispositivo</span></span></span><span class="value" aria-hidden="true">→</span>
+        </button>{% endif %}
+        <button type="button" class="row favorites-menu" id="favorites-menu-all" hidden data-i18n="favorites.showAll">Tutti i servizi</button>
+        {% include 'components/text_zoom.html' %}
         <div class="row" data-sub="city">
           <div class="left">
             <div class="icon"><img src="/static/assets/icons/default/building.svg" alt="" aria-hidden="true" /></div>

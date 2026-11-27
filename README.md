@@ -1,3 +1,65 @@
+# Current preview lifecycle — EGI-134
+
+See [owned preview lifecycle](docs/preview-lifecycle.md) for the durable
+`python scripts/preview.py status|start|restart|stop` interface, isolation,
+prerequisites and bounded browser recovery. Existing origins 4328/4335 are preserved;
+synthetic milestone preview 4340 and automated checks 4341 are separate.
+
+# Current development checks — EGI-130
+
+The environment milestone adds one discovered check interface:
+
+```sh
+npm ci
+python3 scripts/check.py --profile quick --json
+python3 scripts/check.py --profile complete --json
+```
+
+Use the selected project Python environment with the existing runtime/dev lockfiles.
+ESLint10.15.0 is a pinned development dependency (Node20.19/22.13/24+ as supported
+by ESLint); no application bundler or runtime dependency changes. Setup:
+https://eslint.org/docs/latest/use/getting-started . The existing test-only httpx
+choice is preserved. Do not install a second Python lint/type toolchain.
+
+Quick discovers Python fixture tests, Node test*.cjs suites, syntax and focused ESLint
+checks. Explicit native/live suites are reported as Integration selections. The one
+optional sibling-importer drift case reports its test identity/reason if absent;
+other unexpected skips block the profile. Complete is the default delivery profile and includes actual browser, offline and
+generated-PDF stages. See [browser verification](docs/browser-verification.md). Integration owns explicitly configured native/cross-repository
+checks through identified provider commands; see [Integration verification](docs/integration-verification.md).
+Exit codes:0 passed,1 failed,2 prerequisite-blocked. JSON schema1 includes source
+commit, observed per-check state, named Python outcomes, reasons and durations.
+Quick is not evidence of Complete success. Native desktop print remains separate.
+
+The approved workspace execution record is
+`project_egi/.scratch/agent-workflow-improvements/execution.md`. Saved-list and Community feature bases are locally integrated in this milestone
+branch under the explicit session-2 grant; their original worktrees and existing
+previews are preserved. Native database properties and final acceptance remain
+separate from synthetic browser verification.
+
+## Commit and push validation — EGI-131
+
+`python3 scripts/commit_guard.py range BASE TIP` validates actual commit objects.
+`commit-msg FILE` validates a prospective title; `pre-push` reads Git's update stream
+and requires a clean worktree matching the pushed tip, passing Complete, and passing
+Integration when shared developer/product boundaries changed. Required report status,
+profile and source identity must agree with the process exit. Hook bypass cannot
+hide an invalid new commit from range validation. PR-to-dev CI runs the same policy, Complete and composed Integration; its job identity is `EGI / app`. Remote rule and validation evidence is recorded separately from workflow configuration.
+
+Ordinary titles use `EGI-<positive number>: <summary>`. Git-generated merge messages
+require merge context/parents; automatic reverts identify an existing target. Exact
+historical SHAs are inventoried in the owning exception policy; they do not approve
+feature integration or history rewriting. Commit bodies allow additional references.
+
+Run `python3 scripts/install_hooks.py` only from the assigned worktree. It refuses
+an unrelated existing hook path, sets a worktree-specific hooksPath, and preserves
+other worktree hook configuration. Commit-msg allows a valid local checkpoint even
+when Complete is blocked; pre-push refuses delivery in that state. Activate the
+selected Python environment when using hooks. The standalone canonical utility has
+no web-runtime dependency; provider repositories consume its exact pinned revision.
+
+## Earlier app setup and retained evidence
+
 # EGI app v0.2 — local preview
 
 ## B1 architectural completion
@@ -220,7 +282,7 @@ contributions grouped by service, filtered by state, kind, category, waiting rea
 and claimant; a contribution page shows its text, the submitter's contact, proposals
 and history, and lets a person claim, take over, release, reassign or set a waiting
 reason ("serve l'admin" puts it in the admin's view). Tests:
-`tests/test_moderation_access.py`, `tests/test_moderation_queue.py` (need `EGI_DATABASE_REPO`) and
+`tests/test_moderation_access_native.py`, `tests/test_moderation_queue_native.py` (need `EGI_DATABASE_REPO`) and
 `tests/test_moderation_oidc.py` (ID token verification against a mock provider).
 
 `/moderazione/servizi` finds any service by name, published or not; its workspace
@@ -247,7 +309,7 @@ location, or without one. A created location or service cites what the person
 verified, recorded as a "Redazione EGI" observation (`editorial.record_observation`,
 egi_database 013); a new location is published together with the service. The
 moderation pages allow images from `tile.openstreetmap.org` for that map, sent with
-the origin only as referrer. Tests: `tests/test_moderation_workspace.py`.
+the origin only as referrer. Tests: `tests/test_moderation_workspace_native.py`.
 
 ### Contribution decisions (EGI-85)
 
@@ -277,7 +339,7 @@ separate protection-release form approves/publishes an exact draft while releasi
 one chosen protection under the existing database capability and scope checks.
 Ordinary publication never releases it.
 
-Native tests: `tests/test_moderation_decisions.py` with `EGI_DATABASE_REPO`. The
+Native tests: `tests/test_moderation_decisions_native.py` with `EGI_DATABASE_REPO`. The
 retention scheduler templates remain in the database repository's
 `scripts/retention/`; installing one, provisioning a real login or applying SQL to
 a non-disposable demo still requires the existing separate grant. Tests use only
@@ -291,7 +353,7 @@ only in canonical mode with `EGI_INTAKE_DATABASE_URL` set to a login created
 `LOGIN IN ROLE egi_intake`, which may only call `editorial.submit_contribution`
 (global limits, honeypot, admin switch; no IP). Otherwise the page explains that
 contributions are not available. The form states retention and confirms receipt only.
-Tests: `tests/test_contribute.py` (needs `EGI_DATABASE_REPO`).
+Tests: `tests/test_contribute_native.py` (needs `EGI_DATABASE_REPO`).
 
 ## Setup and start
 
@@ -1024,6 +1086,133 @@ No new library, font, model acquisition, feed or prediction behavior is introduc
 [R2 execution and evidence](docs/r2-rendering.md) records budgets, ownership,
 asset provenance, desktop/lifecycle checks and pending physical-phone acceptance.
 Work is local-commit only and remains subject to final R2 review before C.
+
+## Offline favorites
+
+Canonical service sheets and service-list rows share a **bookmark icon**: outlined
+when absent, accent-filled when saved. The accessible label describes add/remove
+and identifies the service. Both controls reflect the same committed local state;
+the list bookmark never opens the service sheet. The map menu uses the same icon
+and opens **Favorites inside the existing map/list shell**, with **All services**
+to return. Saved cards absent from the loaded catalog, including scrubbed unavailable
+entries, remain represented. `/preferiti` is the offline reopening route of the same
+app/PWA feature; the online menu does not navigate to a separate screen.
+Favorites contain public card details, saved language, original save time and last
+successful update time. They live only in this browser profile and site origin;
+clearing site data deletes them. Use the same loopback host and port every time.
+
+The first successful save prepares the offline interface and writes the card to
+IndexedDB. Only after both operations succeed does the UI report offline readiness.
+A failed save reports the failure without deleting existing favorites. Browser
+storage can be denied, exhausted or evicted; this is not a backup or cloud sync.
+
+Opening favorites online, reconnecting while the page is open or pressing Refresh
+updates each saved UUID through the existing public detail endpoint, with at most
+three requests in flight. Network and server failures retain the previous copy and
+its timestamp. A confirmed 404 removes all old service details and retains an
+unavailable entry that the visitor may remove; later republication can restore it.
+Saved schedules remain readable but no stored opening status is displayed as live.
+
+`features/favorites/store.js` owns the public-field projection, versioned local
+storage and refresh rules. `controls.js` owns shared bookmark rendering and click
+handling; its delegated listener serves both list and detail, and never shows a
+successful selection before storage commits. The SVG symbol at
+`assets/icons/ui/bookmark.svg` is also used by the menu and offline view.
+`offline.js` owns shell installation/readiness.
+`/preferiti/sw.js` has scope `/preferiti` and caches only its explicit public shell
+allowlist. It never caches API responses, authentication/moderation pages, map tiles
+or transport. When changing its shell dependencies, update the allowlist and bump
+its cache version in the same change. `pages/favorites.js` renders saved cards using
+the existing service presentation module and the four current UI dictionaries.
+The standalone page uses system fonts so offline setup does not download map fonts.
+
+Desktop, Android and iOS are target platforms, using native IndexedDB, Service
+Worker and Cache Storage. HTTPS is needed away from loopback development. Installing
+a PWA is not required. Initial verification is on the local desktop only; responsive
+viewport checks do not establish Android/iOS device acceptance.
+
+Focused checks (in addition to the existing suites):
+
+```sh
+node --experimental-vm-modules tests/test_favorites.cjs
+python -m unittest discover -s tests -p test_favorites_http.py -v
+```
+
+The approved specification and session execution record are in
+[Linear](https://linear.app/aquaradja/document/offline-favorites-specification-r01-for-approval-bf2e797fc6fb).
+The user approved implementation in one session and explicitly skipped tickets on
+2026-11-27. Code remains on the dedicated local worktree; commit/push/PR/merge and
+deployment were not granted by that exception.
+
+See [local favorites verification](docs/offline-favorites-verification.md) for the
+actual desktop journey, measurements, independent review and mobile-testing limits.
+
+### Text accessibility
+
+The menu's Aa row provides text zoom from 100% to 200% in 10% steps. Reset appears
+before the minus control only away from the default. The preference is stored in
+localStorage on this browser/device and shared with the offline favorites page;
+if storage is denied, the control remains usable for the current visit. Authored
+interface text scales through rem units, while map geometry and marker icons retain
+their size. The preview banner is measured again as text wraps.
+
+This addition was authorized directly by the user on 2026-11-27, without a new
+specification or tickets. Verification on the changed worktree: 142 Python tests
+passed (13 configured skips), all 10 JavaScript suites passed, including
+`tests/test_text_zoom.cjs` for bounds, restoration, reset/focus, cross-tab updates
+and unavailable storage. In the native desktop preview, 110% changed the menu label
+from 15px to 16.5px, 200% survived reload, and Reset restored 100%. At a 390×844
+viewport and 200%, the accessibility row had no horizontal overflow and the controls
+wrapped to the right in Reset/minus/plus order. Physical Android/iOS checks remain
+outstanding; viewport emulation does not establish device acceptance.
+
+The map menu groups Favorites under Preferences, with the same icon/title/subtitle
+layout as adjacent settings and the localized subtitle “Salvati sul tuo dispositivo”.
+
+### Named local collections
+
+The Preferences bookmark opens the in-app “Preferiti e liste” sheet. It groups saved places by Favorites and named collection, with map and print actions and an inline new-list form. `/preferiti/liste` remains an offline fallback, not an app-menu destination. Visitors
+can create, select, rename and delete named collections (1–80 characters), add a
+service from either a result row or detail header, and remove individual members.
+The dedicated offline favorites page also offers “Aggiungi a una lista”. A service
+may belong to several collections independently of its quick bookmark. Removing a
+bookmark, a member or a collection does not remove copies from other collections.
+
+Collections reuse the existing IndexedDB object store with a separate territory
+namespace and one atomic document per collection; there is no database upgrade or
+server-side collection API. Each membership reuses the public snapshot projection,
+refresh/withdrawal rules and compare-token protection. An existing membership is
+not overwritten by re-adding an old saved favorite. A copy added offline retains
+its original update timestamp. Creating a collection prepares the complete shell;
+an already installed shell remains usable when a worker update fails offline.
+The dedicated worker also caches `/preferiti/liste`; map/API caching remains excluded.
+
+“Stampa / salva PDF” prints only the selected collection, with expanded public
+information, schedules, contacts, sources and copy timestamps. Native browser
+printing preserves Unicode layout and requires no PDF dependency or upload. Choose
+“Save as PDF” in the print dialog; the app does not claim to have saved a file.
+The native dialog and available PDF destinations depend on the browser/device.
+See [printing](https://html.spec.whatwg.org/multipage/timers-and-user-prompts.html#printing)
+and [paged CSS](https://www.w3.org/TR/css-page-3/).
+
+See [collections verification](docs/local-collections-verification.md) for actual
+checks and remaining device/PDF validation. The user authorized this direct
+implementation on 2026-11-27; no tickets, server sync, operator accounts, dependency
+installation, publication or merge were added.
+
+User UX correction (2026-11-27): the map app stays at `/map`; saving and collection
+management use its existing panel system. One bookmark opens the destination dialog
+and is selected if the POI belongs to any list. A POI may belong to multiple lists;
+removal is scoped to one membership. “Vista su mappa” filters to that group, with a
+visible “Tutti i servizi” exit. See the updated collection verification record.
+
+Saved-group rows use the same `renderListItem` renderer as the service results,
+including category, title, service type, address, opening information, transport
+badge when available, attribution and the shared bookmark. Live public catalog
+entries are reused when present; fallback snapshots retain their copy timestamp
+and unknown current-opening status. The filtered map has a persistent collection
+name plus “Torna alle liste” and “Tutti i servizi”; the list view also offers a
+direct return to the grouped panel.
 
 Private Community preparation JSON/raw-text endpoints are documented in
 [preparation HTTP](docs/community/preparation-http.md). They reuse editorial

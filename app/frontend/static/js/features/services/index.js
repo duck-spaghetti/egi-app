@@ -1,10 +1,16 @@
 import {reconcileMarkup,reconcileRows,forgetMarkup} from '../../reconcile.js';
+import {createCollections} from '../favorites/collections.js';
+import {createSavedPanel} from '../favorites/panel.js';
+import {createCollectionPicker} from '../favorites/collection-picker.js';
+import {createFavorites} from "../favorites/store.js";
+import {prepareOffline} from "../favorites/offline.js";
+import {createFavoriteControls} from "../favorites/controls.js";
 import {createPresentation} from "./presentation.js";
 /** createServices owns its behavior; dependencies and snapshots are explicit. */
 export function createServices({context,scope,loader,sites,transit,translate,emit}) {
 let state={pois:[],categories:[],languages:[],categoryTranslations:[],taxonomy:{course_levels:[]},filters:{cats:new Set(),offersOff:new Set()},lang:context.languageCode||'it',matchedIds:new Set()};
 const model=createPresentation({snapshot:()=>state,context,translate});
-const {normalizePublicService,normalizeArea,normalizeCategory,mergeServiceCategories,applyCategoryLabels,categoryBadge,formatDistance,sourceOpeningStatus,renderServiceHeader,renderInfoSection,renderHoursSection,renderContactsSection,renderSourcesSection,renderServiceBar,serviceButton,SERVICE_SECTIONS,escapeHtml,t}=model;
+const {normalizePublicService,normalizeArea,normalizeCategory,mergeServiceCategories,applyCategoryLabels,categoryBadge,formatDistance,sourceOpeningStatus,renderServiceHeader,renderInfoSection,renderHoursSection,renderContactsSection,renderSourcesSection,renderServiceBar,serviceButton,serviceTitle,SERVICE_SECTIONS,escapeHtml,t}=model;
 let descriptions=new Map(),refreshTime=null;
 /** Memoization belongs to one coherent refresh, including its clock/reference/language context. */
 function beginRefresh(snapshot,now=new Date()){state=snapshot;refreshTime=now;descriptions=new Map();}
@@ -13,13 +19,78 @@ function describe(poi,now=refreshTime||new Date()){
  const key=poi.id??poi;if(!descriptions.has(key))descriptions.set(key,model.describe(poi,now));return descriptions.get(key);
 }
 const closeSheets=()=>emit('closeSheets');
+const favorites=context.canonical ? createFavorites({territory:context.profile?.territory_code || 'roma',prepare:prepareOffline}) : null;
+const collections=context.canonical?createCollections({territory:context.profile?.territory_code || 'roma',prepare:prepareOffline}):null;
+let collectionEntries=new Map();
+const chooseSavedList=favorites?createCollectionPicker({favorites,changed:()=>{void refreshSavedPanel();},territory:context.profile?.territory_code || 'roma',scope,translate,notify:message=>emit('toast',{message})}):null;
+const favoriteControls=favorites ? createFavoriteControls({favorites,scope,translate,
+  listSaved:async()=>{const lists=await collections.list();collectionEntries=new Map(lists.map(list=>[list.id,list.entries]));return lists.flatMap(list=>list.entries.map(entry=>entry.id));},
+  chooseList:(control,id,language,copy)=>chooseSavedList(control,id,language,copy || [...collectionEntries.values()].flat().find(entry=>entry.id===id && entry.status==='saved')),
+  notify:message=>emit('toast',{message}),changed:()=>emit('favoritesChanged',{
+    unavailable:favoriteControls.entries().filter(entry=>entry.status==='unavailable').map(entry=>entry.id)})}) : null;
+
+const savedPanel=favorites && document.getElementById('sheet-saved')?.hasAttribute?.('aria-modal') ? createSavedPanel({favorites,collections,scope,translate,emit,changed:()=>favoriteControls.load(true),renderEntry:(entry,group)=>renderListItem(projectSavedEntry(entry,state.catalogPois || state.pois),{position:`saved-${group}`,selectAttribute:'data-saved-select'})}) : null;
+
+/** Refresh both bookmark membership and the visible library after a committed picker action. */
+async function refreshSavedPanel() {
+  const loaded=await favoriteControls.load(true);
+  if(!loaded || scope.signal.aborted || !savedPanel?.visible())return;
+  try{await savedPanel.render();}
+  catch(error){if(!scope.signal.aborted)emit('toast',{message:t('lists.error')});}
+}
+
+/** Reuse current public cards where available; retain saved copies and scrubbed unavailable entries. */
+function savedServices(snapshot) {
+  return (snapshot.filters.savedCollection && snapshot.filters.savedCollection!=='favorites' ? collectionEntries.get(snapshot.filters.savedCollection) || [] : favoriteControls?.entries() || []).map(entry=>projectSavedEntry(entry,snapshot.pois));
+}
+function projectSavedEntry(entry,catalog) {
+  const current=catalog.find(poi=>String(poi.id)===entry.id);
+  if(entry.status==='saved' && current)return current;
+  const raw=entry.status==='saved' ? structuredClone(entry.card) : {
+    id:entry.id,name:t('favorites.unavailable'),data_status:'approved_canonical_local',
+    description:t('favorites.removedDetails'),sources:[],contacts:[],place:{}};
+  raw.hours_display={...raw.hours_display,canonical_opening:{status:'unknown'}};
+  return {...normalizePublicService(raw),favoriteSavedAt:entry.updatedAt,
+    favoriteLanguage:entry.language,favoriteUnavailable:entry.status==='unavailable'};
+}
+
+/** Refresh saved cards for the in-app favorites view without replacing the main catalogue. */
+let favoriteRefresh;
+async function reloadFavorites() {
+  if(!favoriteControls || scope.signal.aborted)return;
+  if(favoriteRefresh)return favoriteRefresh;
+  favoriteRefresh=(async()=>{
+    await favoriteControls.load(true);
+    if(scope.signal.aborted)return;
+    if(globalThis.navigator?.onLine){
+      try {const result=await favorites.refresh();scope.check();await favoriteControls.load(true);
+        if(result.failures)emit('toast',{message:t('favorites.refreshError')});
+      }catch(error){if(!scope.signal.aborted)emit('toast',{message:t('favorites.refreshError')});}
+    }
+  })().finally(()=>{favoriteRefresh=undefined;});
+  return favoriteRefresh;
+}
+
+/** Mark fallback cards as saved copies in their original content language. */
+function savedCopyNotice(poi) {
+  if(!poi.favoriteSavedAt)return '';
+  const stamp=new Date(poi.favoriteSavedAt).toLocaleString(state.lang);
+  return `<span class="favorite-snapshot">${escapeHtml(t(poi.favoriteUnavailable ? 'favorites.removedDetails' : 'favorites.snapshot'))}
+    ${escapeHtml(t('favorites.updated'))}: ${escapeHtml(stamp)} · ${escapeHtml(t('favorites.contentLanguage'))}: ${escapeHtml(poi.favoriteLanguage.toUpperCase())}</span>`;
+}
+
+/** Remove all retained detail markup after an authoritative withdrawal. */
+function clearDetail() {
+  for(const id of ['detail-top','detail-body','detail-bar'])document.getElementById(id).replaceChildren();
+}
 
 async function openDetail(id) {
-  const poi=state.pois.find(p=>String(p.id)===String(id));
+  const poi=[...state.pois,...(state.catalogPois || [])].find(p=>String(p.id)===String(id));
   if (!poi) return emit("toast",{message:"Servizio non disponibile"});
   const sheet=document.getElementById("sheet-detail");
   sheet.classList.add("service-mode");
-  document.getElementById("detail-top").innerHTML=renderServiceHeader(poi);
+  document.getElementById("detail-top").innerHTML=renderServiceHeader(poi,{actions:favoriteControls?.button(poi.id,serviceTitle(poi),'detail') || '',notice:savedCopyNotice(poi)});
+  favoriteControls?.sync();
   document.getElementById("detail-body").innerHTML=[
     renderInfoSection(poi), renderHoursSection(poi), renderContactsSection(poi),
     renderArriveSection(poi), renderOtherServices(poi), renderSourcesSection(poi)].join("");
@@ -96,22 +167,15 @@ function openServiceChooser(items, matched = new Set(items.map(p=>p.id))) {
   document.querySelector("#sheet-detail .sheet-body").scrollTop=0;
   emit("openSheet",{id:"sheet-detail"});
 }
-function renderList(list) {
-  document.getElementById("list-count").textContent=String(list.length);
-  const wrap=document.getElementById("poi-list");
-  if (!list.length) {
-    reconcileMarkup(wrap,`<div class="empty-state"><p>${state.filters.section==="directory" ? "Nessun servizio esplicitamente a distanza nei dati selezionati. I servizi senza coordinate restano nell’elenco da localizzare." : "Nessun servizio per questa ricerca."}</p></div>`);
-    return;
-  }
-  const rows=list.map(poi=>{
+function renderListItem(poi,{position='list',selectAttribute='data-id'}={}) {
     const raw=poi.raw || {};
     const siblings=sites.siblings(poi).length;
     const distance=state.userLoc ? (poi._dist==null ? "Distanza non disponibile" : formatDistance(poi._dist)) : "";
-    const display=describe(poi);
     // Same hierarchy as the service sheet header (layout r3): category, title, place, hours, who.
+    const display=describe(poi);
     const status=display.status,today=display.today;
     const who=[display.organiser,...display.sources].filter(Boolean);
-    return {id:poi.id,html:`<button type="button" class="poi-item" data-id="${escapeHtml(poi.id)}"><span class="marker-stripe" style="background:${poi.category_color}"></span><span class="info">
+    return `<div class="service-list-item" data-id="${escapeHtml(poi.id)}"><button type="button" class="poi-item" ${selectAttribute}="${escapeHtml(poi.id)}"><span class="marker-stripe" style="background:${poi.category_color}"></span><span class="info">
       <span class="meta">${display.categoryBadge}${distance?`<span class="dist">${escapeHtml(distance)}</span>`:""}${raw.itinerant_source?'<span class="dist">Itinerante</span>':""}</span>
       <span class="service-list-title"><span class="name">${escapeHtml(display.title)}</span></span>
       <span class="service-kind">${escapeHtml(display.kind)}${siblings>1?` <span class="service-key">· ${siblings} servizi qui</span>`:""}</span>
@@ -119,9 +183,19 @@ function renderList(list) {
       <span class="service-status ${status.kind}" data-opening-service="${escapeHtml(poi.id)}"><strong>${escapeHtml(status.label)}</strong>${today ? `<span class="service-today">${escapeHtml(today)}</span>` : ""}<small hidden></small></span>
       ${transit.badge(poi)}
       <span class="list-who">${escapeHtml(who.join(" · "))} · <span class="list-flag">da verificare</span></span>
-    </span></button>`};
-  });
-  reconcileRows(wrap,rows);
+      ${savedCopyNotice(poi)}
+    </span></button>${favoriteControls?.button(poi.id,display.title,position) || ''}</div>`;
+}
+function renderList(list) {
+  document.getElementById("list-count").textContent=String(list.length);
+  const wrap=document.getElementById("poi-list");
+  if (!list.length) {
+    reconcileMarkup(wrap,`<div class="empty-state"><p>${state.filters.favoritesOnly ? escapeHtml(t('favorites.empty')) : state.filters.section==="directory" ? "Nessun servizio esplicitamente a distanza nei dati selezionati. I servizi senza coordinate restano nell’elenco da localizzare." : "Nessun servizio per questa ricerca."}</p>${state.filters.favoritesOnly ? `<button type="button" class="btn" data-favorites-empty-all>${escapeHtml(t('favorites.showAll'))}</button>` : ''}</div>`);
+    wrap.querySelector('[data-favorites-empty-all]')?.addEventListener('click',()=>emit('allServices'),{signal:scope.signal});
+    return;
+  }
+  reconcileRows(wrap,list.map(poi=>({id:poi.id,html:renderListItem(poi)})));
+  favoriteControls?.sync();
 }
 function bindHoursToggle() {
   const toggle = document.querySelector("[data-hours-toggle]");
@@ -165,6 +239,7 @@ function updateOpeningBadges() {
 
 async function load(language, targetTranslate=translate) {
  const bundle=await loader.load(language);
+ await favoriteControls?.load();
  scope.check();
  const candidate={...state,lang:language,languages:bundle.languages,categoryTranslations:bundle.categoryTranslations,taxonomy:bundle.taxonomy};
  const projection=createPresentation({snapshot:()=>candidate,context,translate:targetTranslate});
@@ -173,9 +248,9 @@ async function load(language, targetTranslate=translate) {
  return {categories,pois:bundle.rows.map(projection.normalizePublicService).filter(Boolean),languages:bundle.languages,
   cityOptions:bundle.areas.map(projection.normalizeArea),categoryTranslations:bundle.categoryTranslations,taxonomy:{...bundle.taxonomy,needs:(bundle.taxonomy.needs||[]).map(projection.displayCategory)}};
 }
-const listHost=document.getElementById('poi-list');listHost.addEventListener('click',event=>{const row=event.target.closest('[data-id]');if(row&&listHost.contains(row))emit('select',{id:row.dataset.id});},{signal:scope.signal});
+const listHost=document.getElementById('poi-list');listHost.addEventListener('click',event=>{if(event.target.closest('[data-favorite-id]'))return;const row=event.target.closest('.poi-item[data-id]');if(row&&listHost.contains(row))emit('select',{id:row.dataset.id});},{signal:scope.signal});
 function update(snapshot,list) {state=snapshot;if(list){document.getElementById('list-count').textContent=String(list.length);if(state.view==='list')renderList(list);else if(listHost.childNodes.length){listHost.replaceChildren();forgetMarkup(listHost);}}}
 function dispose(){descriptions.clear();refreshTime=null;state={pois:[]};listHost.replaceChildren();forgetMarkup(listHost);document.getElementById('detail-body').onscroll=null;}
 
-return {load,update,beginRefresh,show:openDetail,choose:openServiceChooser,refreshHours:updateOpeningBadges,describe,dispose};
+return {openSaved:()=>savedPanel?.open(),load,update,beginRefresh,show:openDetail,choose:openServiceChooser,refreshHours:updateOpeningBadges,describe,savedServices,reloadFavorites,clearDetail,dispose};
 }

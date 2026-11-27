@@ -1,9 +1,18 @@
 /** Load actual ES Modules unchanged; callers and tests cross the same Imports. */
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const {element}=require('./dom_fixture.cjs');
-function environment(extra={}){
- const elements=new Map();const get=id=>{if(!elements.has(id))elements.set(id,element());return elements.get(id);};
- const document={getElementById:get,querySelector:get,querySelectorAll:()=>[],createElement:element,addEventListener(){},documentElement:{},title:''};
+function environment(extra={},fixture=null){
+ const unsupported=()=>{throw Error('Unsupported DOM operation in strict fixture');};
+ const make=(tag)=>fixture?{...element(tag),querySelector:unsupported,querySelectorAll:unsupported}:element(tag);
+ const elements=new Map((fixture?.nodes || []).map(id=>[id,make()]));
+ const get=id=>{
+  if(fixture && !elements.has(id)){
+   if(fixture.optional?.includes(id))return null;
+   throw Error('Missing required DOM node: '+id);
+  }
+  if(!elements.has(id))elements.set(id,make());return elements.get(id);
+ };
+ const document={getElementById:get,querySelector:fixture?unsupported:get,querySelectorAll:fixture?unsupported:()=>[],createElement:make,addEventListener(){},documentElement:{},title:''};
  const context=vm.createContext({console,AbortController,AbortSignal,DOMException,URL,URLSearchParams,structuredClone,setTimeout,clearTimeout,setInterval,clearInterval,
  window:{location:{origin:'http://localhost'},clearTimeout,setTimeout,clearInterval},location:{search:''},navigator:{},document,...extra});
  const root=path.resolve(__dirname,'../app/frontend/static/js'),modules=new Map();
@@ -18,4 +27,6 @@ function environment(extra={}){
  }
  return {load,context,document,elements,get};
 }
-module.exports={environment,element};
+/** Integration assertions declare nodes; legacy unit-only fakes remain explicit. */
+function strictEnvironment(fixture,extra={}){return environment(extra,fixture);}
+module.exports={environment,strictEnvironment,element};

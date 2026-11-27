@@ -9,7 +9,9 @@ import os
 from pathlib import Path
 import subprocess
 
-from scripts.cw1_checks import resources
+import sys
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
+from devchecks.resources import OwnedCluster, CleanupError, preserve_failure
 
 REPOSITORY = os.environ.get("EGI_DATABASE_REPO")
 PG = Path(os.environ.get("EGI_PG_BIN", "/Library/PostgreSQL/18/bin"))
@@ -23,8 +25,7 @@ class Cluster:
         if not REPOSITORY:
             raise RuntimeError('EGI_DATABASE_REPO must select the disposable schema source')
         self.port, self.database = port, database
-        self.tooling = resources()
-        self.resource = self.tooling.OwnedCluster(Path(__file__).resolve().parents[1], PG, port, database)
+        self.resource = OwnedCluster(Path(__file__).resolve().parents[1], PG, port, database)
         self.base, self.environment = self.resource.path, self.resource.environment
         try:
             self.sql(f"REVOKE TEMPORARY ON DATABASE {database} FROM PUBLIC")
@@ -43,12 +44,12 @@ class Cluster:
                 for change in changes:
                     self.file(Path(REPOSITORY)/"deploy"/f"{change}.sql")
         except BaseException as primary:
-            receipt = self.tooling.preserve_failure(self.resource.run, self.resource.path, primary)
+            receipt = preserve_failure(self.resource.run, self.resource.path, primary)
             primary.add_note('Evidence: ' + receipt)
             try:
                 self.resource.close()
             except BaseException as cleanup:
-                raise self.tooling.CleanupError(f'Primary {type(primary).__name__}; cleanup: {cleanup}') from primary
+                raise CleanupError(f'Primary {type(primary).__name__}; cleanup: {cleanup}') from primary
             raise
 
     def dsn(self, user: str) -> str:
