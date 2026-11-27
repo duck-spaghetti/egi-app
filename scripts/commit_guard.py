@@ -25,7 +25,9 @@ def check_profile(root, profile):
 def integration_needed(root, base, tip):
     """Detect changed shared developer/product boundaries conservatively."""
     names = git(root, "diff", "--name-only", base, tip).splitlines()
-    return any(name.startswith(("app/backend/api/", "scripts/devchecks/", "scripts/check.py",
+    return any(name in ("checks/integration.py", "tests/native.py")
+                   or (name.startswith("tests/") and name.endswith("_native.py"))
+                   or name.startswith(("app/backend/api/", "scripts/devchecks/", "scripts/check.py",
                                 "scripts/commit_guard.py", "requirements", "pyproject.toml", "review/",
                                 "deploy/", "revert/", "verify/", "sqitch.plan", ".checks/", ".github/")) for name in names)
 

@@ -12,14 +12,14 @@
       "name": "database",
       "environment": "EGI_DATABASE_PROVIDER",
       "path": "../egi_database-development-checks",
-      "revision": "e92b40c4f0b2a54fb23693d5787d8a1e076191a6"
+      "revision": "893d8afca54448c5503e162ab303bd1d75339f42"
     },
     {
       "name": "reviewer",
       "environment": "EGI_REVIEWER_PROVIDER",
       "path": "../egi-reviewer-development-checks",
-      "revision": "80bac3f9b24d2bb348193ffa1ad5f8a7b71bbb9f",
-      "wheel_sha256": "7b68d4ac3272ae967df3a93650957970b97cdf9f347010e060cbbe494f05e616",
+      "revision": "92a52e438691a3137122f1be0eec51198339b5b3",
+      "wheel_sha256": "42792737207d09fc73356f7fd096dc1cc5a727bff82e848d3d9f2cb4fb227e56",
       "python_environment": "EGI_REVIEWER_PYTHON",
       "python": "../egi-reviewer-community-text/.venv/bin/python"
     }

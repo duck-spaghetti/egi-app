@@ -109,21 +109,39 @@ def start(port, target, timeout):
         child = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '--serve',
                                   '--port', str(port), '--target', target], cwd=ROOT,
                                  env=env, stdout=log, stderr=log, start_new_session=True)
-    receipt = {'pid': child.pid, 'fingerprint': fingerprint(child.pid), 'token': token,
-               'port': port, 'url': f'http://127.0.0.1:{port}', 'worktree': str(ROOT),
-               'source': git('rev-parse', 'HEAD'), 'target': target}
-    path = RUNTIME / 'runtime.json'
-    path.write_text(json.dumps(receipt)); path.chmod(0o600)
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if child.poll() is not None:
-            raise RuntimeError('Preview startup failed; inspect the recorded server log')
-        if state()[0]['ownership'] == 'owned':
-            return
-        time.sleep(.05)
-    # Still our just-created child, not a stale PID from a previous invocation.
-    child.terminate(); child.wait(timeout=8)
-    raise RuntimeError('Preview startup timed out; inspect the recorded server log')
+    try:
+        receipt = {'pid': child.pid, 'fingerprint': fingerprint(child.pid), 'token': token,
+                   'port': port, 'url': f'http://127.0.0.1:{port}', 'worktree': str(ROOT),
+                   'source': git('rev-parse', 'HEAD'), 'target': target}
+        path = RUNTIME / 'runtime.json'
+        path.write_text(json.dumps(receipt)); path.chmod(0o600)
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if child.poll() is not None:
+                raise RuntimeError('Preview startup failed; inspect the recorded server log')
+            if state()[0]['ownership'] == 'owned':
+                return
+            time.sleep(.05)
+        raise RuntimeError('Preview startup timed out; inspect the recorded server log')
+    except BaseException:
+        # The Popen handle is the capability for this newly acquired child only.
+        try:
+            discard_startup(child)
+        except (OSError, subprocess.SubprocessError) as error:
+            raise RuntimeError('Owned preview startup cleanup failed; inspect the recorded server log') from error
+        raise
+
+
+def discard_startup(child):
+    """Reap a just-created preview after any failed acquisition, with bounded kill fallback."""
+    if child.poll() is not None:
+        return
+    child.terminate()
+    try:
+        child.wait(timeout=8)
+    except subprocess.TimeoutExpired:
+        child.kill()
+        child.wait(timeout=8)
 
 
 def serve(target, port):

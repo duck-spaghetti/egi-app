@@ -12,7 +12,16 @@ test('empty library stays in the shell with a visible operable exit',async({page
 });
 
 test('list/detail bookmarks, independent memberships and map/catalog round trip',async({page})=>{
+  const unsaved='00000000-0000-0000-0000-000000000009';
+  await page.route(/\/api\/public\/services\?/,async route=>{
+    const response=await route.fetch(),services=await response.json();
+    const extra=structuredClone(services[0]);
+    Object.assign(extra,{id:unsaved,name:'Zeta servizio non salvato',service_title:'Zeta servizio non salvato',place_id:'unsaved-place'});
+    extra.place={...extra.place,id:'unsaved-place',geometry:{type:'Point',coordinates:[12.51,41.91]}};
+    await route.fulfill({response,json:[...services,extra]});
+  });
   await openMap(page);
+  await expect(page.locator('#poi-list [data-favorite-id]')).toHaveCount(2);
   const listBookmark=page.locator('#poi-list [data-favorite-id]').first();
   await listBookmark.click();await saveTo(page);
   await expect(listBookmark).toHaveAttribute('aria-pressed','true');
@@ -34,10 +43,20 @@ test('list/detail bookmarks, independent memberships and map/catalog round trip'
   await expect(page.locator('#saved-map-back')).toBeVisible();await page.locator('#saved-map-back').click();
   await expect(page.locator('#sheet-saved')).toHaveClass(/shown/);
   await page.locator('[data-saved-map]:not([disabled])').click();
-  await page.locator('#saved-map-exit').click();
-  await expect(page.locator('#saved-map-nav')).not.toBeVisible();
   await page.locator('#view-toggle').click();
-  await expect(page.locator('#poi-list [data-favorite-id]')).toHaveAttribute('data-favorite-id',SERVICE);
+  const secondary=page.locator('#poi-list [data-favorite-id="'+unsaved+'"]');
+  await expect(page.locator('#poi-list [data-favorite-id]')).toHaveCount(1);
+  await expect(secondary).toHaveCount(0);
+  await page.locator('#favorites-show-all').click();
+  await expect(page.locator('#saved-map-nav')).not.toBeVisible();
+  await expect(page.locator('#poi-list [data-favorite-id]')).toHaveCount(2);
+  await expect(secondary).toBeVisible();
+  // An equivalent retained-filter result must fail this exact restoration assertion.
+  await secondary.evaluate(button=>{button.closest('.service-list-item').style.display='none';});
+  let rejected=false;try{await expect(secondary).toBeVisible({timeout:250});}catch{rejected=true;}
+  expect(rejected).toBe(true);
+  await secondary.evaluate(button=>{button.closest('.service-list-item').style.removeProperty('display');});
+  await expect(secondary).toBeVisible();
 });
 
 test('storage denial keeps navigation usable without a false saved state',async({page})=>{
