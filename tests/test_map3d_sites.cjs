@@ -13,7 +13,7 @@ const assert=require('node:assert/strict');const {environment}=require('./module
  const html=siteLabel(site,true,t);assert(html.includes('&lt;script&gt;'));assert(!html.includes('map3d-category-row'),'single category icon is not repeated');assert(html.includes('status closing'));assert(html.includes('da verificare'));assert(!html.includes('<test>'));
  const kind=siteLabel({...site,kinds:['Mensa & accoglienza']},true,t);assert(kind.includes('Mensa &amp; accoglienza'));assert(!kind.includes('map3d-category-row'));
  const all=siteLabel({...site,allCategories:[{slug:'first',label:'Visible'},{slug:'second',label:'Other service',matched:false}]},true,t);assert(all.includes('Other service'));assert(all.includes('outside-search'));assert(all.includes('fuori dai filtri'));
- const mixed=siteLabel({...site,statuses:[{kind:'closed',label:'Chiuso'},{kind:'unknown',label:'Non noto'}]},true,t);assert(mixed.includes('Orario da verificare'));assert(!mixed.includes('</i>Chiuso'));
+ const mixed=siteLabel({...site,statuses:[{kind:'closed',label:'Chiuso'},{kind:'unknown',label:'Non noto'}]},true,t);assert(mixed.includes('Orario non disponibile'));assert(!mixed.includes('</i>Chiuso'));
  const unverified=siteLabel({...site,statuses:[1,2].map(()=>({kind:'open',label:'Aperto · da verificare',verificationLabel:'da verificare'}))},true,t);assert(unverified.includes('</i>da verificare · 2/2 servizi aperti'));
  assert.equal(clusterAppearance(64).ink,'#000');
  console.log('PASS: neighbour clusters, count presentation, site conservation, progressive safe labels and honest mixed status');

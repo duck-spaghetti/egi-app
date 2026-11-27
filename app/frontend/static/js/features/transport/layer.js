@@ -82,7 +82,7 @@ const TransportLayer = (() => {
 
   /** Marker HTML: one mode symbol per stop/station; line codes sit in .tl-codes,
    * which CSS shows only at detail zoom (DETAIL_ZOOM), in focus or on hover/focus.
-   * A close-scale wrapper anchors the ground dot without altering source geometry. */
+   * Close-scale Roman-inspired signs share the source anchor; no extra bus/tram text. */
   function stopIconHtml(props, highlighted = false, anchored = false) {
     const near = highlighted ? " tl-near" : "";
     let symbol;
@@ -92,12 +92,35 @@ const TransportLayer = (() => {
       symbol=`<span class="tl-station${near}"><span class="tl-roundel">M</span><span class="tl-codes">${lineChips(props.routes)}</span></span>`;
     } else if (props.transport_type === "tram") symbol=`<span class="tl-stop tl-tram${near}">T</span>`;
     else symbol=`<span class="tl-stop tl-bus${near}">${BUS_GLYPH}</span>`;
-    return anchored?`<span class="tl-anchored">${symbol}<span class="tl-stem" aria-hidden="true"></span><span class="tl-ground" aria-hidden="true"></span></span>`:symbol;
+    const compact=symbol;
+    const palina=anchored&&['metro','tram','bus'].includes(props.transport_type);
+    if(palina){
+      if(props.transport_type==='metro')symbol=symbol.replace('tl-station','tl-station tl-palina tl-palina-metro');
+      else {
+        const mode=props.transport_type;
+        symbol=`<span class="tl-stop tl-${mode} tl-palina tl-palina-${mode}${near}"><span class="tl-palina-cap" aria-hidden="true"></span><span class="tl-palina-mode" aria-hidden="true">${mode==='tram'?'T':BUS_GLYPH}</span><span class="tl-palina-board" aria-hidden="true"></span></span>`;
+      }
+    }
+    return anchored?`${palina?`<span class="tl-compact" style="--tl-progress:var(--tl-${props.transport_type==='metro'?'metro':'road'}-progress,0)">${compact}</span>`:''}<span class="tl-anchored${palina?` tl-palina-anchor tl-palina-${props.transport_type==='metro'?'metro':'road'}-anchor`:''}">${symbol}<span class="tl-stem" aria-hidden="true"></span><span class="tl-ground" aria-hidden="true"></span></span>`:symbol;
   }
 
   /** Bus/tram ground anchors need one closer zoom than station points. */
   function pointDetail(props,zoom){
     return zoom >= (props.transport_type==='bus'||props.transport_type==='tram'?ROAD_STOP_POINT_ZOOM:STOP_POINT_ZOOM);
+  }
+
+  /** Continuous scale grows with map scale; sign faces remain bounded and crossfade from compact symbols. */
+  function palinaPresentation(zoom,threshold,maxZoom=20){
+    return {progress:maxZoom<=threshold?Number(zoom>=threshold):Math.max(0,Math.min(1,zoom-threshold)),scale:Math.min(.65,.32*2**Math.max(0,zoom-threshold))};
+  }
+
+  /** Four style writes on camera zoom; no marker rebuild, layout read or network request. */
+  function scalePaline(root,zoom,maxZoom=20){
+    for(const [mode,threshold] of [['metro',STOP_POINT_ZOOM],['road',ROAD_STOP_POINT_ZOOM]]){
+      const view=palinaPresentation(zoom,threshold,maxZoom);
+      root.style.setProperty(`--tl-${mode}-progress`,view.progress);
+      root.style.setProperty(`--tl-${mode}-scale`,view.scale);
+    }
   }
 
   function wheelchairText(value) {
@@ -214,6 +237,8 @@ const TransportLayer = (() => {
     const layer = L.layerGroup().addTo(map);
     const names=createStopNames(map.getContainer());
     const refreshNames=()=>names.refresh(map.getZoom());
+    const scale=()=>scalePaline(map.getContainer(),map.getZoom(),map.getMaxZoom?.()||19);
+    ownMap("zoom",scale);
     const syncDetail = () => {
       map.getContainer().classList.toggle("tl-detail", map.getZoom() >= DETAIL_ZOOM || Boolean(focused));
       map.getContainer().classList.toggle("tl-focused", Boolean(focused));
@@ -245,7 +270,7 @@ const TransportLayer = (() => {
       popupOpen = false;
       held = null;
       names.clear();layer.clearLayers();
-      syncDetail();
+      syncDetail();scale();
       if (disposed || !visible) return;
       const labelled = new Set(),stops=[];
       for (const feature of features) {
@@ -413,7 +438,7 @@ const TransportLayer = (() => {
     return {setVisible, isVisible: () => visible, reload: load, focus, clearFocus, focusedRoutes: () => focused?.routeIds || null, dispose(){disposed=true;visible=false;listeners.abort();request?.abort();clearTimeout(timer);clearInterval(interval);for(const clean of cleanup)clean();names.dispose();layer.off?.();layer.remove?.();chip.remove?.();}};
   }
 
-  return {pointDetail,STOP_POINT_ZOOM,ROAD_STOP_POINT_ZOOM,DETAIL_ZOOM, TRAIN_GLYPH, UNTIMED_NOTE, routePopupHtml, directionTimes, realtimeText, alertsHtml, realtimeNote, create, statusText, viewportQuery, lineStyle, focusLineStyle, lineLabelPoint, colorForLine, stopIconHtml, popupHtml, lineColor, departuresHtml, timeText, wheelchairText};
+  return {palinaPresentation,scalePaline,pointDetail,STOP_POINT_ZOOM,ROAD_STOP_POINT_ZOOM,DETAIL_ZOOM, TRAIN_GLYPH, UNTIMED_NOTE, routePopupHtml, directionTimes, realtimeText, alertsHtml, realtimeNote, create, statusText, viewportQuery, lineStyle, focusLineStyle, lineLabelPoint, colorForLine, stopIconHtml, popupHtml, lineColor, departuresHtml, timeText, wheelchairText};
 })();
 
 export {TransportLayer};

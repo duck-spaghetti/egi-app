@@ -16,7 +16,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
  class Popup{constructor(o){this.options=o;created.popups.push(this);} setLngLat(l){this.lngLat=l;return this;} setHTML(h){this.html=h;return this;} addTo(){return this;} on(name,fn){(this.handlers||={})[name]=fn;} remove(){if(this.removed)return;this.removed=true;this.handlers?.close?.();}}
  const maplibre={Marker,Popup};
  function fakeMap(){
-  const container=element();container.clientWidth=800;container.clientHeight=600;
+  const container=element();container.style.setProperty=function(k,v){this[k]=String(v);};container.clientWidth=800;container.clientHeight=600;
   const bounds={getWest:()=>12.45,getSouth:()=>41.88,getEast:()=>12.52,getNorth:()=>41.92};
   return {container,sources:{},layers:[],handlers:[],zoom:14.4,
    getContainer(){return container;},getBounds(){return bounds;},getZoom(){return this.zoom;},isStyleLoaded:()=>true,
@@ -57,7 +57,9 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
  assert.equal(created.markers.filter(m=>!m.removed).length,0);
  const individual={...stop,id:'stop:platform-a',geometry:{type:'Point',coordinates:[12.4902,41.9001]},properties:{...stop.properties,kind:'stop',stop_id:'platform-a',stop_ids:undefined}};responses['/api/preview/transport']={...responses['/api/preview/transport'],features:[line,individual]};
  const highMap=fakeMap();highMap.zoom=17.4;const second=TransportLayerGL.create(highMap,{},maplibre);second.setVisible(true);await second.reload();
- const highStop=created.markers.filter(m=>!m.removed).at(-1);assert(highStop.options.element.innerHTML.includes('tl-ground'));assert(highStop.options.element.className.includes('tl-point-detail'));same(highStop.lngLat,individual.geometry.coordinates,'ground anchor keeps source coordinates');
+ const highStop=created.markers.filter(m=>!m.removed).at(-1);
+ const count=created.markers.length,requests=calls.length;highMap.zoom=17.75;highMap.handlers.find(h=>h[0]==='zoom')[1]();assert.equal(highMap.container.style['--tl-metro-progress'],'0.75');assert.equal(created.markers.length,count,'continuous zoom does not rebuild markers');assert.equal(calls.length,requests,'continuous zoom does not fetch');
+ assert(highStop.options.element.innerHTML.includes('tl-ground'));assert(highStop.options.element.innerHTML.includes('tl-palina-metro')); assert(highStop.options.element.className.includes('tl-point-detail'));same(highStop.lngLat,individual.geometry.coordinates,'ground anchor keeps source coordinates');
  created.markers.filter(m=>!m.removed).at(-1).options.element.click();await wait(20);assert(calls.filter(c=>c.url.startsWith('/api/preview/transit/departures?')).at(-1).url.includes('stops=platform-a'),'individual platform requests its own departures');second.dispose();assert.equal(frames.size,0,'popup teardown without held data must not queue name work');
  // Cycleways: same body as the current map's layer, features drawn, same status text.
  const cmap=fakeMap();cmap.zoom=13.2;const ctoggle=element(),cstatus=element();

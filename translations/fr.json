@@ -114,7 +114,7 @@
       "look": "Voir le bâtiment",
       "slow": "La vue 3D est lente sur cet appareil : vous pouvez revenir à la carte plane.",
       "site_open": "{open}/{total} services ouverts",
-      "hours_unknown": "Horaires à vérifier",
+      "hours_unknown": "Horaires indisponibles",
       "category_outside": "{category} · hors des filtres"
     },
     "walk": {

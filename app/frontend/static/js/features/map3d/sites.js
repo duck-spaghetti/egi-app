@@ -38,7 +38,7 @@ export function siteLabel(site,detail,translate){
  if(!detail)return `<span class="map3d-site-label" aria-hidden="true"><strong>${escapeHtml(name)}</strong></span>`;
  const statuses=(site.statuses||[]).filter(Boolean),live=statuses.filter(s=>s.kind==='open'||s.kind==='closing');
  const kind=live.some(s=>s.kind==='open')?'open':live.length?'closing':statuses.length&&statuses.every(s=>s.kind==='closed')?'closed':'unknown';
- const label=statuses.length===1?statuses[0].label:live.length?translate('map.map3d.site_open',{open:live.length,total:statuses.length},`${live.length}/${statuses.length} servizi aperti`):kind==='closed'?statuses[0].label:translate('map.map3d.hours_unknown',{},'Orario da verificare');
+ const label=statuses.length===1?statuses[0].label:live.length?translate('map.map3d.site_open',{open:live.length,total:statuses.length},`${live.length}/${statuses.length} servizi aperti`):kind==='closed'?statuses[0].label:translate('map.map3d.hours_unknown',{},'Orario non disponibile');
  const verification=[...new Set(statuses.map(s=>s.verificationLabel).filter(Boolean))].join(' · ');
  const visibleLabel=statuses.length>1&&verification&&!label.includes(verification)?`${verification} · ${label}`:label;
  const categorySet=site.allCategories||site.categories||[];

@@ -843,3 +843,28 @@ NeTEx/OSM station-only data do not gain invented detail. Names avoid the combine
 symbol/stem/foot footprint. The 3D equivalent zoom is capped at the existing API
 maximum19, so maximum camera zoom remains usable. Timetables and nearby summaries
 keep their existing source-stop memberships. No importer/runtime format changes.
+
+
+Close bus/tram stops now use light CSS paline inspired by Roman stop signs:
+yellow boards, red caps and a mode glyph, with no automatic names or route text.
+Metro uses a red square M sign. Signs replace compact symbols only at the existing
+point-detail thresholds (Leaflet18 metro /19 bus-tram; MapLibre17 /18). Rail keeps
+its previous symbol. The pole ends at the unchanged source coordinate; it does not
+assert that the source point is a street entrance. No model/texture/network loading.
+
+Service opening labels now include known closing boundaries even more than an hour
+ahead, and next opening when the canonical transition explicitly leads to open.
+Civil-day text distinguishes today, tomorrow and later dates in the schedule timezone.
+Unknown transitions, missing/invalid boundaries and uninterrupted24h hours do not
+invent a time. Opening-status text omits the verification qualifier per user choice; provenance
+notes and other verification controls remain in the card. Timed invalidation remains.
+Signs crossfade from the compact symbol over one continuous zoom level, starting
+at the point-detail threshold. Size grows with map scale from32% to a65% cap
+(~42px including pole). Zoom writes four CSS variables on the map container, with
+no geometry reads, marker rebuilds or requests; reduced-motion skips transitions.
+Opening date/time formatters are cached by schedule timezone.
+
+Leaflet reaches its maximum at19: bus/tram signs appear there with an opacity
+entry transition at the initial small scale. MapLibre continues its proportional
+zoom ramp. Name bounds include both fading branches; scale geometry changes
+without an extra transform transition so collision geometry stays current.

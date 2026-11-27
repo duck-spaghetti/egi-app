@@ -114,7 +114,7 @@
       "look": "Look at the building",
       "slow": "The 3D view is slow on this device: you can go back to the flat map.",
       "site_open": "{open}/{total} services open",
-      "hours_unknown": "Hours to verify",
+      "hours_unknown": "Hours unavailable",
       "category_outside": "{category} · outside filters"
     },
     "walk": {

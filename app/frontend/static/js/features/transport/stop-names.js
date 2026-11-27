@@ -38,10 +38,12 @@ export function createStopNames(root){
   const reserved=[...scene.querySelectorAll('.map3d-pin-body,.site-pin,.map3d-cluster,.marker-cluster,.map-mode-tools,.map-brand,.map-city-tag,.floating-actions .nav-btn,.maplibregl-ctrl,.leaflet-control,.map3d-route-status:not([hidden]),.maplibregl-popup,.leaflet-popup,.tl-line-label,.tl-focus-chip:not([hidden])')].map(rect).filter(Boolean);
   const stops=[];
   for(const entry of entries){
-   const symbol=rect(entry.element?.querySelector('.tl-station,.tl-stop')),ground=rect(entry.element?.querySelector('.tl-ground'));
+   const symbol=rect(entry.element?.querySelector('.tl-anchored>.tl-station,.tl-anchored>.tl-stop'))||rect(entry.element?.querySelector('.tl-station,.tl-stop')),ground=rect(entry.element?.querySelector('.tl-ground'));
    const origin=entry.element?.getBoundingClientRect?.();
    if(!symbol||!origin)continue;
-   const box=ground?{left:Math.min(symbol.left,ground.left),right:Math.max(symbol.right,ground.right),top:Math.min(symbol.top,ground.top),bottom:Math.max(symbol.bottom,ground.bottom)}:symbol;
+   const compact=rect(entry.element?.querySelector('.tl-compact .tl-station,.tl-compact .tl-stop'));
+   const footprint=[symbol,compact,ground].filter(Boolean);
+   const box={left:Math.min(...footprint.map(b=>b.left)),right:Math.max(...footprint.map(b=>b.right)),top:Math.min(...footprint.map(b=>b.top)),bottom:Math.max(...footprint.map(b=>b.bottom))};
    stops.push({...entry,box,origin,key:JSON.stringify([entry.props.transport_type,entry.props.stop_ids||entry.props.stop_id,entry.props.name]),name:String(entry.props.name||'').trim()});
   }
   const placements=placeStopNames(stops,viewport,reserved,zoom);

@@ -724,7 +724,7 @@ function sourceOpeningStatus(display, now = new Date()) {
   if (active && active[1]===1440) return {kind:"open",label:"Aperto ora",note:unknown.note};  // continues past midnight
   if (active) {
     const remaining=active[1]-minute;
-    return {kind:remaining<=60 ? "closing" : "open",label:remaining<=60?`Aperto ora · chiude alle ${String(Math.floor(active[1]/60)).padStart(2,"0")}:${String(active[1]%60).padStart(2,"0")}`:"Aperto ora",note:unknown.note};
+    return {kind:remaining<=60 ? "closing" : "open",label:`Aperto ora · chiude alle ${String(Math.floor(active[1]/60)).padStart(2,"0")}:${String(active[1]%60).padStart(2,"0")}`,note:unknown.note};
   }
   const upcoming=merged.find(([a])=>a>minute);
   if (upcoming) return {kind:"closed",label:`Chiuso ora · apre oggi alle ${String(Math.floor(upcoming[0]/60)).padStart(2,"0")}:${String(upcoming[0]%60).padStart(2,"0")}`,note:unknown.note};
@@ -746,21 +746,47 @@ function hoursVerification(display){
   return check?.outcome==="confirmed" && check.warning!=="review_due" ? check : null;
 }
 
+const openingFormats=new Map();
+/** Reuse formatters per schedule timezone across service refreshes. */
+function openingFormatters(timezone){
+ if(!openingFormats.has(timezone))openingFormats.set(timezone,{
+  civil:new Intl.DateTimeFormat('en-CA',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit'}),
+  day:new Intl.DateTimeFormat('it-IT',{timeZone:timezone,weekday:'long',day:'numeric',month:'numeric'}),
+  time:new Intl.DateTimeFormat('it-IT',{timeZone:timezone,hour:'2-digit',minute:'2-digit'})});
+ return openingFormats.get(timezone);
+}
+
+/** Format a known future boundary in the territory's civil day, including overnight/DST. */
+function openingBoundary(value,now,timezone){
+  const instant=value?new Date(value):null;
+  if(!instant||!Number.isFinite(instant.getTime())||instant<=now)return '';
+  const formats=openingFormatters(timezone);
+  const dateKey=date=>formats.civil.formatToParts(date)
+    .filter(p=>['year','month','day'].includes(p.type)).reduce((parts,p)=>({...parts,[p.type]:p.value}),{});
+  const civil=date=>{const p=dateKey(date);return Date.UTC(Number(p.year),Number(p.month)-1,Number(p.day));};
+  const days=Math.round((civil(instant)-civil(now))/86400000);
+  const day=days===0?'':days===1?'domani ':formats.day.format(instant)+' ';
+  return `${day}alle ${formats.time.format(instant)}`;
+}
+
 function canonicalOpeningStatus(display, now = new Date()) {
   const opening=display.canonical_opening || {};
   const check=hoursVerification(display);
-  const hint=check ? "" : " · da verificare";
-  const verificationLabel=check ? "" : "da verificare";
+  const verificationLabel="";
   const note=check ? `Verifica registrata il ${String(check.checked_at).slice(0,10)}. Non è disponibilità in tempo reale.` : "Orari interpretati come verosimilmente completi, in attesa di verifica. Contatta il servizio per conferma.";
   const transition=opening.next_transition_at ? new Date(opening.next_transition_at) : null;
   if (transition && transition.getTime()<=now.getTime()) return {verificationLabel,kind:"unknown",label:"Aggiornamento degli orari in corso",note};
   if (opening.status==="open") {
     const closes=opening.closes_at ? new Date(opening.closes_at) : null;
     const closing=closes && closes.getTime()>now.getTime() && closes.getTime()-now.getTime()<=3600000;
-    return {verificationLabel,kind:closing?"closing":"open",label:closing ? `Aperto${hint} · chiude alle ${new Intl.DateTimeFormat("it-IT",{timeZone:opening.timezone || context.profile?.timezone || "UTC",hour:"2-digit",minute:"2-digit"}).format(closes)}` : `Aperto${hint}`,note};
+    const boundary=openingBoundary(opening.closes_at,now,opening.timezone || context.profile?.timezone || 'UTC');
+    return {verificationLabel,kind:closing?'closing':'open',label:`Aperto${boundary?` · chiude ${boundary}`:''}`,note};
   }
-  if (opening.status==="closed") return {verificationLabel,kind:"closed",label:`Chiuso${hint}`,note};
-  return {verificationLabel,kind:"unknown",label:"Orario da verificare",note};
+  if (opening.status==='closed') {
+    const boundary=opening.next_status==='open'?openingBoundary(opening.next_transition_at,now,opening.timezone || context.profile?.timezone || 'UTC'):'';
+    return {verificationLabel,kind:'closed',label:`Chiuso${boundary?` · apre ${boundary}`:''}`,note};
+  }
+  return {verificationLabel,kind:"unknown",label:"Orario non disponibile",note};
 }
 
 /** Show selected canonical conditions and preserve each supplementary field's source. */

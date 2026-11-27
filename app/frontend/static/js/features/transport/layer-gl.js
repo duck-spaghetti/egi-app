@@ -43,6 +43,8 @@ function create(map, elements, maplibre) {
   let markers = [];
   const names=createStopNames(map.getContainer());
   const refreshNames=()=>names.refresh(leafletZoom(map));
+  const scale=()=>TransportLayer.scalePaline(map.getContainer(),map.getZoom()+1);
+  ownMap("zoom",scale);
   const chip = document.createElement("div");
   chip.className = "tl-focus-chip"; chip.hidden = true;
   map.getContainer().appendChild(chip);
@@ -90,7 +92,7 @@ function create(map, elements, maplibre) {
     names.clear();
     for (const marker of markers) marker.remove();
     markers = [];
-    syncDetail();
+    syncDetail();scale();
     const source = map.getSource?.(LINES);
     const shown = disposed || !visible ? [] : features;
     source?.setData({type: "FeatureCollection", features: shown.filter(f => f.geometry.type !== "Point").map(f => lineFeature(f, focused))});

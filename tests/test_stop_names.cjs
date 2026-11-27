@@ -30,6 +30,10 @@ const assert=require('node:assert/strict');const {performance}=require('node:per
  glyph.getBoundingClientRect=()=>({left:190,right:210,top:162,bottom:182,width:20,height:20});foot.getBoundingClientRect=()=>({left:197,right:203,top:197,bottom:203,width:6,height:6});
  zeroRoot.querySelector=selector=>selector==='.tl-ground'?foot:glyph;
  const detail={element:zeroRoot,props:{name:'Punto reale',transport_type:'metro',stop_id:'single'}};const detailNames=createStopNames(root);detailNames.update([detail],18);assert.equal(detail.label.hidden,false,'zero-size source anchor still supports names');detailNames.dispose();
+ const wide=element();wide.getBoundingClientRect=()=>({left:180,right:330,top:190,bottom:210,width:150,height:20});
+ zeroRoot.querySelector=selector=>selector==='.tl-ground'?foot:selector.startsWith('.tl-compact')?wide:glyph;
+ const fading={element:zeroRoot,props:{name:'Fade station',transport_type:'metro',stop_id:'fade'}};const fadeNames=createStopNames(root);fadeNames.update([fading],18);
+ const x=200+parseFloat(fading.label.style.left),y=200+parseFloat(fading.label.style.top);assert(!(x<330&&x+parseFloat(fading.label.style.width)>180&&y<210&&y+24>190),'name avoids wide compact codes during palina fade');fadeNames.dispose();
  let offReads=0;const offRoot=element();offRoot.getBoundingClientRect=()=>{offReads++;return viewport;};offRoot.querySelectorAll=()=>[];const off=createStopNames(offRoot);off.update([],17);off.refresh(17);assert.equal(offReads,0,'inactive layer has no geometry work');off.dispose();
  let queued,reads=0;const delayed=environment({requestAnimationFrame:fn=>{queued=fn;return 1;},cancelAnimationFrame(){}});
  const {createStopNames:deferredOwner}=await delayed.load('features/transport/stop-names.js');
