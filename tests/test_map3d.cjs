@@ -39,6 +39,7 @@ const live=c=>c.markers.filter(m=>!m.removed&&m.options.element.children?.[0]);
  const events=[];const {lib,created}=fakeMapLibre(16);
  const map=createMap3d({context,sites,describe,emit:(type,payload)=>events.push([type,payload]),maplibre:lib,pmtiles:{Protocol:class{tile(){}}},origin:'http://localhost',reduceMotion:true});
  map.mount();const gl=created.maps[0];assert.equal(gl.pitch,45,"3D starts inclined");
+ assert(gl.controls.every(c=>c.position==='top-left'),'camera tools stay on the left');
  same(created.protocols,['pmtiles']);
  assert.equal(gl.options.style.sources.basemap.url,'pmtiles://http://localhost/map3d/20261126T120000Z/basemap.pmtiles');
  assert.equal(gl.options.pixelRatio<=2,true);assert.equal(gl.options.touchPitch,false);assert.equal(gl.options.renderWorldCopies,false);

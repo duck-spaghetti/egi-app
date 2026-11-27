@@ -4,6 +4,18 @@ const GAP=6, HEIGHT=24;
 const intersects=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
 const station=p=>p.kind==='station'||p.transport_type==='metro'||p.transport_type==='rail';
 
+/** Suppress optional road overlays under service heads, station glyphs or earlier road symbols. */
+export function visibleStopSymbols(stops,reserved){
+ const visible=new Set(),occupied=[...reserved];
+ const ordered=[...stops].sort((a,b)=>Number(station(b.props))-Number(station(a.props))||Number(b.near)-Number(a.near)||a.key.localeCompare(b.key));
+ for(const stop of ordered){
+  const road=['bus','tram'].includes(stop.props.transport_type);
+  if(road&&occupied.some(box=>intersects(stop.box,box)))continue;
+  visible.add(stop);occupied.push(stop.box);
+ }
+ return visible;
+}
+
 /** Place names beside real symbol boxes, preserving all symbols and preferring focused/station names. */
 export function placeStopNames(stops,viewport,reserved,zoom){
  const result=new Map(),occupied=[...reserved];
@@ -42,11 +54,17 @@ export function createStopNames(root){
    const origin=entry.element?.getBoundingClientRect?.();
    if(!symbol||!origin)continue;
    const compact=rect(entry.element?.querySelector('.tl-compact .tl-station,.tl-compact .tl-stop'));
-   const footprint=[symbol,compact,ground].filter(Boolean);
+   const badge=rect(entry.element?.querySelector('.tl-stop-count'));
+   const footprint=[symbol,compact,ground,badge].filter(Boolean);
    const box={left:Math.min(...footprint.map(b=>b.left)),right:Math.max(...footprint.map(b=>b.right)),top:Math.min(...footprint.map(b=>b.top)),bottom:Math.max(...footprint.map(b=>b.bottom))};
    stops.push({...entry,box,origin,key:JSON.stringify([entry.props.transport_type,entry.props.stop_ids||entry.props.stop_id,entry.props.name]),name:String(entry.props.name||'').trim()});
   }
-  const placements=placeStopNames(stops,viewport,reserved,zoom);
+  const visible=visibleStopSymbols(stops,reserved);
+  for(const stop of stops){
+   const hidden=!visible.has(stop);
+   if(stop.element.dataset)stop.element.dataset.collisionHidden=String(hidden);
+  }
+  const placements=placeStopNames(stops.filter(stop=>visible.has(stop)),viewport,reserved,zoom);
   for(const entry of entries)if(entry.label)entry.label.hidden=true;
   for(const [stop,box] of placements){
    const label=stop.label;label.hidden=false;label.style.left=`${box.left-stop.origin.left}px`;label.style.top=`${box.top-stop.origin.top}px`;label.style.width=`${box.width}px`;
@@ -72,6 +90,6 @@ export function createStopNames(root){
   for(const entry of previous.values())entry.label?.remove?.();
   refresh(zoom);
  }
- function clear(){generation++;cancel?.(pending);pending=null;for(const entry of entries)entry.label?.remove?.();entries=[];}
+ function clear(){for(const entry of entries)if(entry.element.dataset)delete entry.element.dataset.collisionHidden;generation++;cancel?.(pending);pending=null;for(const entry of entries)entry.label?.remove?.();entries=[];}
  return {update,refresh,clear,dispose(){disposed=true;clear();}};
 }

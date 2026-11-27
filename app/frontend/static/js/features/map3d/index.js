@@ -1,5 +1,5 @@
 import {siteMarkers,USER_DOT_HTML,USER_DOT_LABEL} from "../map/pins.js";
-import {clusterSites,clusterAppearance,siteLabel,placeSiteHeads,CLUSTER_DISTANCE,STEM_ZOOM,NAME_ZOOM,DETAIL_ZOOM} from "./sites.js";
+import {clusterSites,clusterAppearance,siteLabel,placeSiteHeads,hitsMapControls,CLUSTER_DISTANCE,STEM_ZOOM,NAME_ZOOM,DETAIL_ZOOM} from "./sites.js";
 import {egiStyle,liftBridgeLabels} from "./style.js";
 /** createMap3d: the 3D mode's map module, on MapLibre GL JS, with the current map's interface.
  *
@@ -50,8 +50,8 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
    pixelRatio:Math.min(devicePixelRatio,2),canvasContextAttributes:{antialias:devicePixelRatio<2},
    maxTileCacheSize:120,renderWorldCopies:false,maxBounds:runtime.bounds,minZoom:10,maxZoom:19,
   });
-  map.addControl(new maplibre.NavigationControl({visualizePitch:true,showCompass:true,showZoom:true}),"top-right");
-  map.addControl(controls(),"top-right");
+  map.addControl(new maplibre.NavigationControl({visualizePitch:true,showCompass:true,showZoom:true}),"top-left");
+  map.addControl(controls(),"top-left");
   map.on("click",event=>{
    if(!state.choosingReference)return;
    event.egiReferencePicked=true;
@@ -173,8 +173,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
        const box={left,right,top:headPoint.y-24-Math.max(44,labelHeight),bottom:headPoint.y-20};
        const inFrame=box.left>=0&&box.right<=screenWidth&&box.top>=0&&box.bottom<=screenHeight;
        const hitsPin=layout.some(other=>other!==group&&intersects(box,{left:other.headPoint.x-25,right:other.headPoint.x+25,top:other.headPoint.y-82,bottom:other.headPoint.y-20}));
-       const toolSide=rtl?box.left<140:box.right>screenWidth-140;
-       const hitsTools=toolSide&&box.top<470;
+       const hitsTools=hitsMapControls(box,{width:screenWidth,height:screenHeight,rtl});
        if(inFrame&&!hitsTools&&!hitsPin&&!labels.some(b=>intersects(box,b))){placement={width,leftSide,box};break;}
       }
       if(placement)break;

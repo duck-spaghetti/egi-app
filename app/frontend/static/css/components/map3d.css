@@ -98,3 +98,18 @@ html[dir="rtl"] .map3d-site-label { direction:rtl; }
 #map .map3d-route-status,#map .map3d-buses { z-index:var(--map-controls-z); }
 #map .maplibregl-ctrl-top-left,#map .maplibregl-ctrl-top-right,
 #map .maplibregl-ctrl-bottom-left,#map .maplibregl-ctrl-bottom-right { z-index:var(--map-controls-z); }
+
+/* Camera tools occupy the left rail; mode/layers and visitor actions stay right. */
+#map .maplibregl-ctrl-top-left { top:calc(112px + var(--safe-top,0px));left:var(--map-edge-x,16px);width:90px;display:flex;flex-direction:column;align-items:center; }
+#map .maplibregl-ctrl-top-left .maplibregl-ctrl { margin:10px 0 0; }
+.stage.list-mode #map .maplibregl-ctrl-top-left { display:none; }
+#map .maplibregl-popup-content { box-sizing:border-box;max-height:calc(100dvh - 180px);overflow-y:auto;overscroll-behavior:contain; }
+#map .tl-icon[data-collision-hidden="true"] { visibility:hidden;pointer-events:none; }
+
+@media (max-width:600px) {
+ /* Leave the camera/mode rails above the mobile timetable; the remaining content scrolls. */
+ #map .maplibregl-popup-content { max-height:max(48px,calc(100dvh - 450px)); }
+}
+
+/* Mirror the two distinct rails in RTL, preserving separation from mode/view controls. */
+html[dir="rtl"] #map .maplibregl-ctrl-top-left { left:auto;right:var(--map-edge-x,16px); }

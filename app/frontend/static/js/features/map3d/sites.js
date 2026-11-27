@@ -1,3 +1,12 @@
+/** Conservative map-space footprints shared by service heads and their expanded labels. */
+export function hitsMapControls(box,{width,height,rtl=false}){
+ const camera=(rtl?box.right>width-140:box.left<140)&&box.right>0&&box.top<350&&box.bottom>100;
+ const modes=(rtl?box.left<140:box.right>width-140)&&box.top<270;
+ const brand=box.left<150&&box.top<125;
+ const navigation=box.bottom>height-115&&(box.left<110||box.right>width-110||box.left<width/2+85&&box.right>width/2-85);
+ return camera||modes||brand||navigation;
+}
+
 import {iconPath} from '../map/pins.js';
 import {escapeHtml,categoryCaption} from '../../format.js';
 /** Screen-space site clustering and progressive labels; editorial/service rules stay upstream. */
@@ -21,9 +30,9 @@ export function placeSiteHeads(layout,{width,height,zoom,selectedId,rtl=false}){
  for(const group of ordered){
   let placed=null;
   for(const [dx,dy] of candidates){
-   const box=boxAt(group.point,dx,dy),toolSide=rtl?box.left<140:box.right>width-140;
+   const box=boxAt(group.point,dx,dy);
    const inFrame=box.left>=4&&box.right<=width-4&&box.top>=4&&box.bottom<=height-4;
-   const overTools=toolSide&&box.top<470||box.left<150&&box.top<125||box.bottom>height-115&&(box.left<110||box.right>width-110||box.left<width/2+85&&box.right>width/2-85);
+   const overTools=hitsMapControls(box,{width,height,rtl});
    if(inFrame&&!overTools&&!hits(box)){placed={dx,dy,box};break;}
   }
   // A bounded layout cannot guarantee space in arbitrarily dense views. Keep every site reachable.

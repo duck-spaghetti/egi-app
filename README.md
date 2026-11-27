@@ -832,99 +832,54 @@ resize/data refresh, with one owned animation-frame callback for DOM positioning
 there are no per-frame rebuilds or additional feed/network requests.
 
 
-Close transport points: at Leaflet-equivalent z18 (MapLibre z17), metro overview
-centroids give way to the original individual GTFS coordinates/IDs. A short stem
-and ground dot tie station symbols to the source position. Bus/tram keep their
-existing source coordinates and gain this ground-anchor detail only one zoom
-closer, at Leaflet19 / MapLibre18. Farther views keep the compact drawing. There
-is no artificial spiderfy/displacement; coincident source points remain coincident.
-The dot is a source position, not a verified entrance or platform-access point;
-NeTEx/OSM station-only data do not gain invented detail. Names avoid the combined
-symbol/stem/foot footprint. The 3D equivalent zoom is capped at the existing API
-maximum19, so maximum camera zoom remains usable. Timetables and nearby summaries
-keep their existing source-stop memberships. No importer/runtime format changes.
+Current 3D transport presentation (2026-11-27):
 
+- Metro overlays summarise nearby (150 m) same-named GTFS platforms at every zoom,
+  including S./San spelling. Interchanges keep all line chips in one marker.
+  Their sorted constituent-ID identity survives overview/detail zoom changes.
+- Physical metro signs use the bundled OSM surface entrance snapshot in
+  `static/data/metro-entrances.geojson`, compiled by the importer's manual
+  `scripts/metro_entrances.py`. Only explicit stop-area memberships with an exact
+  normalised station name, one unique station candidate and a 500 m sanity bound
+  are associated. Line-specific areas (Termini A/B, San Giovanni Linea A/C) keep
+  their GTFS route filters. Shared entrances produce one sign. Missing/ambiguous
+  evidence leaves only the station summary; platform centres never become fake
+  entrances. Visitor browsers fetch the local snapshot once, never OSM/Overpass.
+- All entrances are prepared before the trees' shared 16–16.6 zoom appearance.
+  From GL zoom15, viewport acquisition requests full source detail with a .006°
+  station margin; an overview centroid cannot appear as one pole and split later.
+  This increases the bounded nearby data workload; unchanged meshes remain cached.
+- Bus/tram signs retain exact source-stop positions. Their compact overlays group
+  same-mode symbols less than32px apart and split when there is room. Grouped
+  clicks request all constituent stops; native signs keep their individual IDs.
+  Optional road symbols are hidden where service heads, station symbols, controls,
+  popups or other retained road symbols occupy their footprint. No automatic
+  bus/tram names or route text; rail/Leaflet representation is unchanged.
+- Native signs use one batched GeoJSON source/two depth-tested extrusion layers,
+  scale6.4 (max17.28m), original base0, schematic two-sided glyphs, no model/texture
+  dependency. Metro sign coordinates equal the retained OSM nodes; bus/tram signs
+  equal GTFS source points. Compact overlays remain available through buildings
+  subject to collision suppression. Hidden native geometry cannot be selected.
+- Metro lines are continuous at42% opacity; 3D GPU width grows3→7.5px from zoom13
+  to19. Focused routes retain stronger styling. Timetable popups have a bounded
+  scrolling height and pan into the viewport after initial opening, asynchronous
+  timetable growth and resize, with up to12 post-projection frame checks on tilted maps. Mobile popups fit below both top rails. Camera/rotation/tilt controls occupy the left rail;
+  layers/view and visitor actions stay right (opposing rails mirror in RTL).
 
-Close bus/tram stops now use light CSS paline inspired by Roman stop signs:
-yellow boards, red caps and a mode glyph, with no automatic names or route text.
-Metro uses a red square M sign. Signs replace compact symbols only at the existing
-point-detail thresholds (Leaflet18 metro /19 bus-tram; MapLibre17 /18). Rail keeps
-its previous symbol. The pole ends at the unchanged source coordinate; it does not
-assert that the source point is a street entrance. No model/texture/network loading.
+OSM entrances are community evidence, not a field survey or accessibility guarantee.
+The snapshot retains source node/area IDs, exact coordinates, capture SHA-256 and
+OSM base timestamp with © OpenStreetMap contributors / ODbL credit. Source captures
+and receipts remain local and outside Git. Refresh is manual; no new job is installed.
+Opening-hour restrictions are retained as evidence; the visual sign does not assert
+that an entrance is open now. GTFS still owns every timetable/platform/route ID.
 
-Service opening labels now include known closing boundaries even more than an hour
-ahead, and next opening when the canonical transition explicitly leads to open.
-Civil-day text distinguishes today, tomorrow and later dates in the schedule timezone.
-Unknown transitions, missing/invalid boundaries and uninterrupted24h hours do not
-invent a time. Opening-status text omits the verification qualifier per user choice; provenance
-notes and other verification controls remain in the card. Timed invalidation remains.
-Signs crossfade from the compact symbol over one continuous zoom level, starting
-at the point-detail threshold. Size grows with map scale from32% to a65% cap
-(~42px including pole). Zoom writes four CSS variables on the map container, with
-no geometry reads, marker rebuilds or requests; reduced-motion skips transitions.
-Opening date/time formatters are cached by schedule timezone.
+3D reloads reconcile stable marker IDs and reuse unchanged DOM/event handlers;
+identical line/mesh data is not resent to the renderer worker. Explicit wrapper
+stacking is transport10, service20, popup30, navigation40. Service label backgrounds
+are white80%, text/status/icons opaque. Source feet stay fixed while service heads
+try stable screen offsets up to96px, connected by leaders; in fully saturated views
+overlap cannot be ruled out. Native sign orientation remains schematic.
 
-Leaflet reaches its maximum at19: bus/tram signs appear there with an opacity
-entry transition at the initial small scale. MapLibre continues its proportional
-zoom ramp. Name bounds include both fading branches; scale geometry changes
-without an extra transform transition so collision geometry stays current.
-
-
-3D transit reloads now reconcile marker IDs, retaining unchanged stop/route-label
-DOM and event handlers. Only changed markup/coordinates update; missing IDs are
-removed. Existing popup holding remains in force. Optional station-name nodes
-are reused (and reattached after changed glyph markup), and identical network
-line data is not resent to the renderer worker. This prevents the close-sign
-entry fade restarting on unchanged viewport reloads. Native3D paline now replace physical HTML signs in the3D view; source coordinates
-are not moved to fake sidewalks.
-
-
-Native3D stop signs use one GeoJSON source/two existing-renderer extrusion layers:
-pole base0m, board2.05–2.7m, schematic two-faced metro/bus/tram glyphs. Geometry is
-prepared onezoom before close appearance (metro17→18,road18→19), grows naturally
-with camera scale and uses scene depth. No model/texture dependency. Source maxzoom22
-and tolerance0 retain small prisms; productcamera max19/APIcap19 unchanged.
-At max19 the physical signs are intentionally small. Orientation is schematic;
-the feed does not provide a sign heading or certified sidewalk/access position.
-Compact symbols/keyboard buttons persist, with pointer picking on visible native
-geometry and foreground extrusion intersections blocking hidden selections.
-Reference selection takes precedence. Rail and Leaflet drawing are unchanged.
-
-Close3D service heads try stable offsets up to96px while their feet remain at the
-original source coordinates. Inclined SVG leaders connect each displaced head to
-its own foot. Exact co-location grouping stays unchanged. Head placement uses a
-small screen-space grid, prioritises the selected site and avoids other heads/feet
-and maincontrols; optional labels use the displaced positions. In saturated views
-with no bounded slot every site remains reachable, but overlap cannot be ruled out.
-
-
-Native sign legibility refinement: all prism dimensions are multiplied by1.6
-(4.32m maximum height), intentionally schematic. The source-centred base remains0.
-The shared eased fade spans1.5zoom levels (metro16.5–18,road17.5–19); native paint
-and compact-symbol opacity use the same stops, with a slower onset/completion.
-Compact wrappers exist at every zoom, avoiding markup replacement at the fade or
-point-detail thresholds. Geometry is still cached; source counts/topology unchanged.
-
-
-Transport visibility refinement: native paline are another2× larger again (scale6.4
-from the original model, max17.28m). They share the trees'16–16.6zoom appearance
-and grow from ground level. Their compact HTML markers remain fully visible and
-clickable at every zoom, including through buildings; native geometry still uses
-scene depth. No automatic bus/tram text added. Late composition now also waits
-for idle when the initial load event already passed; first layer enable starts
-the request immediately, with camera-change debouncing retained.
-
-
-3D overlay stacking is explicit on MapLibre marker wrappers: transport10, service
-heads20, popups30, navigation/attribution40. Later transport reloads cannot cover
-service labels or steal their clicks. Label backgrounds are white at80% opacity;
-text/status/icons remain opaque, leaving underlying stops visible through the card.
-
-3D metro overlays summarise nearby (150 m) same-named platforms at every zoom,
-including the source abbreviation `S.`/`San`. Interchanges retain all line chips
-in one marker (for example A/C at San Giovanni), avoiding competing station labels.
-Native signs still use every unmodified source point; their clicks request that
-point's departures, whereas the summary requests all constituent platforms.
-These GTFS points describe platforms/directions, not verified pedestrian entrances.
-Metro network lines use 42% opacity and dashes; the 3D GPU scales their width from
-3 px at zoom 13 to 7.5 px at zoom 19. Focused routes retain their stronger styling.
+Service opening labels show known closing times and the next known opening using
+the schedule timezone, without inventing boundaries for incomplete/24h schedules.
+The verification qualifier is omitted per user choice; provenance remains in cards.

@@ -1,5 +1,7 @@
 import {createPaline,nativeMode,stopKey} from './paline-gl.js';
-import {stationMarkers} from './station-markers.js';
+import {entranceSigns} from './metro-entrances.js';
+import {createPopupFitter} from './popup-layout.js';
+import {stationMarkers,roadMarkers} from './station-markers.js';
 import {createStopNames} from './stop-names.js';
 import {TransportLayer} from "./layer.js";
 /* Transit layer of the 3D mode: the scheduled metro/rail/tram/bus layer on MapLibre.
@@ -42,10 +44,11 @@ function create(map, elements, maplibre) {
   const ownMap = (event, ...args) => { map.on(event, ...args); cleanup.push(() => map.off?.(event, ...args)); };
   const modes = new Set(elements.modes ? ["metro", "rail", "tram", "bus"].filter(mode => elements.modes[mode]?.checked) : ["metro", "rail", "tram", "bus"]);
   let visible = false, features = [], request = null, timer = null, focused = null, popup = null, held = null;
-  let markers = new Map(),lineData=null;
+  let markers = new Map(),lineData=null,entrances=null,nativeFeatures=[];
+  const popupFitter=createPopupFitter(map);
   const paline=createPaline(map,key=>{
     if(disposed||!visible)return;
-    const source=features.find(f=>f.geometry.type==='Point'&&stopKey(f)===key);
+    const source=nativeFeatures.find(f=>f.geometry.type==='Point'&&stopKey(f)===key);
     if(source)selectStop({lngLat:source.geometry.coordinates,props:source.properties,ids:source.properties.stop_ids||[source.properties.stop_id]});
   });
   const names=createStopNames(map.getContainer());
@@ -89,10 +92,10 @@ function create(map, elements, maplibre) {
 
   function openPopup(lngLat, html, onOpen) {
     popup?.remove();
-    popup = new maplibre.Popup({maxWidth: "280px", focusAfterOpen: true}).setLngLat(lngLat).setHTML(html).addTo(map);
+    popup = new maplibre.Popup({maxWidth: "280px", anchor:"bottom", focusAfterOpen: true}).setLngLat(lngLat).setHTML(html).addTo(map);
     const current = popup;
-    current.on?.("close", () => { if (popup === current) { popup = null; release(); } });
-    refreshNames();onOpen?.(current);
+    current.on?.("close", () => { if (popup === current) { popup = null; popupFitter.clear();release(); } });
+    popupFitter.fit(current);refreshNames();onOpen?.(current);
   }
 
   function selectStop(entry){openPopup(entry.lngLat,TransportLayer.popupHtml(entry.props),current=>{if(!entry.props.untimed)loadDepartures(current,entry.ids,entry.props);});}
@@ -111,7 +114,8 @@ function create(map, elements, maplibre) {
     const encoded=JSON.stringify(lines);
     if(source&&encoded!==lineData){source.setData(lines);lineData=encoded;}
     const labelled = new Set(),stops=[];
-    for (const feature of stationMarkers(shown)) {
+    const stations=stationMarkers(shown);
+    for (const feature of roadMarkers(stations,map.project?.bind(map))) {
       const props = feature.properties;
       if (feature.geometry.type !== "Point") {
         if (focused && !labelled.has(props.route_id)) {
@@ -153,7 +157,9 @@ function create(map, elements, maplibre) {
       stops.push({element:el,props,near});next.set(key,entry);
     }
     for(const [key,entry] of previous)if(!next.has(key))entry.marker.remove();
-    markers=next;paline.update(shown,map.getZoom(),focused);
+    markers=next;
+    nativeFeatures=[...shown.filter(f=>f.properties.transport_type!=='metro'),...entranceSigns(stations,entrances)];
+    paline.update(nativeFeatures,map.getZoom(),focused);
     names.update(stops,leafletZoom(map));
   }
 
@@ -161,8 +167,12 @@ function create(map, elements, maplibre) {
     request?.abort();
     if (disposed || !visible) return;
     if (!modes.size && !focused) { features = []; render(); return setStatus("Seleziona almeno una modalità di trasporto."); }
-    const {size, bounds} = viewport(map);
-    const query = TransportLayer.viewportQuery(size, bounds, leafletZoom(map), modes.size ? modes : new Set(["metro", "rail", "tram", "bus"]));
+    const {size, bounds: visibleBounds} = viewport(map);
+    // Surface entrances may sit outside the platform viewport; retain nearby station anchors.
+    const pad=modes.has('metro')&&map.getZoom()>=15?.006:0;
+    const bounds={getWest:()=>visibleBounds.getWest()-pad,getEast:()=>visibleBounds.getEast()+pad,
+      getSouth:()=>visibleBounds.getSouth()-pad,getNorth:()=>visibleBounds.getNorth()+pad};
+    const query = TransportLayer.viewportQuery(size, bounds, map.getZoom()>=15?Math.max(18,leafletZoom(map)):leafletZoom(map), modes.size ? modes : new Set(["metro", "rail", "tram", "bus"]));
     if (!query) { map.once("resize", schedule); return; }
     if (focused) query.set("routes", focused.routeIds.join(","));
     const current = new AbortController();
@@ -194,7 +204,7 @@ function create(map, elements, maplibre) {
       if (response.ok) data = await response.json();
     } catch (_error) { /* shown as unavailable */ }
     if (disposed || listeners.signal.aborted || popup !== current) return;
-    current.setHTML(TransportLayer.popupHtml(props, TransportLayer.departuresHtml(data)));refreshNames();
+    current.setHTML(TransportLayer.popupHtml(props, TransportLayer.departuresHtml(data)));popupFitter.fit(current);refreshNames();
   }
 
   function schedule() { if (disposed) return; clearTimeout(timer); timer = setTimeout(load, 180); }
@@ -253,9 +263,13 @@ function create(map, elements, maplibre) {
     }, {signal: listeners.signal});
   }
   ownMap("moveend", refreshNames);
-  ownMap("resize", refreshNames);
+  ownMap("resize", ()=>{popupFitter.fit(popup);refreshNames();});
   ownMap("moveend", schedule);
   ownMap("zoomend", ()=>{syncDetail();refreshNames();});
+  // One local snapshot per mounted layer; visitors never contact OSM/Overpass.
+  fetch('/static/data/metro-entrances.geojson',{signal:listeners.signal}).then(r=>r.ok?r.json():null).then(data=>{
+    if(disposed)return;entrances=data;render();
+  }).catch(()=>{}); // Station summaries stay available when entrance evidence is absent.
   const interval = setInterval(load, 60000);
   setVisible(false);
   return {setVisible, isVisible: () => visible, reload: load, focus, clearFocus, focusedRoutes: () => focused?.routeIds || null,
@@ -263,7 +277,7 @@ function create(map, elements, maplibre) {
       disposed = true; visible = false; listeners.abort(); request?.abort(); clearTimeout(timer); clearInterval(interval);
       for (const clean of cleanup) clean();
       for (const entry of markers.values()) entry.marker.remove();
-      paline.dispose();names.dispose();markers.clear(); popup?.remove(); popup = null; chip.remove?.();
+      paline.dispose();names.dispose();popupFitter.dispose();markers.clear(); popup?.remove(); popup = null; chip.remove?.();
       for (const id of LINE_LAYERS) if (map.getLayer?.(id)) map.removeLayer(id);
       if (map.getSource?.(LINES)) map.removeSource(LINES);
     }};

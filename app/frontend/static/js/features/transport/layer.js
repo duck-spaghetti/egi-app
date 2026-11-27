@@ -45,7 +45,7 @@ const TransportLayer = (() => {
 
   /** Leaflet path options: thin, semi-transparent network lines that stay under services. */
   function lineStyle(mode, color) {
-    if (mode === "metro") return {color: lineColor(mode, color), weight: 3, opacity: 0.42, dashArray: "8 4"};
+    if (mode === "metro") return {color: lineColor(mode, color), weight: 3, opacity: 0.42};
     if (mode === "tram") return {color: lineColor(mode, color), weight: 2, opacity: 0.55};
     if (mode === "rail") return {color: lineColor(mode, color), weight: 2.5, opacity: 0.5, dashArray: "8 4"};
     return {color: BUS_COLOR, weight: 1.5, opacity: 0.35};
@@ -92,6 +92,7 @@ const TransportLayer = (() => {
       symbol=`<span class="tl-station${near}"><span class="tl-roundel">M</span><span class="tl-codes">${lineChips(props.routes)}</span></span>`;
     } else if (props.transport_type === "tram") symbol=`<span class="tl-stop tl-tram${near}">T</span>`;
     else symbol=`<span class="tl-stop tl-bus${near}">${BUS_GLYPH}</span>`;
+    if(props.group_count>1)symbol+=`<span class="tl-stop-count" aria-hidden="true">${props.group_count}</span>`;
     const compact=symbol;
     const palina=anchored&&['metro','tram','bus'].includes(props.transport_type);
     if(palina){
@@ -191,7 +192,7 @@ const TransportLayer = (() => {
   }
 
   function popupHtml(props, departures = null) {
-    const kind = props.transport_type === "rail" ? "Stazione ferroviaria" : props.kind === "station" || props.transport_type === "metro" ? "Stazione metro" : props.transport_type === "tram" ? "Fermata tram" : "Fermata autobus";
+    const kind = props.kind === "entrance" ? "Ingresso metro (OpenStreetMap)" : props.transport_type === "rail" ? "Stazione ferroviaria" : props.kind === "station" || props.transport_type === "metro" ? "Stazione metro" : props.transport_type === "tram" ? "Fermata tram" : "Fermata autobus";
     const code = props.code ? ` · ${escapeHtml(props.code)}` : "";
     const times = props.untimed ? `<p class="tl-dep-note">${UNTIMED_NOTE}</p>` : departures ?? "Carico i prossimi passaggi…";
     const source = props.untimed ? "Rete da © OpenStreetMap contributors (ODbL 1.0) · servizio odierno non verificato" : `Linee in servizio oggi · ${props.transport_type === "rail" ? "Trenitalia (NeTEx, NAP nazionale)" : "Roma Servizi per la Mobilità"}`;

@@ -226,3 +226,5 @@
 .tl-native-stop { pointer-events:none; }
 .tl-native-stop .tl-compact { opacity:1;pointer-events:auto;transition:none; }
 .tl-native-stop:focus-visible .tl-compact { opacity:1;outline:3px solid #0570b5;outline-offset:3px; }
+
+.tl-stop-count { position:absolute;top:-16px;left:5px;min-width:12px;padding:1px 3px;border-radius:8px;background:#fff;color:#243239;box-shadow:0 1px 3px #0004;font:700 9px/12px system-ui; }

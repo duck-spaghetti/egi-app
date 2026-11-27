@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict');const {environment}=require('./module_fixture.cjs');
 (async()=>{
- const {clusterSites,clusterAppearance,siteLabel,placeSiteHeads,MAX_HEAD_OFFSET}=await environment().load('features/map3d/sites.js');
+ const {clusterSites,clusterAppearance,siteLabel,placeSiteHeads,hitsMapControls,MAX_HEAD_OFFSET}=await environment().load('features/map3d/sites.js');
  const project=([x,y])=>({x,y}),sites=[{lng:63,lat:10},{lng:65,lat:10},{lng:200,lat:10}];
  assert.deepEqual(Array.from(clusterSites(sites,project,14),g=>g.members.length).sort(),[1,2],'neighbours across grid boundary merge');
  assert.equal(clusterSites(sites,project,16).length,3,'close zoom preserves each site');
@@ -9,7 +9,7 @@ const assert=require('node:assert/strict');const {environment}=require('./module
  for(let a=0;a<groups.length;a++)for(let b=a+1;b<groups.length;b++)assert(Math.hypot(groups[a].point.x-groups[b].point.x,groups[a].point.y-groups[b].point.y)>=64);
  assert(clusterAppearance(64).size>clusterAppearance(2).size);assert.notEqual(clusterAppearance(64).background,clusterAppearance(2).background);
  const close=[0,1,2].map(i=>({site:{serviceIds:[String(i)]},members:[{}],lngLat:[12.5+i*.00001,41.9],point:{x:400+i*4,y:350+i*2}}));
- const view={width:1000,height:700,zoom:17};const heads=placeSiteHeads(close,view),overlap=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
+ const view={width:1000,height:700,zoom:17};assert(hitsMapControls({left:50,right:100,top:180,bottom:240},view),'new left camera rail is reserved');assert(hitsMapControls({left:900,right:980,top:100,bottom:160},view),'right mode rail remains reserved');assert(hitsMapControls({left:900,right:980,top:180,bottom:240},{...view,rtl:true}),'RTL camera rail is reserved opposite modes');assert(!hitsMapControls({left:300,right:360,top:180,bottom:240},view));const heads=placeSiteHeads(close,view),overlap=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
  const positions=[...heads.values()];assert(positions.some(p=>p.dx||p.dy));for(let i=0;i<positions.length;i++){assert(Math.hypot(positions[i].dx,positions[i].dy)<=MAX_HEAD_OFFSET);for(let j=0;j<i;j++)assert(!overlap(positions[i].box,positions[j].box),'distinct close heads must not overlap');}
  const reordered=placeSiteHeads([...close].reverse(),view);for(const group of close)assert.deepEqual({...heads.get(group)},{...reordered.get(group)},'stable identity order prevents pan jitter');
  const mobileClose=close.map((g,i)=>({...g,point:{x:195+i*3,y:400+i*2}}));const mobileHeads=[...placeSiteHeads(mobileClose,{width:390,height:844,zoom:17}).values()];for(let i=0;i<mobileHeads.length;i++)for(let j=0;j<i;j++)assert(!overlap(mobileHeads[i].box,mobileHeads[j].box),'mobile nearby heads stay separate');

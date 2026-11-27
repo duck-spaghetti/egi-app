@@ -1,7 +1,7 @@
 /** Exercise collision/zoom policy and actual DOM-name ownership without changing transport behavior. */
 const assert=require('node:assert/strict');const {performance}=require('node:perf_hooks');const {environment,element}=require('./module_fixture.cjs');
 (async()=>{
- const env=environment();const {placeStopNames,createStopNames}=await env.load('features/transport/stop-names.js');
+ const env=environment();const {placeStopNames,createStopNames,visibleStopSymbols}=await env.load('features/transport/stop-names.js');
  const viewport={left:0,top:0,right:800,bottom:600,width:800,height:600};
  const stop=(name,x,y,type='bus',near=false)=>({name,key:name,near,props:{transport_type:type},box:{left:x-12,right:x+12,top:y-12,bottom:y+12}});
  const a=stop('Termini',200,200,'metro'),b=stop('Volturno',500,200),empty=stop('',400,300);
@@ -11,6 +11,8 @@ const assert=require('node:assert/strict');const {performance}=require('node:per
  assert.equal(placeStopNames([stop('Tram',500,200,'tram',true)],viewport,[],19).size,0,'nearby tram names remain click-only');
  assert.equal(placeStopNames([{...b,near:true}],viewport,[],14).size,0,'focused bus stays click-only');
  assert.equal(placeStopNames([{...a,near:true}],viewport,[],14).size,1,'focused station name stays available');
+ const overlap=stop('Bus over service',200,200),clear=stop('Clear bus',500,300);
+ const symbols=visibleStopSymbols([a,overlap,clear],[{left:180,right:230,top:180,bottom:230}]);assert(symbols.has(a));assert(!symbols.has(overlap));assert(symbols.has(clear),'road symbols avoid station/service heads');
  const obstacles=[{left:218,right:400,top:170,bottom:230}];
  const placed=placeStopNames([a],viewport,obstacles,17).get(a);assert(placed.right<a.box.left,'try the other side before hiding');
  assert.equal(placeStopNames([a],viewport,[viewport],17).size,0,'fully occupied view hides the optional name');
@@ -36,6 +38,11 @@ const assert=require('node:assert/strict');const {performance}=require('node:per
  zeroRoot.querySelector=selector=>selector==='.tl-ground'?foot:selector.startsWith('.tl-compact')?wide:glyph;
  const fading={element:zeroRoot,props:{name:'Fade station',transport_type:'metro',stop_id:'fade'}};const fadeNames=createStopNames(root);fadeNames.update([fading],18);
  const x=200+parseFloat(fading.label.style.left),y=200+parseFloat(fading.label.style.top);assert(!(x<330&&x+parseFloat(fading.label.style.width)>180&&y<210&&y+24>190),'name avoids wide compact codes during palina fade');fadeNames.dispose();
+ const roadRoot=element(),roadGlyph=element(),badge=element();
+ roadGlyph.getBoundingClientRect=()=>({left:100,right:118,top:100,bottom:118,width:18,height:18});badge.getBoundingClientRect=()=>({left:115,right:140,top:90,bottom:103,width:25,height:13});
+ roadRoot.getBoundingClientRect=()=>({left:109,right:109,top:109,bottom:109,width:0,height:0});roadRoot.querySelector=sel=>sel==='.tl-stop-count'?badge:sel==='.tl-ground'?null:roadGlyph;
+ const reservedUI=element();reservedUI.getBoundingClientRect=()=>({left:130,right:150,top:90,bottom:110,width:20,height:20});const badgeScene=element();badgeScene.getBoundingClientRect=()=>viewport;badgeScene.querySelectorAll=()=>[reservedUI];
+ const badgeOwner=createStopNames(badgeScene);badgeOwner.update([{element:roadRoot,props:{transport_type:'bus',name:'Grouped',stop_ids:['a','b']}}],18);assert.equal(roadRoot.dataset.collisionHidden,'true','count badge cannot overlap reserved UI');badgeOwner.dispose();
  let offReads=0;const offRoot=element();offRoot.getBoundingClientRect=()=>{offReads++;return viewport;};offRoot.querySelectorAll=()=>[];const off=createStopNames(offRoot);off.update([],17);off.refresh(17);assert.equal(offReads,0,'inactive layer has no geometry work');off.dispose();
  let queued,reads=0;const delayed=environment({requestAnimationFrame:fn=>{queued=fn;return 1;},cancelAnimationFrame(){}});
  const {createStopNames:deferredOwner}=await delayed.load('features/transport/stop-names.js');
