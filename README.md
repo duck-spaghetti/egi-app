@@ -1293,3 +1293,27 @@ and selection rather than mixing revisions. No periodic metadata polling is adde
 Bridge heights preserve the importer's inferred ramp model and source centerlines.
 Native labels keep their approximate camera-dependent lift; exact deck-following
 3D text and physical-phone acceptance remain deferred.
+
+### Consolidated Integration in CI
+
+The app workflow checks out the exact importer revision in `.checks/integration.json`
+from the private `duck-spaghetti/egi-importer` repository. Configure the app repository
+secret `EGI_IMPORTER_READ_TOKEN` with Contents read permission limited to that private
+repository. Private access is used only for same-repository PRs; fork PRs cannot
+receive it. Checkout does not persist the credential.
+
+Historical preview changes also require the authentic 315-service pilot. CI consumes
+`retained-preview.tar.gz` from the private importer release `retained-preview-20261127`,
+pinned to SHA-256 `37d018dbaf9b6d0c62512511281ea11dd0186f0d1af51165804484560a2c07f7`.
+This is a prepared private fixture, not a synthetic replacement or a public artifact.
+It contains only the retained dump and the selected immutable transport/rail/cycleway
+versions with per-file hashes. Publication and token provisioning are explicit
+operator actions; a prepared workflow alone does not prove remote CI passes.
+
+`python checks/pilot_integration.py --fixture-root PATH` validates the unpacked fixture,
+restores it into an owned disposable PostgreSQL cluster, starts the preview on a
+pre-bound loopback socket and runs the normal composed Integration command. It retains
+`.local/ci-integration.json` and `.local/integration/pilot/` diagnostics, then tears down
+its web child and cluster. Set `EGI_PG_BIN` to the selected PostgreSQL18 binary directory;
+all standard Integration provider/schema/wheel prerequisites still apply. No existing
+preview/database, live acquisition or provider dispatch is selected by this command.

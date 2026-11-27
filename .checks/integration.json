@@ -35,6 +35,6 @@
     "name": "importer transport fixture",
     "environment": "EGI_IMPORTER_REPO",
     "path": "../egi-importer-consolidation",
-    "revision": "929f81fbd496eff2393dbd958cd01c6b36285481"
+    "revision": "76ba62415e2adc04f1ddcbef4288d685ad9bbdaf"
   }
 }
