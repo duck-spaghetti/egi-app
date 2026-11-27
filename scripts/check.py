@@ -70,7 +70,7 @@ def checks(root, profile):
 
 
 def main(argv=None):
-    """Print a report and return a failing/blocked exit when evidence is missing."""
+    """Print and retain the observed report; fail or block when evidence is missing."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", choices=("quick", "complete", "integration"), default="complete")
     parser.add_argument("--json", action="store_true")
@@ -83,6 +83,12 @@ def main(argv=None):
         if name.startswith('GIT_'):
             del os.environ[name]
     result = report("app", args.profile, root, checks(root, args.profile))
+    try:
+        destination = root / '.local/checks'
+        destination.mkdir(parents=True, exist_ok=True)
+        (destination / (args.profile + '.json')).write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
+    except OSError as error:
+        print('Unable to retain check report: ' + type(error).__name__, file=sys.stderr)
     print(json.dumps(result, ensure_ascii=False, indent=2) if args.json else
           "\n".join([f"{item['status']}: {item['name']}" + (f" — {item['reason']}" if item['reason'] else "")
                       for item in result["checks"]] + [f"app {args.profile}: {result['status']} ({result['seconds']}s)"]))
