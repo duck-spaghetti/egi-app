@@ -16,8 +16,10 @@ export function createPlans(host) {
   const localDirty=()=>host.inputDirty() || !!host.draft()?.dirty || !!host.draft()?.conflicted;
   const sameSelection=()=>!!plan && selected.size===plan.selection?.length && plan.selection.every(item=>selected.has(item.record_key));
   const localStale=()=>!!plan && (host.workspace()?.current_input_id!==plan.input_id || plan.selection?.some(item=>item.record_key===host.draft()?.item && item.item_version!==host.draft()?.version));
+  const selectedTasks=()=>($('plan-task-mode').value || 'classify_cards,group_labels').split(',');
+  const sameTasks=()=>!plan || JSON.stringify(selectedTasks().sort())===JSON.stringify([...(plan.stage_policy?.tasks || ['classify_cards','group_labels'])].sort());
   const sameLimits=()=>!plan || Number($('plan-max-requests').value)===plan.followup_limits?.max_total_packets && Number($('plan-max-followups').value)===plan.followup_limits?.max_followup_packets && Math.round(Number($('plan-max-cost').value)*1000000)===plan.followup_limits?.max_reserved_micro_usd;
-  function restoreLimits(){if(!plan)return;$('plan-max-requests').value=plan.followup_limits.max_total_packets;$('plan-max-followups').value=plan.followup_limits.max_followup_packets;$('plan-max-cost').value=Number(plan.followup_limits.max_reserved_micro_usd)/1000000;}
+  function restoreLimits(){if(!plan)return;$('plan-task-mode').value=(plan.stage_policy?.tasks || ['classify_cards','group_labels']).join(',');$('plan-max-requests').value=plan.followup_limits.max_total_packets;$('plan-max-followups').value=plan.followup_limits.max_followup_packets;$('plan-max-cost').value=Number(plan.followup_limits.max_reserved_micro_usd)/1000000;}
   const path=()=>'/preparazioni/'+workspaceId+'/piani/'+plan.plan_id;
   const current=ticket=>ticket===generation && workspaceId===host.workspace()?.id;
   function notify() {for(const listener of listeners)listener({plan,coverage,workspaceId});}
@@ -36,7 +38,7 @@ export function createPlans(host) {
     $('plan-preview').disabled=!writable() || busy || !selected.size || host.inputDirty();
     $('plan-amend').hidden=!hasPlan; $('plan-amend').disabled=$('plan-preview').disabled;
     $('plan-start').hidden=!hasPlan || !!plan.events?.some(event=>event.kind==='started') || coverage?.progress && coverage.progress!=='planned';
-    $('plan-start').disabled=!coverage || !writable() || busy || dirty || stale || !sameSelection() || !sameLimits();
+    $('plan-start').disabled=!coverage || !writable() || busy || dirty || stale || !sameSelection() || !sameLimits() || !sameTasks();
     $('plan-continue').hidden=!hasPlan || !['finished_with_gaps','waiting_budget','waiting_retry'].includes(coverage?.progress);
     $('plan-continue').disabled=!writable() || busy || dirty || stale || coverage?.progress==='waiting_retry';
     $('plan-cancel').hidden=!hasPlan || !coverage || ['finished','cancelled'].includes(coverage?.progress) || coverage?.progress==='planned';
@@ -45,8 +47,8 @@ export function createPlans(host) {
     $('plan-clear-selection').disabled=!selected.size || busy;
     const items=host.workspace()?.items || [];
     $('plan-select-all').disabled=!writable() || busy || !items.length || items.length>MAX_SELECTION;
-    $('plan-selection-note').textContent=host.inputDirty()?'Salva o ripristina il materiale originale prima di creare o avviare un piano.':dirty?'Le modifiche locali sono conservate: prima di procedere devono essere salvate.':stale?'La selezione congelata è diventata obsoleta: crea una nuova anteprima.':hasPlan && (!sameSelection() || !sameLimits())?'La selezione o i limiti sono cambiati. La vecchia anteprima resta conservata: creane una nuova.':items.length>MAX_SELECTION?'Seleziona esplicitamente fino a 100 schede. Non viene esclusa automaticamente nessuna scheda.':'';
-    for(const id of ['plan-max-requests','plan-max-followups','plan-max-cost'])$(id).disabled=busy || !writable();
+    $('plan-selection-note').textContent=host.inputDirty()?'Salva o ripristina il materiale originale prima di creare o avviare un piano.':dirty?'Le modifiche locali sono conservate: prima di procedere devono essere salvate.':stale?'La selezione congelata è diventata obsoleta: crea una nuova anteprima.':hasPlan && (!sameSelection() || !sameLimits() || !sameTasks())?'La selezione, le attività o i limiti sono cambiati. La vecchia anteprima resta conservata: creane una nuova.':items.length>MAX_SELECTION?'Seleziona esplicitamente fino a 100 schede. Non viene esclusa automaticamente nessuna scheda.':'';
+    for(const id of ['plan-max-requests','plan-max-followups','plan-max-cost','plan-task-mode'])$(id).disabled=busy || !writable();
     syncCheckboxes();
   }
   function termContext() {
@@ -64,7 +66,7 @@ export function createPlans(host) {
     const config=plan.configuration || {}, limits=plan.followup_limits || {};
     root.append(node('p',`Modello: ${config.model || 'configurazione verificata sul server'}. Richieste previste: ${plan.planned_request_count ?? plan.total_packets}; iniziali: ${plan.initial_packet_ids?.length || 0}; massimo dichiarato: ${limits.max_total_packets}.`));
     root.append(node('p',`Costo massimo delle richieste previste: ${money(plan.ceiling_micro_usd)}. Limite autorizzato del piano: ${money(limits.max_reserved_micro_usd)}. Ulteriori richieste ammesse: ${limits.max_followup_packets || 0}.`));
-    root.append(node('p',(plan.stage_policy?.tasks || []).map(task=>tasks[task] || 'Analisi dichiarata').join(' → ')+'; il confronto attende gli esiti delle schede.'));
+    root.append(node('p',(plan.stage_policy?.tasks || []).map(task=>tasks[task] || 'Analisi dichiarata').join(' → ')+(plan.stage_policy?.tasks?.length===2?'; il confronto attende gli esiti delle schede.':plan.stage_policy?.tasks?.includes('group_labels')?'; nessuna analisi delle singole schede è richiesta.':'; nessun confronto di gruppo è richiesto.')));
     const catalog=plan.catalog_coverage;
     if(catalog?.complete===true)root.append(node('p',`Catalogo EGI completo per questo contesto: ${catalog.supplied_terms} termini forniti.`));
     else if(catalog?.complete===false)root.append(node('p',`Catalogo EGI parziale: ${catalog.supplied_terms} termini forniti; il totale e il numero di omissioni non sono determinati.`,'desk-notice'));
@@ -90,7 +92,8 @@ export function createPlans(host) {
     if(!coverage){$('plan-records').replaceChildren();$('plan-record-page').textContent='';$('plan-record-prev').disabled=true;$('plan-record-next').disabled=true;return;}
     const records=coverage.record_coverage || {}, comparison=coverage.comparison_coverage || {};
     root.append(node('h3','Analisi delle schede'));
-    root.append(node('p',`${records.validated_records || 0} analisi disponibili; ${records.insufficient_context_records || 0} astensioni; ${records.partial_records || 0} parziali; ${records.pending_records || 0} in attesa; ${records.blocked_records || 0} bloccate; ${records.stale_records || 0} da aggiornare. Totale selezionato: ${records.selected_records || 0}.`));
+    if(coverage.analysis_requested===false)root.append(node('p',`Analisi delle schede non richiesta. ${coverage.selected_record_count ?? plan?.selection?.length ?? 0} schede selezionate per il confronto; nessuna è conteggiata come analizzata.`));
+    else root.append(node('p',`${records.validated_records || 0} analisi disponibili; ${records.insufficient_context_records || 0} astensioni; ${records.partial_records || 0} parziali; ${records.pending_records || 0} in attesa; ${records.blocked_records || 0} bloccate; ${records.stale_records || 0} da aggiornare. Totale selezionato: ${records.selected_records || 0}.`));
     root.append(node('h3','Confronto delle categorie'));
     root.append(node('p',labelState(comparison.state || coverage.comparison_state || (coverage.awaiting_materialization_records?'awaiting_materialization':comparison.pending_scope_keys?.length?'pending':comparison.completed_scope_keys?.length?'complete':comparison.selected_unit_keys?.length?'awaiting_comparison':'not_declared'))));
     root.append(node('p',`${comparison.selected_unit_keys?.length || 0} etichette o interpretazioni incluse; ${comparison.completed_scope_keys?.length || 0} ambiti di confronto completati; ${comparison.pending_scope_keys?.length || 0} ancora da confrontare; ${comparison.omitted_unit_keys?.length || 0} unità omesse; ${comparison.reference_unit_keys?.length || 0} solo di riferimento.`));
@@ -106,8 +109,9 @@ export function createPlans(host) {
     for(const record of coverage.records || []){
       const row=node('li'), card=host.workspace()?.items?.find(item=>item.item_id===record.record_key);
       row.append(button(card?.display_name || 'Apri scheda',()=>host.openCard(record.record_key).catch(host.error)));
-      row.append(node('p',`${labelState(record.state)} · ${record.processed_basis_keys?.length || 0} passaggi esaminati, ${record.unprocessed_basis_keys?.length || 0} ancora da verificare.`));
-      if(record.reason)row.append(node('p',waitReasons[record.reason] || 'Controlla le condizioni di questa scheda prima di proseguire.','hint'));
+      if(record.reason==='analysis_not_requested')row.append(node('p','Analisi della scheda non richiesta: il piano prevede solo il confronto.'));
+      else row.append(node('p',`${labelState(record.state)} · ${record.processed_basis_keys?.length || 0} passaggi esaminati, ${record.unprocessed_basis_keys?.length || 0} ancora da verificare.`));
+      if(record.reason && record.reason!=='analysis_not_requested')row.append(node('p',waitReasons[record.reason] || 'Controlla le condizioni di questa scheda prima di proseguire.','hint'));
       if(record.comparison_state)row.append(node('p','Confronto: '+labelState(record.comparison_state),'hint'));
       list.append(row);
     }
@@ -177,7 +181,7 @@ export function createPlans(host) {
     if(busy || !writable() || !selected.size || selected.size>MAX_SELECTION || !await barrier() || !current(ticket))return;
     const total=Number($('plan-max-requests').value),followups=Number($('plan-max-followups').value),cost=Number($('plan-max-cost').value);
     if(!Number.isInteger(total) || total<1 || total>1000 || !Number.isInteger(followups) || followups<0 || followups>=total || !Number.isFinite(cost) || cost<0.01 || cost>10){message('Indica limiti validi: richieste, richieste successive e costo massimo tra 0,01 e 10 USD.');return;}
-    const body={item_ids:[...selected],configuration_version:null,limits:{max_total_packets:total,max_followup_packets:followups,max_reserved_micro_usd:Math.round(cost*1000000),allowed_followup_kinds:['remaining_record_analysis','cross_packet_comparison']}};
+    const body={item_ids:[...selected],configuration_version:null,tasks:selectedTasks(),limits:{max_total_packets:total,max_followup_packets:followups,max_reserved_micro_usd:Math.round(cost*1000000),allowed_followup_kinds:['remaining_record_analysis','cross_packet_comparison']}};
     if(amend && plan)body.version=plan.version;
     await mutate(amend?'amend':'preview',amend && plan?path()+'/modifica':'/preparazioni/'+workspaceId+'/piani/anteprima',body);
   }
@@ -185,7 +189,7 @@ export function createPlans(host) {
     const ticket=generation;
     if(!plan || busy || !writable())return;
     if(name!=='annulla' && (!await barrier() || !current(ticket) || localStale())){renderControls();return;}
-    if(name==='avvia' && (!sameSelection() || !sameLimits())){message('La selezione o i limiti sono cambiati: crea una nuova anteprima.');return;}
+    if(name==='avvia' && (!sameSelection() || !sameLimits() || !sameTasks())){message('La selezione o i limiti sono cambiati: crea una nuova anteprima.');return;}
     await mutate(name,path()+'/'+name,{version:plan.version});
   }
   async function retryUncertain(packet) {
@@ -213,7 +217,7 @@ export function createPlans(host) {
     try {const result=await host.api(path()+`/eventi?version=${plan.version}&after=${after}&limit=${PAGE}`);if(!current(ticket))return;events=result.events || [];eventAfter=after;nextEvent=result.next_event_id;renderEvents();renderPlan();}
     catch(error){if(current(ticket)){fail(error);renderControls();}}
   }
-  for(const id of ['plan-max-requests','plan-max-followups','plan-max-cost'])$(id).addEventListener('input',renderControls);
+  for(const id of ['plan-max-requests','plan-max-followups','plan-max-cost','plan-task-mode'])$(id).addEventListener('input',renderControls);
   $('plan-preview').addEventListener('click',()=>preview());$('plan-amend').addEventListener('click',()=>preview(true));
   $('plan-start').addEventListener('click',()=>action('avvia'));$('plan-continue').addEventListener('click',()=>action('continua'));$('plan-cancel').addEventListener('click',()=>action('annulla'));
   $('plan-refresh').addEventListener('click',()=>refresh());

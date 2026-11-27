@@ -30,6 +30,16 @@ def configuration_version(value):
     return value
 
 
+def analysis_tasks(value):
+    """Accept only an explicit nonempty set of the two approved workbench tasks."""
+    if not isinstance(value, list) or not 1 <= len(value) <= 2 or any(
+            not isinstance(task, str) or task not in ('classify_cards', 'group_labels') for task in value):
+        raise Failure(422, 'invalid_request')
+    if len(set(value)) != len(value):
+        raise Failure(422, 'invalid_request')
+    return sorted(value)
+
+
 def plan_version(value):
     """Require a positive exact plan version, excluding Boolean JSON values."""
     value = revision(value)
@@ -41,12 +51,12 @@ def plan_version(value):
 @router.post('/{workspace}/piani/anteprima')
 async def preview(request: Request, workspace: UUID):
     """Freeze a visible selection and bounds without enqueueing or granting live access."""
-    body = await read_json(request, ('item_ids', 'configuration_version', 'limits', 'request_key'))
+    body = await read_json(request, ('item_ids', 'configuration_version', 'limits', 'request_key'), ('tasks',))
     if not isinstance(body['limits'], dict):
         raise Failure(422, 'invalid_plan_limits')
-    return reply(await execute(request, 'SELECT preparation.preview_analysis_plan(%s,%s,%s,%s,%s) AS result',
+    return reply(await execute(request, 'SELECT preparation.preview_analysis_plan(%s,%s,%s,%s,%s,%s) AS result',
         (workspace, selected_items(body['item_ids']), configuration_version(body['configuration_version']),
-         Jsonb(body['limits']), identifier(body['request_key'])), True), 201)
+         Jsonb(body['limits']), identifier(body['request_key']), analysis_tasks(body.get('tasks', ['classify_cards', 'group_labels']))), True), 201)
 
 
 @router.get('/{workspace}/piani/{plan}')
@@ -108,12 +118,12 @@ async def cancel(request: Request, workspace: UUID, plan: UUID):
 @router.post('/{workspace}/piani/{plan}/modifica')
 async def amend(request: Request, workspace: UUID, plan: UUID):
     """Preview a new visible plan identity, preserving the prior plan and reviewed cards."""
-    body = await read_json(request, ('version', 'item_ids', 'configuration_version', 'limits', 'request_key'))
+    body = await read_json(request, ('version', 'item_ids', 'configuration_version', 'limits', 'request_key'), ('tasks',))
     if not isinstance(body['limits'], dict):
         raise Failure(422, 'invalid_plan_limits')
-    return reply(await execute(request, 'SELECT preparation.amend_analysis_plan(%s,%s,%s,%s,%s,%s,%s) AS result',
+    return reply(await execute(request, 'SELECT preparation.amend_analysis_plan(%s,%s,%s,%s,%s,%s,%s,%s) AS result',
         (workspace, plan, plan_version(body['version']), selected_items(body['item_ids']),
-         configuration_version(body['configuration_version']), Jsonb(body['limits']), identifier(body['request_key'])), True), 201)
+         configuration_version(body['configuration_version']), Jsonb(body['limits']), identifier(body['request_key']), analysis_tasks(body.get('tasks', ['classify_cards', 'group_labels']))), True), 201)
 
 
 @router.post('/{workspace}/pacchetti/{packet}/ripeti')

@@ -50,6 +50,7 @@
   <section id="plan-panel" class="desk-card preparation-plans" aria-label="Piano di analisi delle categorie" hidden>
     <h2>Analisi delle categorie</h2>
     <p>Seleziona le schede nell’elenco, controlla l’anteprima e avvia il piano una sola volta. Le proposte vanno controllate e non modificano automaticamente le schede.</p>
+    <label>Che cosa analizzare<select id="plan-task-mode"><option value="classify_cards,group_labels">Categorie delle schede e confronto</option><option value="group_labels">Solo confronto delle categorie</option><option value="classify_cards">Solo categorie delle schede</option></select></label>
     <p id="plan-selection-count" role="status" aria-live="polite"></p>
     <div class="desk-actions"><button id="plan-select-all" type="button">Seleziona tutte le schede, fino a 100</button><button id="plan-clear-selection" type="button">Deseleziona tutte</button></div>
     <p id="plan-selection-note" class="hint" aria-live="polite"></p>

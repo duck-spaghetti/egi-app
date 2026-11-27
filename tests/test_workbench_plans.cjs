@@ -22,7 +22,7 @@ async function fixture(count=2,restore=false){
  const api=async(path,body)=>{
   calls.push({path,body});if(denied)throw Object.assign(new Error('forbidden'),{status:403});
   if(delayReads && !body)return delayReads;
-  if(path.endsWith('/anteprima') || path.endsWith('/modifica')){if(failPreview)throw new Error('network');const old=plan;history.set(old.plan_id,old);plan={...old,plan_id:path.endsWith('/modifica')?'amended-'+(++sequence):old.plan_id,selection:body.item_ids.map(id=>({record_key:id,item_version:'version-'+id}))};return plan;}
+  if(path.endsWith('/anteprima') || path.endsWith('/modifica')){if(failPreview)throw new Error('network');const old=plan;history.set(old.plan_id,old);plan={...old,plan_id:path.endsWith('/modifica')?'amended-'+(++sequence):old.plan_id,selection:body.item_ids.map(id=>({record_key:id,item_version:'version-'+id})),stage_policy:{...old.stage_policy,tasks:body.tasks}};return plan;}
   if(path.endsWith('/avvia')){if(failStart){failStart=false;throw new Error('network');}plan={...plan,events:[...plan.events,{kind:'started',body:{}}],packet_jobs:[{packet_id:'packet',state:'queued'}]};coverage={...coverage,progress:'running'};return plan;}
   if(path.includes('/pacchetti/'))return{packet_id:'paid-retry'};
   if(path.includes('/risultati?'))return{results:[],next_offset:null};
@@ -88,6 +88,12 @@ async function fixture(count=2,restore=false){
  const raced=await fixture();raced.checks[0].checked=true;raced.checks[0].dispatch('change',{});let release;raced.delayFlush=new Promise(resolve=>release=resolve);
  raced.env.get('plan-preview').click();raced.workspace={id:'other',permission:'owner',state:'active',current_input_id:'other-input',items:[]};raced.controller.load(raced.workspace);release();await flush();assert.equal(raced.calls.length,0,'late old-workspace save cannot authorize a new-workspace plan');
  const late=await fixture(2,true);await flush();let releaseRead;late.delayReads=new Promise(resolve=>releaseRead=resolve);const oldRefresh=late.controller.refresh();late.workspace={id:'new',permission:'owner',state:'active',items:[]};late.controller.load(late.workspace);releaseRead(late.plan);await oldRefresh;assert.equal(late.controller.current().plan,null,'late old-workspace reads cannot replace the new panel');
- for(const item of [f,restored,capped,raced,late])item.controller.dispose();
+ const only=await fixture();for(const check of only.checks){check.checked=true;check.dispatch('change',{});}only.env.get('plan-task-mode').value='group_labels';only.env.get('plan-task-mode').dispatch('input',{});only.env.get('plan-preview').click();await flush();
+ assert.deepEqual(JSON.parse(JSON.stringify(only.calls.find(call=>call.path.endsWith('/anteprima')).body.tasks)),['group_labels']);
+ assert.doesNotMatch(textOf(only.env.get('plan-summary')),/il confronto attende gli esiti/);
+ only.coverage={...only.coverage,analysis_requested:false,selected_record_count:2,record_coverage:{selected_records:0},records:[{record_key:'card-0',state:null,reason:'analysis_not_requested'}]};await only.controller.refresh();
+ assert.match(textOf(only.env.get('plan-coverage')),/Analisi delle schede non richiesta/);assert.match(textOf(only.env.get('plan-coverage')),/2 schede selezionate per il confronto/);assert.doesNotMatch(textOf(only.env.get('plan-coverage')),/0 analisi disponibili/);
+ only.env.get('plan-task-mode').value='classify_cards,group_labels';only.env.get('plan-task-mode').dispatch('input',{});assert.equal(only.env.get('plan-start').disabled,true,'changing tasks requires a new preview');
+ for(const item of [f,restored,capped,raced,late,only])item.controller.dispose();
  console.log('Workbench plans: explicit preview/start/replay, draft barriers, separate coverage, bounded pages, access loss, reload and workspace generation guards passed.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

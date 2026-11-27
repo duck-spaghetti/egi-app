@@ -5,6 +5,15 @@ Select native checkboxes beside existing cards; the limit is 100 explicitly sele
 cards. Selecting all is available only when the whole visible preparation fits.
 Nothing is silently clipped. Selection alone starts no request.
 
+Choose **Che cosa analizzare**: categories plus comparison (default), comparison
+only, or categories only. A comparison-only preview declares `group_labels` as
+initial primary work, with the selected records supplied as reference context.
+It runs no classification request; the panel explicitly says that card analysis
+was not requested and grants no analyzed-record credit. Changing tasks requires a
+new preview, just like changing selection or bounds. Saved task choices restore
+with the plan. HTTP preview/amend accept the closed optional `tasks` set; omitted
+values preserve the previous two-stage default.
+
 Create an **anteprima** to freeze the selected server card versions, public source
 context, taxonomy scope, task dependencies and request/cost envelope. Null
 configuration resolves the current reviewed server configuration. The panel shows

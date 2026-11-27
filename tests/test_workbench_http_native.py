@@ -1,5 +1,6 @@
 """Exercise the same controlled workbench journeys through protected HTTP contracts."""
 from copy import deepcopy
+import json
 import unittest
 from uuid import uuid4
 
@@ -9,6 +10,7 @@ from app.backend.api.moderation import auth
 from tests import test_community_worker_native as legacy
 from tests import test_workbench_worker_native as worker_tests
 from tests.native import REPOSITORY
+from tests.test_workbench_provider import abstention, response
 
 
 @unittest.skipUnless(REPOSITORY, 'needs an explicit disposable EGI_DATABASE_REPO')
@@ -77,6 +79,50 @@ class WorkbenchHttpTests(worker_tests.WorkbenchWorkerNativeTests):
             self.checked(self.post(path + '/accessi', {'actor_id': self.people['mod2']['actor'],
                 'permission': None, 'expected_revision': state['metadata_revision'], 'request_key': str(uuid4())}))
             self.checked(other.get(plan_path), 404)
+
+    def test_group_only_plan_declares_no_classification_and_preserves_record_credit(self):
+        """An explicit comparison-only plan dispatches no hidden record-analysis task."""
+        workspace, items = self.cards()
+        baseline = self.plan(workspace, items)
+        path = '/preparazioni/' + workspace
+        body = {'item_ids': items, 'configuration_version': None,
+            'limits': baseline['followup_limits'], 'tasks': ['group_labels'], 'request_key': str(uuid4())}
+        for invalid in (None, [], ['extract_text'], ['group_labels', 'group_labels'], [True]):
+            self.checked(self.post(path + '/piani/anteprima', {**body, 'tasks': invalid}), 422)
+        plan = self.checked(self.post(path + '/piani/anteprima', body), 201)
+        self.assertEqual(plan['stage_policy']['tasks'], ['group_labels'])
+        self.assertTrue(plan['packets'])
+        self.assertTrue(all(packet['task'] == 'group_labels' and not packet['predecessor_packet_ids'] for packet in plan['packets']))
+        before = {item: self.owner.execute('SELECT current_version_id FROM preparation.items WHERE id=%s', (item,)).fetchone()[0] for item in items}
+        coverage = self.coverage(workspace, plan)
+        self.assertFalse(coverage['analysis_requested'])
+        self.assertEqual(coverage['selected_record_count'], len(items))
+        self.assertEqual(coverage['record_coverage']['selected_records'], 0)
+        self.assertEqual(coverage['record_coverage']['pending_records'], 0)
+        calls = []
+
+        def handler(message):
+            """Return only declared scoped comparison abstentions through MockTransport."""
+            packet = json.loads(json.loads(message.content)['input'][0]['content'][0]['text'])
+            calls.append(packet)
+            self.assertEqual(packet['task'], 'group_labels')
+            self.assertEqual(packet['coverage']['required_record_keys'], [])
+            return response(abstention(packet))
+
+        self.start(workspace, plan)
+        self.assertEqual(self.coverage(workspace, plan)['progress'], 'running')
+        worker = self.worker(handler)
+        for _ in range(4):
+            if worker.run_once() is None:
+                break
+        coverage = self.coverage(workspace, plan)
+        self.assertTrue(calls)
+        self.assertEqual(coverage['progress'], 'finished')
+        self.assertEqual(coverage['record_coverage']['validated_records'], 0)
+        self.assertFalse(coverage['comparison_coverage']['pending_scope_keys'])
+        for item, version in before.items():
+            self.assertEqual(self.owner.execute('SELECT current_version_id FROM preparation.items WHERE id=%s', (item,)).fetchone()[0], version)
+        self.assertEqual(self.checked(self.post(path + '/piani/anteprima', body), 201)['plan_id'], plan['plan_id'])
 
     def test_explicit_amendment_previews_a_new_identity_without_starting(self):
         """An amended visible envelope leaves the old plan and every item untouched."""
