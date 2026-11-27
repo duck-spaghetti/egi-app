@@ -32,6 +32,7 @@
   <div class="preparation-workbench"><aside class="preparation-source-column"><p class="preparation-step">{{ t('community.material_step') }}</p><div class="desk-card">
     <details open><summary>{{ t('community.input') }}</summary><p id="workspace-source" class="hint"></p>
       <form id="input-form" class="desk-form"><label for="source-text">{{ t('community.original_text_label') }}</label><textarea id="source-text" rows="8" maxlength="50000"></textarea><label class="check"><input id="public-material" type="checkbox" />{{ t('community.public_material') }}</label><p class="hint">{{ t('community.input_hint') }}</p><div class="desk-actions"><button id="save-input" type="submit">{{ t('community.save_input') }}</button><a id="original-link" target="_blank" rel="noopener">{{ t('community.original') }}</a><button id="manual-card" type="button">{{ t('community.manual') }}</button></div></form>
+    <div class="preparation-literal-tools"><p class="hint">{{ t('community.add_literal_hint') }}</p><label>{{ t('community.add_literal_subject') }}<select id="literal-subject" disabled><option value="service">{{ t('community.service') }}</option><option value="location">{{ t('community.location') }}</option></select></label><button id="add-literal-org" type="button" disabled>{{ t('community.add_literal_org') }}</button><button id="add-literal-category" type="button" disabled>{{ t('community.add_literal_category') }}</button></div>
     </details>
   </div>
   <section class="desk-card" id="analysis-panel" hidden>

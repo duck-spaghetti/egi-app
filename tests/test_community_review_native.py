@@ -160,3 +160,105 @@ class CommunityReviewTests(unittest.TestCase):
         contacts=self.owner.execute('SELECT editorial.revision_body(%s)',(accepted_next.json()['initial_revision_id'],)).fetchone()[0]['contacts']
         self.assertEqual(contacts,old_contacts)
         self.assertEqual(admin.get(f'{BASE}/preparazioni/{workspace}/input/{input_id}').status_code,404)
+
+    def test_entity_category_acceptance_and_explicit_organization_publication(self):
+        """Keep an unresolved name; link an existing entity and create/publish one draft."""
+        from psycopg.types.json import Jsonb
+        contributor, admin = self.browser('mod1'), self.browser('admin')
+        evidence = {'record':[{'assertion_id':'57000000-0000-0000-0000-000000000001','role':'supporting'}]}
+        existing_rev = self.owner.execute("SELECT governance.save_revision('organization',NULL,NULL,NULL,%s,'Existing partner fixture')",(Jsonb({'name':'Partner esistente','original_language':'it','evidence':evidence}),)).fetchone()[0]
+        reviewed = self.owner.execute("SELECT governance.review_revision(%s,NULL,'approved','Existing partner fixture')",(existing_rev,)).fetchone()[0]
+        self.owner.execute('SELECT governance.publish_revision(%s,%s,NULL)',(existing_rev,reviewed))
+        initial_orgs = self.owner.execute('SELECT count(*) FROM data.organizations').fetchone()[0]
+        source = self.post(contributor,BASE+'/fonti',{'metadata':{'name':'Entity review source','source_kind':'directory'},'request_key':str(uuid4())}).json()['source_id']
+        workspace = self.post(contributor,BASE+'/preparazioni',{'source_id':source,'title':'Entity integration','request_key':str(uuid4())}).json()['id']
+        raw = 'Mensa\nAssociazione Alfa\nPartner esistente\nAssociazione Zeta\nIstruzione\nPRIVATE UNSENT NOTE'
+        upload = contributor.post(f'{BASE}/preparazioni/{workspace}/input',content=raw.encode(),headers={**self.headers('mod1'),'Content-Type':'text/plain; charset=utf-8','X-EGI-Expected-Revision':'1','X-EGI-Public-Material':'false','X-EGI-Request-Key':str(uuid4())})
+        self.assertEqual(upload.status_code,201,upload.text)
+        input_id = upload.json()['input_id']
+        created = self.post(contributor,f'{BASE}/preparazioni/{workspace}/schede/crea',{'input_id':input_id,'job_id':None,'selections':[{'creation_key':str(uuid4())}],'request_key':str(uuid4())}).json()['items'][0]
+        item_path = f'{BASE}/preparazioni/{workspace}/schede/{created["item_id"]}'
+        payload = contributor.get(item_path).json()['version']['payload']
+        contexts = self.post(contributor,f'{BASE}/preparazioni/{workspace}/catalogo',{'query':{'kind':'taxonomy_context'}}).json()['entries']
+        scope = contexts[0]
+        payload.update(schema_version=2,source_facts=[],resolutions=[],outcome='confirmed',service={'name':'Mensa','description':'Informazioni sui pasti','delivery_mode':'telephone',
+            'territories':[scope['territory_id']],'contacts':[{'channel_type':'phone','value':'0612345678','is_public':True}]})
+        for kind,value in (('organization_name','Associazione Alfa'),('organization_name','Partner esistente'),('organization_name','Associazione Zeta'),('category_label','Istruzione')):
+            start = raw.index(value)
+            fragment = self.post(contributor,item_path+'/fatto-preparato',{'input_id':input_id,'kind':kind,'subject':'service','selection':{'start':start,'end':start+len(value)}})
+            self.assertEqual(fragment.status_code,200,fragment.text)
+            fragment = fragment.json();index = len(payload['source_facts'])
+            payload['source_facts'].append(fragment['fact'])
+            payload['evidence'].append({**fragment['evidence'],'path':f'/source_facts/{index}/source_value'})
+            payload['field_origins'].update({key.replace('/source_facts/0/',f'/source_facts/{index}/'):value for key,value in fragment['field_origins'].items()})
+        saved = self.post(contributor,f'{BASE}/preparazioni/{workspace}/schede',{'changes':[{'item_id':created['item_id'],'expected_version':created['version_id'],'payload':payload}],'request_key':str(uuid4())})
+        self.assertEqual(saved.status_code,200,saved.text)
+        version = saved.json()['items'][0]['after']
+        proposed = self.post(contributor,item_path+'/suggerimenti',{'expected_version':version,'fact_id':payload['source_facts'][3]['fact_id'],
+            'query':{'kind':'classification','territory_id':scope['territory_id'],'axis_id':scope['axis_id']}})
+        self.assertEqual(proposed.status_code,200,proposed.text)
+        category = proposed.json()['resolution']
+        existing = self.post(contributor,f'{BASE}/preparazioni/{workspace}/catalogo',{'query':{'kind':'organization','search':'Partner esistente'}}).json()['entries'][0]['target']
+        lookup = self.post(contributor,f'{BASE}/preparazioni/{workspace}/catalogo',{'query':{'kind':'organization','organization_ids':[existing['organization_id']]}})
+        self.assertEqual(lookup.status_code,200,lookup.text)
+        self.assertEqual([entry['label'] for entry in lookup.json()['entries']],['Partner esistente'])
+        self.assertEqual(self.post(contributor,f'{BASE}/preparazioni/{workspace}/catalogo',{'query':{'kind':'organization','organization_ids':[str(uuid4()) for _ in range(101)]}}).status_code,422)
+        new_context = self.post(contributor,f'{BASE}/preparazioni/{workspace}/catalogo',{'query':{'kind':'organization','search':'Associazione Alfa'}}).json()['context']
+        payload['resolutions'] = [
+            {'fact_id':payload['source_facts'][0]['fact_id'],'state':'confirmed','context':new_context,'candidates':[],
+             'selected':{'target':{'kind':'new_organization','body':{'name':'Associazione Alfa','original_language':'it','territories':[]}},'role':'provider'}},
+            {'fact_id':payload['source_facts'][1]['fact_id'],'state':'confirmed','context':{},'candidates':[],'selected':{'target':existing,'role':'organizer'}},
+            {'fact_id':payload['source_facts'][3]['fact_id'],'state':'confirmed','context':category['context'],'candidates':[],'selected':{'target':category['candidates'][0]['target']}}]
+        saved = self.post(contributor,f'{BASE}/preparazioni/{workspace}/schede',{'changes':[{'item_id':created['item_id'],'expected_version':version,'payload':payload}],'request_key':str(uuid4())})
+        self.assertEqual(saved.status_code,200,saved.text)
+        version = saved.json()['items'][0]['after']
+        sent = self.post(contributor,f'{BASE}/preparazioni/{workspace}/invii',{'items':[{'item_id':created['item_id'],'expected_version':version}],'request_key':str(uuid4())})
+        self.assertEqual(sent.status_code,200,sent.text)
+        contribution = sent.json()['items'][0]['receipt']['contribution_id']
+        review_path = '/moderazione/contributo/'+contribution
+        page = admin.get(review_path)
+        self.assertEqual(page.status_code,200,page.text[:600])
+        self.assertIn('Associazione Zeta',page.text)
+        self.assertNotIn('PRIVATE UNSENT NOTE',page.text)
+        self.assertEqual(admin.get(item_path).status_code,404)
+        actions = [{'fact_id':r['fact_id'],'action':'create' if r['selected']['target']['kind']=='new_organization' else 'select',
+                    'context':r['context'],'selected':r['selected'],'note':'Checked identity, role and category','reconcile':'retain'} for r in payload['resolutions']]
+        actions.append({'fact_id':payload['source_facts'][2]['fact_id'],'action':'keep'})
+        decision = {'schema_version':2,'expected_service_work':None,'expected_service_public':None,
+            'service_operations':[{'op':'add','path':'/'+key,'value':value,'evidence_ids':[]} for key,value in payload['service'].items()],
+            'location':{'kind':'none'},'reason':'Explicit entity/category review','observations':[{'paths':['/service'],'method':'document','note':'Synthetic service check'}],'fact_actions':actions}
+        request = {'decision':decision,'request_key':str(uuid4())}
+        accepted = self.post(admin,review_path+'/accetta-community',request,'admin')
+        self.assertEqual(accepted.status_code,200,accepted.text)
+        self.assertEqual(self.post(admin,review_path+'/accetta-community',request,'admin').json()['initial_revision_id'],accepted.json()['initial_revision_id'])
+        self.assertEqual(self.owner.execute('SELECT count(*) FROM data.organizations').fetchone()[0],initial_orgs+1)
+        service,revision = accepted.json()['service_id'],accepted.json()['initial_revision_id']
+        canonical = self.owner.execute('SELECT editorial.revision_body(%s)',(revision,)).fetchone()[0]
+        self.assertEqual({o['role_code'] for o in canonical['organizations']},{'provider','organizer'})
+        organization = next(o for o in canonical['organizations'] if o['role_code']=='provider')['organization_id']
+        org_revision = str(self.owner.execute('SELECT revision_id FROM governance.working_heads WHERE entity_id=%s',(organization,)).fetchone()[0])
+        page = admin.get(review_path)
+        self.assertEqual(page.status_code,200,page.text[:600])
+        self.assertIn('Approva e pubblica ente',page.text)
+        publication_body = {'expected_work':org_revision,'expected_public':None,'reason':'Explicit organization approval/publication'}
+        publish_org = review_path+'/enti/'+organization+'/pubblica'
+        blocked = self.post(admin,publish_org,publication_body,'admin')
+        self.assertEqual(blocked.status_code,422,blocked.text)
+        editorial = self.owner.execute("SELECT source_id::text FROM sources.registry WHERE code='egi_editorial'").fetchone()[0]
+        for selected in (source,editorial):
+            self.assertEqual(self.post(admin,BASE+'/fonti/'+selected+'/ammetti',{'reason':'Checked fixture source'},'admin').status_code,200)
+        publish_service = '/moderazione/servizio/'+service+'/pubblica'
+        self.assertEqual(self.form(admin,publish_service,working=revision,public='',summary='Organization still draft').status_code,400)
+        self.assertEqual(self.post(admin,review_path+'/enti/'+str(uuid4())+'/pubblica',publication_body,'admin').status_code,404)
+        published = self.post(admin,publish_org,publication_body,'admin')
+        self.assertEqual(published.status_code,200,published.text)
+        self.assertTrue(self.post(admin,publish_org,publication_body,'admin').json()['already_published'])
+        self.assertIsNone(self.owner.execute('SELECT revision_id FROM governance.published_heads WHERE entity_id=%s',(service,)).fetchone())
+        self.assertEqual(self.form(admin,publish_service,working=revision,public='',summary='Explicit service publication').status_code,303)
+        public = admin.get('/api/public/services/'+service)
+        self.assertEqual(public.status_code,200,public.text)
+        canonical_public = self.owner.execute('SELECT api.service_detail(%s)',(service,)).fetchone()[0]
+        self.assertEqual({item['name']['text'] for item in canonical_public['organizations']},{'Associazione Alfa','Partner esistente'})
+        self.assertEqual({item['role'] for item in canonical_public['organizations']},{'provider','organizer'})
+        self.assertNotIn('Associazione Zeta',public.text)
+        self.assertNotIn('PRIVATE UNSENT NOTE',public.text)

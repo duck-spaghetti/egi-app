@@ -10,13 +10,15 @@ import re
 import httpx
 from pydantic import SecretStr
 from review.insertion import INSTRUCTIONS
+from review.insertion_fields import ContractError
+from review.matching import validate_context
 
 from .schema import clean_result, output_schema
 
 ENDPOINT = 'https://api.openai.com/v1/responses'
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 CONFIG_KEYS = {'provider', 'api', 'model', 'store', 'live_authorized', 'language_version',
-               'taxonomy_version', 'timeout_seconds', 'reasoning_effort', 'fixture_only', 'interpretation_version'}
+               'taxonomy_version', 'timeout_seconds', 'reasoning_effort', 'fixture_only', 'interpretation_version', 'catalog_context'}
 
 
 class ConfigurationError(ValueError):
@@ -39,6 +41,13 @@ def validate_config(config: dict) -> dict:
         raise ConfigurationError('invalid_provider_configuration')
     if type(config.get('interpretation_version', 1)) is not int or config.get('interpretation_version', 1) not in (1, 2):
         raise ConfigurationError('invalid_interpretation_version')
+    if 'catalog_context' in config:
+        if config.get('interpretation_version') != 2:
+            raise ConfigurationError('invalid_catalog_context')
+        try:
+            validate_context(config['catalog_context'], provider=True)
+        except ContractError:
+            raise ConfigurationError('invalid_catalog_context') from None
     timeout = config.get('timeout_seconds', 120)
     if type(timeout) not in (int,float) or not 5 <= timeout <= 300:
         raise ConfigurationError('invalid_provider_timeout')

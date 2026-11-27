@@ -11,6 +11,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import Response
 from psycopg.types.json import Jsonb
 
+from .literal import prepared_fact
 from .http import Failure, PreparationRoute, execute, identifier, read_json, read_text, reply, revision
 
 router = APIRouter(prefix='/moderazione/contribuisci/api', route_class=PreparationRoute)
@@ -97,6 +98,16 @@ async def create_items(request: Request, workspace: UUID):
 async def item(request: Request, workspace: UUID, item: UUID, version: UUID | None = None):
     """Read an authorized current card or an immutable historical version."""
     return reply(await execute(request, 'SELECT preparation.read_item(%s,%s,%s) AS result', (workspace, item, version)))
+
+
+@router.post('/preparazioni/{workspace}/schede/{item}/fatto-preparato')
+async def prepare_literal(request: Request, workspace: UUID, item: UUID):
+    """Derive an unsaved fact from retained bytes; persistence uses ordinary save."""
+    body = await read_json(request, ('input_id', 'kind', 'subject', 'selection'))
+    input_id = identifier(body['input_id'])
+    value = await execute(request, "SELECT jsonb_build_object('item',preparation.read_item(%s,%s,NULL),'input',preparation.read_input(%s,%s)) AS result",
+                          (workspace, item, workspace, input_id))
+    return reply(prepared_fact(value['input'], {**body, 'input_id': input_id}))
 
 
 @router.get('/preparazioni/{workspace}/schede/{item}/cronologia')

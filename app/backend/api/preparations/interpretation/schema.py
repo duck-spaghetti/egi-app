@@ -64,6 +64,16 @@ def output_schema(request: dict) -> dict:
         fact = {key: {'type':'string', **({'enum':fields['source_fact_choices'][key]} if key in fields['source_fact_choices'] else {})}
                 for key in fields['source_fact']}
         candidate_fields['source_facts'] = array_schema(object_schema(fact))
+    if 'catalog_context' in request:
+        context = request['catalog_context']
+        # Supplied keys are the only model-facing handles. Canonical references,
+        # roles and confirmation remain outside the generated result grammar.
+        key = {'type':'string'}
+        if context['entries']:
+            key['enum'] = [entry['candidate_key'] for entry in context['entries']]
+        choice = object_schema({'candidate_key': key, 'reason': {'type':'string'}})
+        candidate_fields['matches'] = array_schema(object_schema({'fact_key':{'type':'string'},
+            'context_digest':{'type':'string','enum':[context['digest']]},'choices':array_schema(choice)}))
     candidate = object_schema(candidate_fields)
     return object_schema({'schema_version': {'type':'integer','enum':[request['schema_version']]},
         'input_id': {'type':'string','enum':[request['input_id']]},

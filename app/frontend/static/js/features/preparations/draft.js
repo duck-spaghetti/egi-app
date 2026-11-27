@@ -24,7 +24,7 @@ function edited(payload, path, value) {
   if (/^\/source_facts\/\d+\/value$/.test(path)) {
     const fact=payload.source_facts[Number(parts(path)[1])];
     for(const resolution of payload.resolutions || [])if(resolution.fact_id===fact.fact_id){
-      resolution.state='unresolved';resolution.context={};resolution.candidates=[];delete resolution.selected;
+      resolution.state='unresolved';resolution.context={};resolution.candidates=[];delete resolution.selected;delete resolution.confirmation;
     }
   }
 }
@@ -46,6 +46,20 @@ export class PreparationDraft {
   }
   get dirty() { return !equal(this.base, this.payload); }
   edit(path, value) { edited(this.payload, path, value); }
+  addSourceFact(fragment) {
+    if((this.payload.source_facts || []).some(fact=>fact.fact_id===fragment.fact.fact_id))return;
+    this.payload.schema_version=2;this.payload.source_facts??=[];this.payload.resolutions??=[];
+    const index=this.payload.source_facts.length,from='/source_facts/0',into='/source_facts/'+index;
+    this.payload.source_facts.push(clone(fragment.fact));
+    this.payload.evidence.push({...clone(fragment.evidence),path:into+'/source_value'});
+    for(const [path,origin]of Object.entries(fragment.field_origins))this.payload.field_origins[into+path.slice(from.length)]=clone(origin);
+  }
+  resolveFact(id,resolution) {
+    if(!(this.payload.source_facts || []).some(fact=>fact.fact_id===id))throw new Error('unknown_fact');
+    const value={...clone(resolution),fact_id:id};
+    if(value.state!=='confirmed'){delete value.selected;delete value.confirmation;}
+    this.payload.resolutions=(this.payload.resolutions || []).filter(item=>item.fact_id!==id);this.payload.resolutions.push(value);
+  }
   attempt(key) {
     if (!this.pending) this.pending = {key, payload: clone(this.payload), version: this.version};
     return {request_key: this.pending.key, changes: [{item_id: this.item, expected_version: this.pending.version, payload: clone(this.pending.payload)}]};
@@ -69,11 +83,25 @@ export class PreparationDraft {
       const found=(remote.payload.source_facts || []).find(fact=>fact.fact_id===change.fact.fact_id);
       return (!found && !!change.before) || !equal(found?.value,change.before?.value) && !equal(found?.value,change.value);
     });
-    const all=[...conflicts.map(change=>({...change,remote:readPath(remote.payload,change.path)})),
+    const resolutionChanges=(this.payload.resolutions || []).flatMap(value=>{
+      const before=(this.base.resolutions || []).find(item=>item.fact_id===value.fact_id);
+      if(equal(before,value))return [];
+      const theirs=(remote.payload.resolutions || []).find(item=>item.fact_id===value.fact_id);
+      const fact=this.payload.source_facts.find(item=>item.fact_id===value.fact_id),other=(remote.payload.source_facts || []).find(item=>item.fact_id===value.fact_id);
+      const missing=!other && (this.base.source_facts || []).some(item=>item.fact_id===value.fact_id);
+      const stale=['confirmed','proposed'].includes(value.state) && !!other && !equal(fact.value,other.value);
+      return [{path:'/resolutions/'+value.fact_id,value,before,remote:theirs,stale,missing,
+        conflict:missing || !!other && (stale || !equal(before,theirs) && !equal(value,theirs))}];
+    });
+    const all=[...resolutionChanges.filter(change=>change.conflict).map(change=>({...change,value:change.stale?{state:'unresolved'}:change.value})),...conflicts.map(change=>({...change,remote:readPath(remote.payload,change.path)})),
       ...factConflicts.map(change=>({...change,remote:(remote.payload.source_facts || []).find(fact=>fact.fact_id===change.fact.fact_id)?.value}))];
     if(all.some(change=>!['local','remote'].includes(choices[change.path])))return all;
     const payload = clone(remote.payload);
     for (const change of local) if (choices[change.path] !== 'remote') edited(payload, change.path, change.value);
+    for(const change of resolutionChanges)if(change.missing && choices[change.path]==='local'){
+      const index=this.payload.source_facts.findIndex(fact=>fact.fact_id===change.value.fact_id),fact=this.payload.source_facts[index];
+      facts.push({path:'/source_facts/'+index+'/value',fact,index,value:fact.value});
+    }
     for(const change of facts)if(choices[change.path]!=='remote'){
       payload.schema_version=2;payload.source_facts??=[];payload.resolutions??=[];
       let index=payload.source_facts.findIndex(fact=>fact.fact_id===change.fact.fact_id);
@@ -84,6 +112,10 @@ export class PreparationDraft {
         for(const [path,origin]of Object.entries(this.payload.field_origins))if(path.startsWith(from+'/'))payload.field_origins[into+path.slice(from.length)]=clone(origin);
       }
       edited(payload,'/source_facts/'+index+'/value',change.value);
+    }
+    for(const change of resolutionChanges)if(choices[change.path]!=='remote' && payload.source_facts?.some(fact=>fact.fact_id===change.value.fact_id)){
+      const value=change.stale?{fact_id:change.value.fact_id,state:'unresolved',context:{},candidates:[]}:clone(change.value);
+      payload.resolutions=(payload.resolutions || []).filter(item=>item.fact_id!==value.fact_id);payload.resolutions.push(value);
     }
     this.base = clone(remote.payload);
     this.version = remote.id;

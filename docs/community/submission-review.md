@@ -62,3 +62,42 @@ complete arrays, exact heads and removal of caller proof. The full application
 suite ran 185 tests (179 passed, six external-prerequisite skips); final targeted integrated
 checks also passed after local hardening. No real provider calls occurred. Combined
 milestone review, human corpus/model evaluation and user acceptance remain pending.
+
+## Explicit organization/category acceptance — EGI-119
+
+Moderation reuses the in-card reference controls. Literal submitted claims remain
+immutable/read-only; the reviewer edits canonical fields, prepares a corrected new
+organization body or confirms an existing entity/category independently. Decision v2
+contains explicit keep/select/create actions tied to submitted fact IDs. Its human
+reason supports the editorial identity/role/mapping decision, not a fabricated name
+quotation. Updates require a visible retain/replace reconciliation choice; only the
+previous association for that fact may be replaced. Unrelated baseline roles remain.
+
+Acceptance atomically creates/links an organization draft and service draft through
+the existing DB writer. A related-organizations section shows actual names, heads,
+minimal body and draft/public status. Approve and publish organization is explicit,
+requires a reason, checks its current linkage to this accepted service/location and
+uses the existing canonical governance operations in one transaction. Exact-head
+replay acknowledges an already published revision. Foreign organization IDs fail404;
+changed heads conflict. Source admission stays Admin-only. Publishing the service
+remains a separate existing operation; an unpublished linked organization blocks it.
+
+The public canonical DB read retains published organization names/roles. The app's
+existing map/API DTO remains unchanged and currently omits an organization section;
+this amendment does not add a public DTO contract or organization profile UI.
+Unresolved literal names remain visible editorially and never become fake public
+relationships. HTTP fixtures prove this with a retained unresolved organization,
+an existing organizer, a newly created provider and an adopted category.
+
+
+Final-review hardening freezes the displayed decision from its first acceptance
+request. A network/5xx outcome retains the same request key and body; fields,
+reference choices and observation controls remain read-only while an explicit retry
+resolves that attempt. A known 4xx refusal unlocks the unchanged editor. Success
+keeps controls locked until the accepted canonical view reloads. No retry silently
+uses a later edited body or creates a second acceptance.
+
+Current integrated verification (2026-11-27, after review fixes): 201 application
+tests, 195 passed and six external-prerequisite skips; five actual-module Node
+checks passed. Native HTTP covers reference resolution and separate organization /
+service publication. Browser verification also covers named entity/category decisions, persistence across card/field views, selective submission and the moderation preview. At390px the document has no horizontal overflow. This does not establish real-model quality or full visual fidelity to the prototype.

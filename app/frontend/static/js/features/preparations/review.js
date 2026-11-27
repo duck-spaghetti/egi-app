@@ -1,8 +1,9 @@
 /** Edit selective submitted proposals before creating a separately published draft. */
 import {PreparationDraft} from './draft.js';
 import {renderFields,node} from './fields.js';
-import {decisionFor} from './acceptance.js';
+import {decisionFor,createAcceptanceAttempt} from './acceptance.js';
 import {renderCard} from './card.js';
+import {createReferenceControls} from './references.js';
 import {evidenceMatches} from './evidence.js';
 const $=id=>document.getElementById(id), context=JSON.parse($('community-review-context').textContent), text=context.text;
 const writable=!context.resolution && !context.closed, proposed=context.snapshot.values;
@@ -16,7 +17,12 @@ if(proposed.schema_version===2){
 if(context.resolution){payload.service=structuredClone(context.accepted_service);payload.location=structuredClone(context.accepted_location || {kind:'none'});payload.field_origins={};payload.evidence=[];}
 if(context.resolution && payload.schema_version===2){payload.source_facts=[];payload.resolutions=[];}
 const draft=new PreparationDraft(context.snapshot.item_id,{id:context.snapshot.item_version_id,payload});
-let pending;
+let submission;
+const reconciliations={};
+const referenceUI=createReferenceControls({text,references:context.references,changed:comparison,fresh:current=>current===draft && !submission?.locked,
+  catalog:query=>post('/moderazione/contributo/'+context.snapshot.contribution_id+'/catalogo',{query}),
+  suggest:(current,fact,query)=>post('/moderazione/contributo/'+context.snapshot.contribution_id+'/suggerimenti',{fact_id:fact.fact_id,query}),
+  requireReconciliation:!!context.service_id,reconciliations});
 function summarize(value) {
   if(value===undefined)return text.cleared;
   if(Array.isArray(value))return value.map(summarize).join('\n') || text.not_set;
@@ -25,7 +31,7 @@ function summarize(value) {
 }
 function comparison() {
   if(!$('review-comparison'))return;
-  const decision=decisionFor(context,draft.payload,'preview',null),table=node('table',undefined,'desk-table compare');
+  const decision=decisionFor(context,draft.payload,'preview',null,reconciliations),table=node('table',undefined,'desk-table compare');
   for(const operation of decision.service_operations) {
     const key=operation.path.slice(1),row=node('tr'); row.className='changed';
     row.append(node('th',text.field_labels[key] || key),node('td',summarize(context.baseline[key])),node('td',summarize(operation.value)));
@@ -34,12 +40,18 @@ function comparison() {
   $('review-comparison').replaceChildren();
   if(!decision.service_operations.length)$('review-comparison').append(node('p',text.review_no_changes));
   else {const heading=node('p',text.review_baseline+' → '+text.review_after,'hint');$('review-comparison').append(heading,table);}
+  for(const action of decision.fact_actions || [])if(action.action!=='keep'){
+    const fact=payload.source_facts.find(item=>item.fact_id===action.fact_id);
+    $('review-comparison').append(node('p',fact.value+' → '+referenceUI.label(action.selected.target)+(action.selected.role?' · '+(text.ref_roles[action.selected.role] || action.selected.role):'')));
+  }
 }
 function render() {
-  const view={...context,canEditFacts:false,sourceName:context.snapshot.source_metadata.name,text:{...text,input_origin:text.review_current_value},evidenceFilter:evidence=>evidenceMatches(draft.payload,proposed,evidence),onEvidence:(evidence)=>{
+  const view={...context,renderResolution:referenceUI.render,rerender:render,referenceLabel:referenceUI.label,canEditFacts:false,sourceName:context.snapshot.source_metadata.name,text:{...text,input_origin:text.review_current_value},evidenceFilter:evidence=>evidenceMatches(draft.payload,proposed,evidence),onEvidence:(evidence)=>{
     $('review-field-evidence').hidden=false;$('review-field-evidence').replaceChildren(node('strong',text.source_passage),node('blockquote',evidence.quote));
   }};
-  ($('review-editor').classList.contains('preparation-fields')?renderFields:renderCard)($('review-editor'),draft,view,writable,comparison);comparison();
+  ($('review-editor').classList.contains('preparation-fields')?renderFields:renderCard)($('review-editor'),draft,view,writable && !submission?.locked,comparison);comparison();
+  for(const input of document.querySelectorAll('#community-accept-form input,#community-accept-form textarea,#community-accept-form select,#review-proposal-choices input'))input.disabled=!!submission?.locked;
+
 }
 async function post(path,body) {
   const response=await fetch(path,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-EGI-Form-Token':$('community-review-token').value},body:JSON.stringify(body)});
@@ -47,6 +59,13 @@ async function post(path,body) {
   return response.json();
 }
 function fail(error) {$('review-error').hidden=false;$('review-error').textContent=error.status===409?text.review_stale:text.review_failed;}
+submission=createAcceptanceAttempt({key:()=>crypto.randomUUID(),
+  request:body=>post('/moderazione/contributo/'+context.snapshot.contribution_id+'/accetta-community',body),
+  onAccepted:()=>window.location.reload(),onError:fail,onState:state=>{
+    render();const control=$('review-accept-button'),status=$('review-pending-status');
+    if(control){control.disabled=state.inFlight || state.complete;control.textContent=state.uncertain?text.review_retry_decision:text.review_accept;}
+    if(status){status.hidden=!state.locked;status.textContent=state.complete?text.review_accepted:state.uncertain?text.review_uncertain_decision:text.review_sending_decision;}
+  }});
 if(writable && context.service_id) {
   for(const [key,value] of Object.entries(proposed.service)) {
     const label=node('label',undefined,'desk-inline'),check=node('input');check.type='checkbox';
@@ -77,16 +96,22 @@ $('community-accept-form')?.addEventListener('submit',async event=>{
   try {
     const observed=$('review-observed').checked,method=$('review-method').value,reason=$('review-reason').value.trim();
     if(!reason || observed && !method || !draft.payload.service.delivery_mode){$('review-error').hidden=false;$('review-error').textContent=text.review_invalid;return;}
-    pending ??= {request_key:crypto.randomUUID(),decision:decisionFor(context,draft.payload,reason,observed?{method,note:$('review-note').value}:null)};
-    await post('/moderazione/contributo/'+context.snapshot.contribution_id+'/accetta-community',pending);
-    window.location.reload();
-  } catch(error) {if(error.status && error.status<500)pending=null;fail(error);}
+    if(context.service_id && draft.payload.resolutions?.some(item=>item.state==='confirmed' && !reconciliations[item.fact_id])){$('review-error').hidden=false;$('review-error').textContent=text.ref_reconcile_required;return;}
+    await submission.send(()=>decisionFor(context,draft.payload,reason,observed?{method,note:$('review-note').value}:null,reconciliations));
+  } catch(error) {fail(error);}
 });
 for(const form of document.querySelectorAll('.community-admit-source'))form.addEventListener('submit',async event=>{
   event.preventDefault();
   try {await post('/moderazione/contribuisci/api/fonti/'+form.dataset.source+'/ammetti',{reason:new FormData(form).get('reason')});form.replaceWith(node('p',text.review_admitted_now));}
   catch(error){fail(error);}
 });
-render();
+referenceUI.loadNames(draft).then(render).catch(fail);
 
 if($('review-original-editor')){const original=new PreparationDraft(context.snapshot.item_id,{id:context.snapshot.item_version_id,payload:{...structuredClone(proposed),evidence:context.snapshot.evidence}});renderFields($('review-original-editor'),original,context,false,()=>{});}
+
+for(const form of document.querySelectorAll('.community-publish-organization'))form.addEventListener('submit',async event=>{
+  event.preventDefault();const control=form.querySelector('button');control.disabled=true;
+  try{await post('/moderazione/contributo/'+context.snapshot.contribution_id+'/enti/'+form.dataset.organization+'/pubblica',{
+    expected_work:form.dataset.working,expected_public:form.dataset.public || null,reason:new FormData(form).get('reason')});window.location.reload();}
+  catch(error){fail(error);}finally{control.disabled=false;}
+});

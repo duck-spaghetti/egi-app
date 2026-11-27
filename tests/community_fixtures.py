@@ -26,4 +26,6 @@ def result(req: dict) -> dict:
                 'input_hash':req['input_hash'],'kind':'stated','quote':req['text'],'span':{'start':0,'end':len(req['text'])}}]}]}
     if req['schema_version'] == 2:
         value['candidates'][0]['source_facts'] = []
+    if 'catalog_context' in req:
+        value['candidates'][0]['matches'] = []
     return value

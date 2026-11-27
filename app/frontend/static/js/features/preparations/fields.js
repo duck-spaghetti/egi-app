@@ -21,7 +21,9 @@ export function renderFields(root, draft, context, canEdit, changed, redrawAll) 
     const wrapper = node('div', undefined, 'preparation-control'); wrapper.dataset.field = key;
     wrapper.append(node('span', label(key)));
     let input,clearControl;
-    if (key==='territory_id' && context.references?.territories) {
+    if(key==='organization_id' && context.referenceLabel){
+      input=node('input');input.type='text';input.readOnly=true;input.value=value?context.referenceLabel({kind:'organization',organization_id:value}):text.not_set;
+    } else if (key==='territory_id' && context.references?.territories) {
       input=node('select');input.append(new Option(text.not_set,''));
       for(const area of context.references.territories)input.append(new Option(area.name,area.territory_id));
       if(value && !context.references.territories.some(area=>area.territory_id===value))input.append(new Option(value,value));
@@ -58,7 +60,7 @@ export function renderFields(root, draft, context, canEdit, changed, redrawAll) 
     const origin = draft.payload.field_origins[path]?.state, citations=key==='is_public'?[]:evidenceFor(draft.payload,path).filter(citation=>!context.evidenceFilter || context.evidenceFilter(citation));
     const hint = node('span', undefined, 'hint');
     hint.append(node('span', origin === 'cleared' ? text.cleared : origin === 'manual' ? text.changed : citations.some(item=>item.kind==='interpreted') ? text.interpreted_value : origin === 'generated' ? text.generated : value === undefined ? text.not_set : text.input_origin));
-    clearControl=button(text.clear, () => { edit(path, undefined); redraw(); }, !canEdit || value === undefined);
+    clearControl=button(text.clear, () => { edit(path, undefined); redraw(); }, !canEdit || value === undefined || key==='organization_id');
     hint.append(clearControl);
     if(context.onEvidence)for(const citation of citations){const link=button(text.see_source,()=>context.onEvidence(citation,path));link.dataset.evidence=citation.id;hint.append(link);}
     wrapper.append(hint); parent.append(wrapper);
@@ -74,7 +76,7 @@ export function renderFields(root, draft, context, canEdit, changed, redrawAll) 
         const row=node('div',undefined,'preparation-category-choice'),select=node('select');
         select.setAttribute('aria-label',text.category);select.disabled=!canEdit;
         select.append(new Option(text.choose_category,''));
-        for(const choice of choices)select.append(new Option(choice.name,choice.adoption_id+'/'+choice.term_id));
+        for(const choice of choices)select.append(new Option(choice.name+(choice.axis_label?' · '+choice.axis_label:''),choice.adoption_id+'/'+choice.term_id));
         if(value) {
           const selected=value.adoption_id+'/'+value.term_id;
           if(!choices.some(choice=>choice.adoption_id+'/'+choice.term_id===selected))select.append(new Option(text.unresolved_category,selected));
@@ -109,7 +111,7 @@ export function renderFields(root, draft, context, canEdit, changed, redrawAll) 
       group.append(button(text.remove, () => { const next = structuredClone(values); next.splice(index, 1); edit(path, next); redraw(); }, !canEdit));
       section.append(group);
     });
-    section.append(button(text.add + ' · ' + label(key), () => { edit(path, [...values, key === 'territories' ? '' : {}]); redraw(); }, !canEdit));
+    if(key!=='organizations')section.append(button(text.add + ' · ' + label(key), () => { edit(path, [...values, key === 'territories' ? '' : {}]); redraw(); }, !canEdit));
     parent.append(section);
   }
   root.replaceChildren();
@@ -150,13 +152,14 @@ export function renderFields(root, draft, context, canEdit, changed, redrawAll) 
       const input=node('input');input.type='text';input.value=fact.value || '';input.placeholder=caption;
       input.setAttribute('aria-label',caption+' '+(index+1));input.disabled=!canEdit || context.canEditFacts===false;
       const hint=node('span',undefined,'hint'),status=node('span'),original=node('span',text.literal_original+': '+fact.source_value,'preparation-literal-original');
-      const state=()=>{status.textContent=draft.payload.field_origins[path]?.state==='cleared'?text.cleared:draft.payload.field_origins[path]?.state==='manual'?text.changed:text.literal_unresolved;original.hidden=fact.value===fact.source_value;};state();
+      const state=()=>{status.textContent=draft.payload.field_origins[path]?.state==='cleared'?text.cleared:draft.payload.field_origins[path]?.state==='manual'?text.changed:text.input_origin;original.hidden=fact.value===fact.source_value;};state();
       input.addEventListener('input',()=>{draft.edit(path,input.value || undefined);changed();state();});
       hint.append(status);
       if(context.onEvidence)for(const citation of evidenceFor(draft.payload,sourcePath).filter(item=>!context.evidenceFilter || context.evidenceFilter(item))){
         const link=button(text.see_source,()=>context.onEvidence(citation,sourcePath));link.dataset.evidence=citation.id;hint.append(link);
       }
-      row.append(input,original,hint);group.append(row);
+      row.append(input,original,hint);
+      context.renderResolution?.(row,draft,fact,index,canEdit,context.rerender || redraw);group.append(row);
     }
     literals.append(group);
   }

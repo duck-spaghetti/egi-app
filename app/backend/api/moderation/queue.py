@@ -4,6 +4,8 @@ Every read and step runs as the verified person; the database records who did wh
 A claim never locks the service: publication keeps its exact-revision check.
 """
 from fastapi import APIRouter, Depends, Request
+from starlette.concurrency import run_in_threadpool
+
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .desk import Refused
@@ -93,12 +95,16 @@ async def claim(request: Request, contribution: str, module: Moderation = Depend
     """Claim, take over, release or hand the contribution to another person."""
     form = await module.form(request)
     module.check_post(request, form)
-    try:
-        module.desk.as_person(module.session_hash(request), 'SELECT editorial.claim(%s,%s,%s)',
-                              (contribution, form.get('action', 'claim'), form.get('assignee') or None))
-    except Refused as refusal:
-        return contribution_page(request, module, contribution, error=refusal.code)
-    return RedirectResponse(f'{PATH}/contributo/{contribution}', status_code=303)
+
+    def operation():
+        """Run the complete DB transaction and dependent rendering off the event loop."""
+        try:
+            module.desk.as_person(module.session_hash(request), 'SELECT editorial.claim(%s,%s,%s)',
+                                  (contribution, form.get('action', 'claim'), form.get('assignee') or None))
+        except Refused as refusal:
+            return contribution_page(request, module, contribution, error=refusal.code)
+        return RedirectResponse(f'{PATH}/contributo/{contribution}', status_code=303)
+    return await run_in_threadpool(operation)
 
 
 @router.post('/contributo/{contribution}/attesa')
@@ -106,9 +112,13 @@ async def waiting(request: Request, contribution: str, module: Moderation = Depe
     """Put the contribution on hold with a reason, or resume it (empty reason)."""
     form = await module.form(request)
     module.check_post(request, form)
-    try:
-        module.desk.as_person(module.session_hash(request), 'SELECT editorial.set_waiting(%s,%s)',
-                              (contribution, form.get('reason') or None))
-    except Refused as refusal:
-        return contribution_page(request, module, contribution, error=refusal.code)
-    return RedirectResponse(f'{PATH}/contributo/{contribution}', status_code=303)
+
+    def operation():
+        """Run the complete DB transaction and dependent rendering off the event loop."""
+        try:
+            module.desk.as_person(module.session_hash(request), 'SELECT editorial.set_waiting(%s,%s)',
+                                  (contribution, form.get('reason') or None))
+        except Refused as refusal:
+            return contribution_page(request, module, contribution, error=refusal.code)
+        return RedirectResponse(f'{PATH}/contributo/{contribution}', status_code=303)
+    return await run_in_threadpool(operation)

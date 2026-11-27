@@ -197,3 +197,57 @@ class PreparationHttpTests(unittest.TestCase):
             self.assertEqual(response.headers['cache-control'], 'no-store')
         for file in Path(self.errors.name).glob('*.json'):
             self.assertNotIn('PRIVATE', file.read_text())
+
+    def test_selected_literals_and_local_catalog_suggestions_have_no_write_effect(self):
+        """Real HTTP maps retained Unicode bytes and keeps reads separate from save."""
+        owner, outsider = self.browser('mod1'), self.browser('admin')
+        workspace = self.prepare(owner)
+        path = f'{BASE}/preparazioni/{workspace}'
+        original = '\ufeff🧭\r\nAssociazione Alfa\r\nIstruzione'
+        uploaded = self.upload(owner, workspace, original.encode())
+        self.assertEqual(uploaded.status_code, 201, uploaded.text)
+        input_id = uploaded.json()['input_id']
+        created = owner.post(path+'/schede/crea', json={'input_id':input_id,'job_id':None,'selections':[{'creation_key':str(uuid4())}],'request_key':str(uuid4())}, headers=self.headers()).json()['items'][0]
+        item_path = path+'/schede/'+created['item_id']
+        normalized = original.removeprefix('\ufeff').replace('\r\n','\n')
+        payload = owner.get(item_path).json()['version']['payload']
+        payload.update(schema_version=2, source_facts=[], resolutions=[])
+        for kind, value in (('organization_name','Associazione Alfa'), ('category_label','Istruzione')):
+            start = normalized.index(value)
+            body = {'input_id':input_id,'kind':kind,'subject':'service','selection':{'start':start,'end':start+len(value)}}
+            self.assertEqual(outsider.post(item_path+'/fatto-preparato',json=body,headers=self.headers('admin')).status_code,404)
+            fragment = owner.post(item_path+'/fatto-preparato',json=body,headers=self.headers())
+            self.assertEqual(fragment.status_code,200,fragment.text)
+            fragment = fragment.json()
+            self.assertEqual(fragment['fact']['source_value'],value)
+            index = len(payload['source_facts'])
+            payload['source_facts'].append(fragment['fact'])
+            payload['evidence'].append({**fragment['evidence'],'path':f'/source_facts/{index}/source_value'})
+            payload['field_origins'].update({key.replace('/source_facts/0/',f'/source_facts/{index}/'):value for key,value in fragment['field_origins'].items()})
+        self.assertEqual(owner.get(item_path).json()['version']['id'],created['version_id'],'prepared fragments do not persist')
+        saved = owner.post(path+'/schede',json={'changes':[{'item_id':created['item_id'],'expected_version':created['version_id'],'payload':payload}],'request_key':str(uuid4())},headers=self.headers())
+        self.assertEqual(saved.status_code,200,saved.text)
+        version = saved.json()['items'][0]['after']
+        contexts = owner.post(path+'/catalogo',json={'query':{'kind':'taxonomy_context'}},headers=self.headers())
+        self.assertEqual(contexts.status_code,200,contexts.text)
+        context = contexts.json()['entries'][0]
+        query = {'kind':'classification','territory_id':context['territory_id'],'axis_id':context['axis_id']}
+        suggestion = owner.post(item_path+'/suggerimenti',json={'expected_version':version,'fact_id':payload['source_facts'][1]['fact_id'],'query':query},headers=self.headers())
+        self.assertEqual(suggestion.status_code,200,suggestion.text)
+        self.assertEqual(suggestion.json()['resolution']['state'],'proposed')
+        self.assertEqual(suggestion.json()['candidate_count'],1)
+        from statistics import median
+        from time import perf_counter
+        read_times, suggestion_times = [], []
+        for _ in range(5):
+            started = perf_counter();response = owner.get(item_path);read_times.append((perf_counter()-started)*1000)
+            self.assertEqual(response.status_code,200)
+            started = perf_counter();response = owner.post(item_path+'/suggerimenti',json={'expected_version':version,'fact_id':payload['source_facts'][1]['fact_id'],'query':query},headers=self.headers());suggestion_times.append((perf_counter()-started)*1000)
+            self.assertEqual(response.status_code,200)
+        print(f'Native in-process HTTP median n=5, 1 catalog candidate: item read {median(read_times):.3f}ms; local suggestions {median(suggestion_times):.3f}ms')
+
+        self.assertEqual(owner.get(item_path).json()['version']['id'],version,'local suggestions do not persist or dispatch IA')
+        stale = owner.post(item_path+'/suggerimenti',json={'expected_version':created['version_id'],'fact_id':payload['source_facts'][1]['fact_id'],'query':query},headers=self.headers())
+        self.assertEqual(stale.status_code,409,stale.text)
+        self.assertEqual(outsider.post(path+'/catalogo',json={'query':{'kind':'organization'}},headers=self.headers('admin')).status_code,404)
+        self.assertEqual(owner.post(path+'/catalogo',json={'query':{'kind':'organization','limit':51}},headers=self.headers()).status_code,422)

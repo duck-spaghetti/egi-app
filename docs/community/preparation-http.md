@@ -73,3 +73,37 @@ item_schema_downgrade to a content-free409; new malformed/stale fact errors stay
 content-free422/409. The existing JSON/text limits, Origin/token checks and read
 permissions apply. Native HTTP checks prove v2 save/reopen/selective moderation and
 old-client downgrade refusal without a new endpoint or any canonical side effect.
+
+## Bounded reference reads and manual literal preparation — EGI-119
+
+POST `preparazioni/{workspace}/catalogo` accepts query and uses the authorized DB
+catalog (organization/taxonomy_context/classification). Search text stays in the
+protected body, not an access-log URL. Pages are1–50 entries; selected organization
+IDs can be looked up in batches of at most100. Reads have no write effects.
+POST `preparazioni/{workspace}/schede/{item}/suggerimenti` takes expected_version,
+fact_id and query. It derives the actual current fact value, compares at most100
+local references and returns unconfirmed resolution, value/version/digest/coverage.
+It dispatches no IA. Missing optional Reviewer installation returns safe503 for
+ranking; catalog reads/manual selections remain independent.
+
+POST `preparazioni/{workspace}/schede/{item}/fatto-preparato` takes input_id, kind,
+subject and selection(start/end in the textarea LF/code-point view). The authorized
+item/input are read in one verified transaction. The returned fact, exact locator
+and origins are unsaved; the existing versioned save owns all mutation/receipts.
+An authorized read-only person can prepare/read this fragment but still cannot save.
+Foreign preparations remain404 and all POST reads require same-origin/form-token
+protection. Moderation exposes catalog/suggestions scoped to its immutable snapshot,
+never a private-input read route. Schemas and safe reference conflicts remain DB-owned.
+
+
+Local lexical matching runs in the existing Starlette thread pool after authorized
+catalog reads. Password verification/enrolment and synchronous account/session DB
+work in async moderation routes use the same offloading boundary. Gated route tests
+verify event-loop progress while matching/password work is waiting; this establishes
+isolation from the loop, not a throughput or response-time SLA.
+
+The same boundary covers editorial claim/waiting, proposal decisions, contribution
+closure, protection release, canonical draft/move/create/publish and the retained
+public contribution intake. Each transaction and its dependent rendering stay in
+one worker callable; body/form parsing remains asynchronous. Seven gated tests cover
+authentication, matching and representative editorial/intake waits.

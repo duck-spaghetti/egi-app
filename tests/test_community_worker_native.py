@@ -350,3 +350,48 @@ class WorkerNativeTests(unittest.TestCase):
         self.assertIn('Associazione Alfa corretta',page.text)
         self.assertNotIn('NOTA NON SELEZIONATA',page.text)
         self.assertEqual(self.owner.execute('SELECT count(*) FROM data.services').fetchone()[0],canonical_before)
+
+    def test_public_context_matches_cross_one_worker_exchange_and_materialize_unconfirmed(self):
+        """The pinned wheel, real HTTP catalog and DB worker agree on the context digest."""
+        from datetime import date
+        from review.matching import make_context, propose
+        workspace,input_id = self.prepare('Istruzione')
+        catalog = self.post('/preparazioni/'+workspace+'/catalogo', {'query':{'kind':'taxonomy_context'}})
+        self.assertEqual(catalog.status_code,200,catalog.text)
+        scope = catalog.json()['entries'][0]
+        page = self.post('/preparazioni/'+workspace+'/catalogo', {'query':{'kind':'classification','territory_id':scope['territory_id'],'axis_id':scope['axis_id']}}).json()
+        context = make_context(page,as_of=date.fromisoformat(page['as_of']))
+        config = {**CONFIG,'interpretation_version':2,'catalog_context':context}
+        self.owner.execute('INSERT INTO preparation.ai_configurations(version,provider_config,max_input_tokens,max_output_tokens,input_rate_microusd_per_million,cached_rate_microusd_per_million,output_rate_microusd_per_million,verified_at,price_reference) VALUES(%s,%s,300000,2000,1000000,500000,1000000,clock_timestamp(),%s)',
+            ('fixture/matches-2',Jsonb(config),'Synthetic public catalog; no provider'))
+        self.owner.execute("UPDATE preparation.ai_settings SET config_version='fixture/matches-2'")
+        self.addCleanup(self.owner.execute,"UPDATE preparation.ai_settings SET config_version='fixture/1'")
+        job = self.enqueue(workspace,input_id)
+        calls = []
+
+        def response(exchange):
+            """Return a bounded supplied-key proposal in the existing extraction response."""
+            body = json.loads(exchange.content)
+            req = json.loads(body['input'][0]['content'][0]['text'])
+            self.assertEqual(req['catalog_context']['digest'],context['digest'])
+            calls.append(req)
+            value = result(req)
+            card = value['candidates'][0]
+            card['source_facts'] = [{'fact_key':'category','subject':'service','kind':'category_label','source_value':'Istruzione'}]
+            card['evidence'].append({**card['evidence'][0],'id':str(uuid4()),'path':'/source_facts/0/source_value'})
+            card['matches'] = propose(card['source_facts'],context)
+            return httpx.Response(200,json={'status':'completed','output':[{'type':'message','role':'assistant','content':[{'type':'output_text','text':json.dumps(value)}]}],
+                                          'usage':{'input_tokens':100,'output_tokens':20}})
+        self.assertEqual(self.worker(response).run_once()['state'],'succeeded')
+        self.assertEqual(len(calls),1)
+        candidate = self.client.get(BASE+'/preparazioni/'+workspace+'/lavori/'+job).json()['candidate_ids']['one']
+        selected = self.post('/preparazioni/'+workspace+'/schede/crea', {'input_id':input_id,'job_id':job,'selections':[{'candidate_id':candidate}],'request_key':str(uuid4())})
+        self.assertEqual(selected.status_code,201,selected.text)
+        item = selected.json()['items'][0]
+        payload = self.client.get(BASE+'/preparazioni/'+workspace+'/schede/'+item['item_id']).json()['version']['payload']
+        resolution = payload['resolutions'][0]
+        self.assertEqual(resolution['state'],'proposed')
+        self.assertEqual(resolution['fact_id'],payload['source_facts'][0]['fact_id'])
+        self.assertNotIn('selected',resolution)
+        self.assertFalse(payload['service'].get('classifications'))
+        self.assertEqual(resolution['candidates'][0]['target'],context['entries'][0]['target'])

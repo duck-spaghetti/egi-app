@@ -9,6 +9,8 @@ from urllib.parse import parse_qs
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request
+from starlette.concurrency import run_in_threadpool
+
 from fastapi.responses import HTMLResponse
 
 from ..directory.exceptions import DirectoryError
@@ -66,28 +68,32 @@ async def submit(request: Request):
     body = await request.body()
     if len(body) > 16 * 1024:
         raise HTTPException(413)
-    values = {key: items[-1].strip() for key, items in parse_qs(body.decode('utf-8', 'replace')).items()}
-    lang, issue = values.get('lang', 'it'), values.get('issue')
-    if not available(request):
-        return page(request, lang, mode='unavailable')
-    card = target(request, values.get('poi_id'), lang) if issue in ISSUES else None
-    if issue in ISSUES and card is None:
-        return page(request, lang, status=404, mode='unknown_service')
-    mode = issue if issue in ISSUES else 'new_service'
-    error = validate(mode, values)
-    if error:
-        return page(request, lang, status=400, mode=mode, card=card, categories=CATEGORIES, values=values, error=error)
-    kind = {'error': 'report', 'still_valid': 'still_valid', 'new_service': 'new_service'}[mode]
-    proposals = proposals_of(mode, values)
-    contact = values.get('contact') if mode != 'still_valid' else None
-    result = request.app.state.resources.intake.submit(kind, card['id'] if card else None,
-        values.get('category') if mode == 'error' else None, values.get('message') if mode != 'still_valid' else None,
-        contact, bool(values.get('consent')) and bool(contact), proposals, values.get('website'))
-    if result in ('stored', 'trapped'):
-        return page(request, lang, mode='received', kind=kind)
-    if result in ('limited', 'closed'):
-        return page(request, lang, status=503, mode='later')
-    return page(request, lang, status=400, mode=mode, card=card, categories=CATEGORIES, values=values, error='invalid')
+
+    def operation():
+        """Run the complete DB transaction and dependent rendering off the event loop."""
+        values = {key: items[-1].strip() for key, items in parse_qs(body.decode('utf-8', 'replace')).items()}
+        lang, issue = values.get('lang', 'it'), values.get('issue')
+        if not available(request):
+            return page(request, lang, mode='unavailable')
+        card = target(request, values.get('poi_id'), lang) if issue in ISSUES else None
+        if issue in ISSUES and card is None:
+            return page(request, lang, status=404, mode='unknown_service')
+        mode = issue if issue in ISSUES else 'new_service'
+        error = validate(mode, values)
+        if error:
+            return page(request, lang, status=400, mode=mode, card=card, categories=CATEGORIES, values=values, error=error)
+        kind = {'error': 'report', 'still_valid': 'still_valid', 'new_service': 'new_service'}[mode]
+        proposals = proposals_of(mode, values)
+        contact = values.get('contact') if mode != 'still_valid' else None
+        result = request.app.state.resources.intake.submit(kind, card['id'] if card else None,
+            values.get('category') if mode == 'error' else None, values.get('message') if mode != 'still_valid' else None,
+            contact, bool(values.get('consent')) and bool(contact), proposals, values.get('website'))
+        if result in ('stored', 'trapped'):
+            return page(request, lang, mode='received', kind=kind)
+        if result in ('limited', 'closed'):
+            return page(request, lang, status=503, mode='later')
+        return page(request, lang, status=400, mode=mode, card=card, categories=CATEGORIES, values=values, error='invalid')
+    return await run_in_threadpool(operation)
 
 
 def proposals_of(mode: str, values: dict) -> list[dict]:

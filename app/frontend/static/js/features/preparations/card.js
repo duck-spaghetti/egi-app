@@ -8,7 +8,9 @@ export function renderCard(root,draft,context,canEdit,changed) {
   const card=node('article',undefined,'preparation-service-card');card.setAttribute('aria-label',text.editable_card);
   const header=node('header',undefined,'preparation-card-header'),mode=service.querySelector('[data-field=delivery_mode]');
   const metadata=node('div',undefined,'preparation-card-metadata'),categories=service.querySelector('[data-field=classifications]');
-  categories.querySelector('h3').remove();metadata.append(categories,mode);
+  categories.querySelector('h3').remove();
+  categories.hidden=!(draft.payload.service.classifications || []).length && (draft.payload.source_facts || []).some(fact=>fact.kind==='category_label');
+  metadata.append(categories,mode);
   header.append(metadata,service.querySelector('[data-field=name]'));
   for(const group of controls.querySelectorAll('[data-fact-kind=organization_name]'))header.append(group);
   for(const group of controls.querySelectorAll('[data-fact-kind=category_label]'))metadata.prepend(group);

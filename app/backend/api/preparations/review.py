@@ -8,9 +8,11 @@ from uuid import UUID
 
 from fastapi import APIRouter, Request
 from psycopg.types.json import Jsonb
+from starlette.concurrency import run_in_threadpool
 
+from .organizations import linked_organizations, publish_linked
 from .fields import dictionary, references
-from .http import Failure, PreparationRoute, execute, identifier, read_json, reply
+from .http import Failure, PreparationRoute, execute, identifier, read_json, reply, session
 from ..moderation import decisions, places
 from ..moderation.workspace import Workspace
 
@@ -52,6 +54,8 @@ def review_context(connection, item: dict, module, query='') -> dict:
             found = places.heads(connection,location_id)
             location_body = connection.execute('SELECT editorial.revision_body(%s) AS body',(found['working'] or found['public'],)).fetchone()['body']
             shared['community']['accepted_location'] = {'kind':'existing','location_id':location_id,'action':'reuse','body':without_evidence(location_body)}
+    shared['community']['organizations'] = linked_organizations(connection,module,item['contribution_id'])
+    shared['community']['references']['organizations'] = [{'organization_id':org['organization_id'],'name':org['name']} for org in shared['community']['organizations']]
     shared['community_observation_source'] = connection.execute(
         "SELECT r.source_id::text AS source_id,r.name,EXISTS(SELECT FROM governance.community_source_admissions a WHERE a.source_id=r.source_id) AS admitted FROM sources.registry r WHERE r.code='egi_editorial'").fetchone()
     shared['community_source_admitted'] = connection.execute(
@@ -68,3 +72,18 @@ async def accept(request: Request, contribution: UUID):
         raise Failure(422,'invalid_request')
     return reply(await execute(request,'SELECT editorial.accept_community_item(%s,%s,%s) AS result',
         (contribution,Jsonb(body['decision']),identifier(body['request_key'])),True))
+
+
+@router.post('/{contribution}/enti/{organization}/pubblica')
+async def publish_organization(request: Request, contribution: UUID, organization: UUID):
+    """Publish only an explicitly selected canonical organization in this frame."""
+    body = await read_json(request, ('expected_work', 'expected_public', 'reason'))
+    working, public = identifier(body['expected_work']), identifier(body['expected_public'], True)
+    digest = session(request, True)
+    module = request.app.state.resources.moderation
+
+    def operation():
+        """Keep frame authorization, review and exact publication in one transaction."""
+        with module.desk.acting(digest) as (connection, _):
+            return publish_linked(connection, module, contribution, organization, working, public, body['reason'])
+    return reply(await run_in_threadpool(operation))

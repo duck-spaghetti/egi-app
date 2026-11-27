@@ -15,8 +15,7 @@ still retain/revise text separately and create blank cards. The card and field l
 service and location bodies, structured contacts/conditions/hours and disclosed
 advanced fields. The shared field dictionary reuses existing editorial vocabularies;
 PostgreSQL still validates all writes. Territories use the existing named options;
-classifications reuse the adopted terms with readable names and actual adoption/term references. Other advanced reference fields use canonical UUIDs. Broader
-catalogue search is not supplied by this editor. A contact's publishability remains
+classifications reuse the adopted terms with readable names and actual adoption/term references. Organization references use named catalog choices; other legacy advanced references retain their existing controls. Bounded organization and taxonomy search is described below. A contact's publishability remains
 unset until the operator chooses it.
 
 Source/interpretation and card occupy adjacent columns above 1100px; smaller widths
@@ -97,9 +96,8 @@ payload or simulated authorization is used.
 Browser verification on the owned 4326 demo at actual 1280px: no page overflow;
 manual adopted-category selection survives save/reload/reopen and both views; exact
 source passage remains inspectable; no console errors observed. Native HTTP test
-also verifies advertised adopted references survive private save/reopen. This is
-manual classification only: unresolved organization names, raw source categories,
-automatic matching and clustering require the pending reviewed contract amendment.
+also verifies advertised adopted references survive private save/reopen. That historical check covered manual classification only. Entity/category resolution
+is implemented below in EGI-119; cross-card clustering remains the provisional CG set.
 Visual fidelity, narrow-screen behavior and whole-milestone acceptance remain open.
 
 ## Literal organization/category controls — EGI-116
@@ -118,12 +116,12 @@ fact's independent correction and quotation. Existing retry/version/save machine
 and ACLs remain authoritative. No field edit starts an IA request.
 
 Moderation receives the submitted source facts and only their relevant quotes.
-These literal submitted claims are currently read-only there; EGI-117/119 add the
-explicit resolution/acceptance decisions. Canonical fields retain existing editing.
+These literal submitted claims remain read-only there; EGI-117/119 now supply the
+separate explicit resolution/acceptance decisions. Canonical fields retain existing editing.
 Accepted canonical previews do not display unresolved source claims as accepted
 relationships; the original submitted version remains available separately.
 
-Final current suite188 run/182 passed/6 external-prerequisite skips; four Node
+EGI-116 historical suite188 run/182 passed/6 external-prerequisite skips; four Node
 actual-module checks pass including reordered-fact conflict recovery. Actual browser
 on owned4328 confirms organization edit, card/field switch, explicit clear, save and
 reopen preserve the original quote; restore and selective submission show both facts
@@ -132,3 +130,43 @@ viewports1280 and390px have no horizontal page overflow; temporary override rese
 Screenshots are retained in the workspace community-checks-20261127 folder. These
 checks do not assert final prototype fidelity, automatic matching, group quality or
 real-provider acceptance. No organization/canonical public record was created.
+
+## Entity/category decisions — EGI-119
+
+`references.js` shares named catalog controls between the editable card and field
+views and selective moderation. Original spelling/current value/quote remain distinct.
+A source-fact selection can stay unresolved, reject proposals, confirm an existing
+organization/category or prepare a minimal new organization. Role is an independent
+explicit selection, including a custom nonblank canonical role. Preparing/saving/
+sending a new organization creates no canonical entity. A fresh same-name digest
+and visible duplicate warning precede confirmation of a separate draft.
+
+A category uses a selected effective territory/release/axis. Provider-context
+suggestions appear on materialized cards in the first extraction exchange. Without
+context, choose one in place: local suggestions and manual term browsing/search need
+no IA. Results are ordinal unconfirmed proposals. One local request compares one
+current fact with at most100 references, discloses incomplete coverage and rejects
+stale version/value responses. Values over500 characters remain unchanged and
+available for manual search; the local automatic comparison does not truncate them.
+Organization labels reload in batches of at most100 IDs with50-entry pages.
+
+Controls protect pending manual choices: stale asynchronous results cannot overwrite
+corrections, rejected matches or another card. Rebase compares resolutions by fact
+identity, surfaces competing decisions and invalidates a choice bound to a changed
+remote value. Cleared/changed values remove confirmation metadata. Existing role and
+classification arrays remain canonical baseline data until explicit acceptance.
+
+To add a literal manually, select the saved source text and use Add organization or
+Add label, choosing service/location scope. The server prepares an unsaved fragment
+from retained bytes, minting IDs and deriving its exact quote/hash/span. Textarea LF
+positions and Unicode code points map back to original CRLF/CR/BOM-decoded offsets.
+The ordinary expected-version save then persists the fragment; the helper itself
+has no write effect. No browser persistent storage or provider call is introduced.
+
+
+All catalog continuations share one bounded paging control. Reaching the final page
+disables continuation; changing the search requires a new search rather than
+continuing an obsolete offset. A pending request makes its current reference panel
+inert without restoring outdated button states. Database change029 makes undo
+restore a literal while leaving a changed-value or stale-head resolution unresolved;
+it preserves the immutable earlier decision and the undo receipt.

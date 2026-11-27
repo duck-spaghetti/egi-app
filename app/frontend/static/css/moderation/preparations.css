@@ -129,3 +129,17 @@ button:disabled { cursor:default; opacity:.55; }
 .community-desk .preparation-card-header .preparation-literal-group[data-fact-kind=organization_name] input { font-size:16px; }
 .community-desk .preparation-card-metadata .preparation-literal-group { flex:1 1 180px; margin:0; }
 .community-desk .preparation-card-metadata .preparation-literal-group input { color:var(--accent); }
+/* Catalog choices share the card and field views, without exposing identifier inputs. */
+.preparation-resolution { margin-top:8px; font-size:12px; font-weight:400; min-width:0; }
+.preparation-resolution>summary { color:var(--accent); cursor:pointer; overflow-wrap:anywhere; }
+.preparation-resolution>div { padding:12px 0; display:grid; gap:10px; }
+.preparation-resolution label { display:grid; gap:4px; color:var(--ink-soft); font-size:11px; }
+.preparation-resolution input,.preparation-resolution select { width:100%; max-width:100%; min-width:0; box-sizing:border-box; }
+.preparation-resolution fieldset { display:grid; gap:10px; border:1px solid var(--line); padding:12px; min-width:0; }
+.preparation-reference-results { display:grid; gap:8px; max-height:280px; overflow:auto; min-width:0; }
+.preparation-reference-results button { text-align:left; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+.preparation-reference-results>div { padding:8px; border:1px solid var(--line); border-radius:6px; }
+.preparation-literal-tools { border-top:1px solid var(--line); padding-top:12px; display:grid; gap:8px; }
+.preparation-literal-tools label { display:grid; gap:4px; font-size:11px; }
+.community-desk .preparation-service-card .preparation-resolution .hint { font-size:11px; }
+.community-organization-publication { padding:14px 0; border-bottom:1px solid var(--line); }

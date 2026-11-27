@@ -3,6 +3,7 @@ import {createAnalysis} from './analysis.js';
 import {PreparationDraft} from './draft.js';
 import {renderFields, node, button} from './fields.js';
 import {renderCard} from './card.js';
+import {createReferenceControls} from './references.js';
 import {passageFor} from './evidence.js';
 const $ = id => document.getElementById(id);
 const context = JSON.parse($('preparation-context').textContent), text = context.text;
@@ -11,6 +12,11 @@ let workspace, draft, mode = 'card', timer, saving, remote, historyAfter = 0, la
 let analysis;
 let pendingSubmission;
 let inspectedEvidence;
+let addingLiteral=false;
+const referenceConflict=error=>['reference_heads_changed','taxonomy_context_stale','organization_catalog_changed','organization_reconciliation_required','source_fact_resolution_stale'].includes(error.message);
+const referenceUI=createReferenceControls({text,references:context.references,catalog:query=>api('/preparazioni/'+workspace.id+'/catalogo',{query}),
+  suggest:(current,fact,query)=>api('/preparazioni/'+workspace.id+'/schede/'+current.item+'/suggerimenti',{expected_version:current.version,fact_id:fact.fact_id,query}),
+  changed,flush:save,fresh:current=>draft===current,requireSavedSuggestions:true});
 let inspectionRequest;
 let pendingInput, creation, manualAttempt, inputBase = '', publicBase = false;
 const inputDirty = () => !!workspace && ($('source-text').value !== inputBase || $('public-material').checked !== publicBase);
@@ -18,7 +24,7 @@ const canEdit = () => workspace?.state === 'active' && ['owner','edit'].includes
 const uuid = () => crypto.randomUUID();
 function problem(error) {
   $('preparation-error').hidden = false;
-  $('preparation-error').textContent = error.status === 409 ? text.conflict : error.status === 403 ? text.forbidden : error.status === 404 ? text.not_found : error.status === 422 ? text.invalid : error.status === 413 ? text.too_large : text.save_failed;
+  $('preparation-error').textContent = referenceConflict(error)?text.ref_stale:error.status === 409 ? text.conflict : error.status === 403 ? text.forbidden : error.status === 404 ? text.not_found : error.status === 422 ? text.invalid : error.status === 413 ? text.too_large : text.save_failed;
 }
 function clearProblem() { $('preparation-error').hidden = true; }
 async function api(path, body, options = {}) {
@@ -51,9 +57,9 @@ async function save() {
     $('retry-card').hidden = true;
     return true;
   }).catch(error => {
-    if (error.status === 409) { current.conflicted = true; $('compare-card').hidden = false; }
+    if (error.status === 409 && !referenceConflict(error)) { current.conflicted = true; $('compare-card').hidden = false; }
     else if (error.status && error.status < 500) current.pending = null;
-    $('retry-card').hidden = error.status === 409;
+    $('retry-card').hidden = error.status === 409 && !referenceConflict(error);
     $('save-state').textContent = text.unsaved;
     throw error;
   }).finally(() => { saving = null; });
@@ -94,7 +100,7 @@ async function loadWorkspace() {
   }
   const people = await api('/persone'); $('share-person').replaceChildren();
   for (const person of people.items) if (person.actor_id !== workspace.owner_actor_id) $('share-person').append(new Option(person.display_name,person.actor_id));
-  analysis?.load(workspace);
+  analysis?.load(workspace);updateLiteralControls();
   $('grant-list').replaceChildren();
   for (const grant of workspace.grants || []) $('grant-list').append(node('li',(people.items.find(person => person.actor_id === grant.actor_id)?.display_name || text.person)+' · '+text[grant.permission]));
 }
@@ -121,7 +127,7 @@ function render() {
   $('editable-fields').classList.toggle('preparation-fields',mode === 'fields');
   $('view-card').setAttribute('aria-pressed',String(mode === 'card'));
   $('view-fields').setAttribute('aria-pressed',String(mode === 'fields'));
-  const viewContext={...context,sourceName:context.sources.find(source=>source.id===workspace.source_id)?.name,onEvidence:inspectEvidence};
+  const viewContext={...context,renderResolution:referenceUI.render,rerender:render,referenceLabel:referenceUI.label,sourceName:context.sources.find(source=>source.id===workspace.source_id)?.name,onEvidence:inspectEvidence};
   (mode==='card'?renderCard:renderFields)($('editable-fields'),draft,viewContext,canEdit() && draft.payload.outcome !== 'trashed',changed);
   $('card-outcome').value = draft.payload.outcome;
   $('submit-card').disabled = !canEdit() || draft.payload.outcome!=='confirmed';
@@ -130,7 +136,7 @@ function render() {
   $('trash-card').hidden = draft.payload.outcome === 'trashed'; $('trash-card').disabled = !canEdit();
   $('restore-card').hidden = draft.payload.outcome !== 'trashed'; $('restore-card').disabled = !canEdit();
   $('undo-card').disabled = !canEdit() || !lastOperation;
-  renderEvidence();
+  updateLiteralControls();renderEvidence();
   renderChecks();updateCardLabels();
   analysis?.cardChanged();
 }
@@ -173,6 +179,7 @@ function renderEvidence() {
   }
 }
 function caption(path) {
+  if(path.startsWith('/resolutions/'))return text.ref_confirmed;
   if(path.startsWith('/source_facts/'))return text.source_facts+' · '+(Number(path.split('/')[2])+1)+' · '+(path.endsWith('/value')?text.literal_value:text.literal_original);
   return path.split('/').filter(part=>part && part!=='body').map(part => text.field_labels[part] || text[part] || (/^\d+$/.test(part) ? Number(part)+1 : part)).join(' · ');
 }
@@ -182,7 +189,7 @@ async function openCard(id) {
   draft = new PreparationDraft(id,result.version); historyAfter = 0; remote = null; lastOperation = null; pendingSubmission = null; $('submission-link').hidden = true;
   $('conflict-panel').hidden = true; $('compare-card').hidden = true; $('retry-card').hidden = true;
   $('card-history').replaceChildren(); $('save-state').textContent = text.saved;
-  render(); await cardHistory();
+  await referenceUI.loadNames(draft);render(); await cardHistory();
 }
 async function cardHistory() {
   const result = await api('/preparazioni/'+workspace.id+'/schede/'+draft.item+'/cronologia?after='+historyAfter);
@@ -249,7 +256,7 @@ $('compare-card').addEventListener('click',async () => {
     const conflicts=draft.rebase(remote); $('conflict-fields').replaceChildren(); $('conflict-panel').hidden=false;
     if (!conflicts.length) { render(); $('conflict-fields').append(node('p',text.server_version)); }
     for (const conflict of conflicts) {
-      const group=node('fieldset'); group.dataset.path=conflict.path; group.append(node('legend',caption(conflict.path)));
+      const group=node('fieldset'); group.dataset.path=conflict.path; group.append(node('legend',caption(conflict.path)));if(conflict.stale)group.append(node('p',text.ref_stale,'hint'));
       for (const choice of ['local','remote']) { const label=node('label'),input=node('input'); input.type='radio'; input.name='conflict'+conflict.path; input.value=choice; label.append(input,node('span',text[choice]+': '+(JSON.stringify(choice==='local'?conflict.value:conflict.remote) ?? text.cleared))); group.append(label); }
       $('conflict-fields').append(group);
     }
@@ -263,6 +270,24 @@ $('apply-comparison').addEventListener('click',() => {
 $('workspace-refresh').addEventListener('click',()=>loadWorkspace().then(()=>{if(draft)render();clearProblem();}).catch(problem));
 $('show-trash').addEventListener('change',() => list().catch(problem));
 window.addEventListener('beforeunload',event => {if(draft?.dirty || draft?.pending || inputDirty()) {event.preventDefault();event.returnValue='';}});
+function updateLiteralControls() {
+  for(const id of ['add-literal-org','add-literal-category','literal-subject'])$(id).disabled=addingLiteral || !draft || !canEdit();
+}
+async function addLiteral(kind) {
+  if(!draft || !canEdit() || addingLiteral)return;
+  if(inputDirty()){$('preparation-error').hidden=false;$('preparation-error').textContent=text.save_input_first;return;}
+  const field=$('source-text'),selection={start:Array.from(field.value.slice(0,field.selectionStart)).length,end:Array.from(field.value.slice(0,field.selectionEnd)).length};
+  if(selection.start===selection.end){$('preparation-error').hidden=false;$('preparation-error').textContent=text.add_literal_selection;field.focus();return;}
+  const current=draft,id=workspace.id,input=workspace.current_input_id;addingLiteral=true;updateLiteralControls();
+  try{
+    if(!await save())return;
+    const fragment=await api('/preparazioni/'+id+'/schede/'+current.item+'/fatto-preparato',{input_id:input,kind,subject:$('literal-subject').value,selection});
+    if(draft!==current || workspace.id!==id || workspace.current_input_id!==input || inputDirty())return;
+    current.addSourceFact(fragment);changed();render();
+  }catch(error){problem(error);}finally{addingLiteral=false;updateLiteralControls();}
+}
+$('add-literal-org').addEventListener('click',()=>addLiteral('organization_name'));
+$('add-literal-category').addEventListener('click',()=>addLiteral('category_label'));
 analysis=createAnalysis({context,api,workspace:()=>workspace,draft:()=>draft,canEdit,inputDirty,persistInput,flush:save,reload:loadWorkspace,openCard,error:problem,caption});
 $('source-text').addEventListener('input',()=>analysis.sourceChanged());
 $('public-material').addEventListener('change',()=>analysis.sourceChanged());

@@ -14,6 +14,8 @@ import json
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from starlette.concurrency import run_in_threadpool
+
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from . import hours, places
@@ -43,12 +45,15 @@ HEADS = '''SELECT (SELECT revision_id::text FROM governance.working_heads WHERE 
  (SELECT revision_id::text FROM governance.published_heads WHERE entity_id=%(e)s) AS public,
  EXISTS(SELECT FROM data.services WHERE entity_id=%(e)s) AS service'''
 # Terms of the taxonomy releases adopted where the service is on the map.
-TERMS = '''SELECT a.adoption_id::text,rt.term_id::text,c.original_text AS name FROM taxonomy.territory_adoptions a
- JOIN taxonomy.release_terms rt ON rt.release_id=a.release_id
+TERMS = '''SELECT a.adoption_id::text,rt.term_id::text,c.original_text AS name,a.territory_id::text,a.release_id::text,rt.axis_id::text,ax.code AS axis_code,ra.label AS axis_label FROM taxonomy.territory_adoptions a
+ JOIN taxonomy.releases release ON release.release_id=a.release_id AND release.sealed_at IS NOT NULL
+ JOIN taxonomy.release_axes ra ON ra.release_id=a.release_id
+ JOIN taxonomy.axes ax ON ax.axis_id=ra.axis_id
+ JOIN taxonomy.release_terms rt ON rt.release_id=a.release_id AND rt.axis_id=ra.axis_id
  JOIN taxonomy.term_revisions tr ON tr.revision_id=rt.term_revision_id
  JOIN i18n.revision_content_links l ON l.revision_id=tr.revision_id AND l.field_code='name'
  JOIN i18n.content_units c ON c.content_id=l.content_id
- WHERE a.territory_id=ANY(%s::uuid[]) AND (a.effective_until IS NULL OR a.effective_until>=current_date)
+ WHERE a.territory_id=ANY(%s::uuid[]) AND tr.active AND a.effective_from<=current_date AND (a.effective_until IS NULL OR a.effective_until>=current_date)
  ORDER BY c.original_text,a.adoption_id'''
 EVIDENCE = '''SELECT a.assertion_id::text,a.attribute_code,a.normalized_value,a.certainty,r.name AS source,
  rv.record_version_id::text AS record,rv.raw_payload FROM sources.assertions a
@@ -328,25 +333,29 @@ async def save_draft(request: Request, service: UUID, module: Moderation = Depen
     """Save the form as a new working draft of the revision it was built on."""
     form = await module.form(request)
     module.check_post(request, form)
-    service, working, public = str(service), revision(form, 'working'), revision(form, 'public')
-    body = None
-    try:
-        with module.desk.acting(module.session_hash(request)) as (connection, _):
-            space = Workspace(module, connection, service)
-            base = space.body(working or public)
-            if base is None:
-                raise Refused('stale_base')
-            terms = space.terms(base)
-            body = edited(base, {key: value for key, value in form.items() if key != 'schedules'}, terms)  # shown if hours are refused
-            body = edited(base, form, terms)
-            if body == base:
-                raise Refused('no_changes')
-            connection.execute("SELECT governance.save_revision('service',%s,%s,%s,%s,%s)",
-                               (service, working, public, json.dumps(body), module.text('moderation.workspace.draft_note')))
-    except Refused as refusal:
-        return page(request, module, service, form_body=body, posted=form, status=409 if refusal.code.startswith('stale') else 400,
-                    error=workspace_error(refusal.code))
-    return RedirectResponse(f'{PATH}/servizio/{service}#confronto', status_code=303)
+
+    def operation(service=service):
+        """Run the complete DB transaction and dependent rendering off the event loop."""
+        service, working, public = str(service), revision(form, 'working'), revision(form, 'public')
+        body = None
+        try:
+            with module.desk.acting(module.session_hash(request)) as (connection, _):
+                space = Workspace(module, connection, service)
+                base = space.body(working or public)
+                if base is None:
+                    raise Refused('stale_base')
+                terms = space.terms(base)
+                body = edited(base, {key: value for key, value in form.items() if key != 'schedules'}, terms)  # shown if hours are refused
+                body = edited(base, form, terms)
+                if body == base:
+                    raise Refused('no_changes')
+                connection.execute("SELECT governance.save_revision('service',%s,%s,%s,%s,%s)",
+                                   (service, working, public, json.dumps(body), module.text('moderation.workspace.draft_note')))
+        except Refused as refusal:
+            return page(request, module, service, form_body=body, posted=form, status=409 if refusal.code.startswith('stale') else 400,
+                        error=workspace_error(refusal.code))
+        return RedirectResponse(f'{PATH}/servizio/{service}#confronto', status_code=303)
+    return await run_in_threadpool(operation)
 
 
 @router.post('/servizio/{service}/luogo')
@@ -354,28 +363,32 @@ async def move(request: Request, service: UUID, module: Moderation = Depends(mod
     """Point the service at another location, existing or new, as a new draft; nothing else moves."""
     form = await module.form(request)
     module.check_post(request, form)
-    service, working, public = str(service), revision(form, 'working'), revision(form, 'public')
-    try:
-        with module.desk.acting(module.session_hash(request)) as (connection, _):
-            space = Workspace(module, connection, service)
-            base = space.body(working or public)
-            if base is None:
-                raise Refused('stale_base')
-            note = module.text('moderation.workspace.draft_note')
-            if form.get('location') == 'new':
-                location = places.create_location(connection, form, note)
-            else:
-                location = revision(form, 'location')
-                if location is None:
-                    raise Refused('location_not_found')
-                places.heads(connection, location)
-            body = places.placed(base, location, places.location_territories(connection, location))
-            connection.execute("SELECT governance.save_revision('service',%s,%s,%s,%s,%s)",
-                               (service, working, public, json.dumps(body), note))
-    except Refused as refusal:
-        return page(request, module, service, posted=form, status=409 if refusal.code.startswith('stale') else 400,
-                    error=workspace_error(refusal.code))
-    return RedirectResponse(f'{PATH}/servizio/{service}#confronto', status_code=303)
+
+    def operation(service=service):
+        """Run the complete DB transaction and dependent rendering off the event loop."""
+        service, working, public = str(service), revision(form, 'working'), revision(form, 'public')
+        try:
+            with module.desk.acting(module.session_hash(request)) as (connection, _):
+                space = Workspace(module, connection, service)
+                base = space.body(working or public)
+                if base is None:
+                    raise Refused('stale_base')
+                note = module.text('moderation.workspace.draft_note')
+                if form.get('location') == 'new':
+                    location = places.create_location(connection, form, note)
+                else:
+                    location = revision(form, 'location')
+                    if location is None:
+                        raise Refused('location_not_found')
+                    places.heads(connection, location)
+                body = places.placed(base, location, places.location_territories(connection, location))
+                connection.execute("SELECT governance.save_revision('service',%s,%s,%s,%s,%s)",
+                                   (service, working, public, json.dumps(body), note))
+        except Refused as refusal:
+            return page(request, module, service, posted=form, status=409 if refusal.code.startswith('stale') else 400,
+                        error=workspace_error(refusal.code))
+        return RedirectResponse(f'{PATH}/servizio/{service}#confronto', status_code=303)
+    return await run_in_threadpool(operation)
 
 
 @router.get('/servizi/nuovo', response_class=HTMLResponse)
@@ -414,65 +427,69 @@ async def create_service(request: Request, module: Moderation = Depends(moderati
     """Create a service draft at a chosen or new location, citing what the person verified."""
     form = await module.form(request)
     module.check_post(request, form)
-    name, mode, choice = form.get('name', '').strip(), form.get('delivery_mode', ''), form.get('location', '')
-    try:
-        if not name:
-            raise Refused('name_required')
-        if mode not in CHOICES['delivery_mode']:
-            raise Refused('mode_required')
-        with module.desk.acting(module.session_hash(request)) as (connection, _):
-            contribution = revision(form, 'contribution')
-            item = None
-            if contribution:
-                from .decisions import read_open
 
-                item = read_open(connection, contribution)
-                if item['kind'] != 'new_service' or any(p['field'] == 'name' and p['decision'] is not None for p in item['proposals']):
-                    raise Refused('stale_submission')
-            note = module.text('moderation.workspace.created_note')
-            if choice == 'new':
-                location = places.create_location(connection, form, note)
-                where = places.location_territories(connection, location)
-            elif choice == 'none':
-                location, where = None, [places.chosen_territory(connection, form, '')]
-            else:
-                location = revision(form, 'location')
-                if location is None:
-                    raise Refused('location_required')
-                where = places.location_territories(connection, location) or [places.chosen_territory(connection, form, '')]
-            observed = {'name': name, 'delivery_mode': mode}
-            description, link = form.get('description', '').strip(), form.get('service_link', '').strip()
-            if description:
-                observed['description'] = description
-            if link:
-                observed['contact'] = link
-            cited = places.observation(connection, 'service', observed, form)
-            body = {'name': name, 'delivery_mode': mode, 'original_language': 'it', 'territories': where,
-                    'evidence': {'record': cited['name'] + cited['delivery_mode'], 'name': cited['name'],
-                                 'delivery_mode': cited['delivery_mode'], 'original_language': [], 'territories': []}}
-            if location:
-                body['place'] = {'location_id': location, 'evidence': []}
-            if description:
-                body['description'] = description
-                body['evidence']['description'] = cited['description']
-            if link:
-                body['contacts'] = [{'channel_type': 'web', 'value': link, 'is_public': True, 'evidence': cited['contact']}]
-            made = connection.execute("SELECT governance.save_revision('service',NULL,NULL,NULL,%s,%s) AS r",
-                                      (json.dumps(body), note)).fetchone()['r']
-            service = connection.execute('SELECT entity_id::text FROM governance.entity_revisions WHERE revision_id=%s',
-                                         (made,)).fetchone()['entity_id']
-            if item:
-                chosen = {'name': name, 'offer': description, 'link': link,
-                          'online': 'sì' if mode == 'online' else mode, 'address': form.get('location_street', '').strip()}
-                for proposal in item['proposals']:
-                    value = chosen.get(proposal['field'])
-                    if proposal['decision'] is None and value:
-                        decision = 'accepted' if value == proposal['value'] else 'amended'
-                        connection.execute('SELECT editorial.decide_proposal(%s,%s,%s,%s)',
-                                           (proposal['proposal_id'], decision, json.dumps(value) if decision == 'amended' else None, note))
-    except Refused as refusal:
-        return new_page(request, module, form.get('query', '')[:200], posted=form, status=400, error=workspace_error(refusal.code))
-    return RedirectResponse(f'{PATH}/servizio/{service}', status_code=303)
+    def operation():
+        """Run the complete DB transaction and dependent rendering off the event loop."""
+        name, mode, choice = form.get('name', '').strip(), form.get('delivery_mode', ''), form.get('location', '')
+        try:
+            if not name:
+                raise Refused('name_required')
+            if mode not in CHOICES['delivery_mode']:
+                raise Refused('mode_required')
+            with module.desk.acting(module.session_hash(request)) as (connection, _):
+                contribution = revision(form, 'contribution')
+                item = None
+                if contribution:
+                    from .decisions import read_open
+
+                    item = read_open(connection, contribution)
+                    if item['kind'] != 'new_service' or any(p['field'] == 'name' and p['decision'] is not None for p in item['proposals']):
+                        raise Refused('stale_submission')
+                note = module.text('moderation.workspace.created_note')
+                if choice == 'new':
+                    location = places.create_location(connection, form, note)
+                    where = places.location_territories(connection, location)
+                elif choice == 'none':
+                    location, where = None, [places.chosen_territory(connection, form, '')]
+                else:
+                    location = revision(form, 'location')
+                    if location is None:
+                        raise Refused('location_required')
+                    where = places.location_territories(connection, location) or [places.chosen_territory(connection, form, '')]
+                observed = {'name': name, 'delivery_mode': mode}
+                description, link = form.get('description', '').strip(), form.get('service_link', '').strip()
+                if description:
+                    observed['description'] = description
+                if link:
+                    observed['contact'] = link
+                cited = places.observation(connection, 'service', observed, form)
+                body = {'name': name, 'delivery_mode': mode, 'original_language': 'it', 'territories': where,
+                        'evidence': {'record': cited['name'] + cited['delivery_mode'], 'name': cited['name'],
+                                     'delivery_mode': cited['delivery_mode'], 'original_language': [], 'territories': []}}
+                if location:
+                    body['place'] = {'location_id': location, 'evidence': []}
+                if description:
+                    body['description'] = description
+                    body['evidence']['description'] = cited['description']
+                if link:
+                    body['contacts'] = [{'channel_type': 'web', 'value': link, 'is_public': True, 'evidence': cited['contact']}]
+                made = connection.execute("SELECT governance.save_revision('service',NULL,NULL,NULL,%s,%s) AS r",
+                                          (json.dumps(body), note)).fetchone()['r']
+                service = connection.execute('SELECT entity_id::text FROM governance.entity_revisions WHERE revision_id=%s',
+                                             (made,)).fetchone()['entity_id']
+                if item:
+                    chosen = {'name': name, 'offer': description, 'link': link,
+                              'online': 'sì' if mode == 'online' else mode, 'address': form.get('location_street', '').strip()}
+                    for proposal in item['proposals']:
+                        value = chosen.get(proposal['field'])
+                        if proposal['decision'] is None and value:
+                            decision = 'accepted' if value == proposal['value'] else 'amended'
+                            connection.execute('SELECT editorial.decide_proposal(%s,%s,%s,%s)',
+                                               (proposal['proposal_id'], decision, json.dumps(value) if decision == 'amended' else None, note))
+        except Refused as refusal:
+            return new_page(request, module, form.get('query', '')[:200], posted=form, status=400, error=workspace_error(refusal.code))
+        return RedirectResponse(f'{PATH}/servizio/{service}', status_code=303)
+    return await run_in_threadpool(operation)
 
 
 @router.post('/servizio/{service}/pubblica')
@@ -480,22 +497,26 @@ async def publish(request: Request, service: UUID, module: Moderation = Depends(
     """Approve and publish exactly the draft the person compared, with their change summary."""
     form = await module.form(request)
     module.check_post(request, form)
-    service, summary = str(service), form.get('summary', '').strip()
-    draft, public = revision(form, 'working'), revision(form, 'public')
-    try:
-        if not summary:
-            raise Refused('summary_required')
-        if not draft:
-            raise Refused('stale_base')
-        with module.desk.acting(module.session_hash(request)) as (connection, _):
-            places.publish_new_location(connection, Workspace(module, connection, service).body(draft), summary)
-            decision = connection.execute("SELECT governance.review_revision(%s,%s,'approved',%s) AS d",
-                                          (draft, public, summary)).fetchone()['d']
-            connection.execute('SELECT governance.publish_revision(%s,%s,%s)', (draft, decision, public))
-    except Refused as refusal:
-        return page(request, module, service, posted={'summary': summary}, status=409 if refusal.code.startswith('stale') else 400,
-                    error=workspace_error(refusal.code), missing=missing(refusal.code))
-    return RedirectResponse(f'{PATH}/servizio/{service}?pubblicato=1', status_code=303)
+
+    def operation(service=service):
+        """Run the complete DB transaction and dependent rendering off the event loop."""
+        service, summary = str(service), form.get('summary', '').strip()
+        draft, public = revision(form, 'working'), revision(form, 'public')
+        try:
+            if not summary:
+                raise Refused('summary_required')
+            if not draft:
+                raise Refused('stale_base')
+            with module.desk.acting(module.session_hash(request)) as (connection, _):
+                places.publish_new_location(connection, Workspace(module, connection, service).body(draft), summary)
+                decision = connection.execute("SELECT governance.review_revision(%s,%s,'approved',%s) AS d",
+                                              (draft, public, summary)).fetchone()['d']
+                connection.execute('SELECT governance.publish_revision(%s,%s,%s)', (draft, decision, public))
+        except Refused as refusal:
+            return page(request, module, service, posted={'summary': summary}, status=409 if refusal.code.startswith('stale') else 400,
+                        error=workspace_error(refusal.code), missing=missing(refusal.code))
+        return RedirectResponse(f'{PATH}/servizio/{service}?pubblicato=1', status_code=303)
+    return await run_in_threadpool(operation)
 
 
 def revision(form: dict, name: str) -> str | None:

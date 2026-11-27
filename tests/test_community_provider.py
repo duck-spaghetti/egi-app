@@ -158,3 +158,39 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(actual['schema_version'],2)
         self.assertEqual(actual['state'],'complete')
         self.assertEqual(len(calls),1)
+
+    def test_public_category_context_shares_one_extraction_exchange(self):
+        """A frozen public catalog can produce unconfirmed matches with one mock call."""
+        from datetime import date
+        from uuid import uuid4
+        from review.matching import make_context, propose
+        from app.backend.api.preparations.interpretation.runner import build_request
+        axis = str(uuid4())
+        context = make_context({'context': {'kind':'classification','territory_id':str(uuid4()),'axis_id':axis},
+            'complete':True,'entries':[{'label':'Mensa','published':True,'effective_from':'2026-01-01','effective_until':None,
+                'target':{'kind':'classification','axis_id':axis,'adoption_id':str(uuid4()),'release_id':str(uuid4()),'term_id':str(uuid4())}}]}, as_of=date(2026,11,27))
+        config = {**CONFIG,'interpretation_version':2,'catalog_context':context}
+        base = request('Mensa')
+        req = build_request({'provider_config':config,'task':'extract_text','input_id':base['input_id'],'config_version':base['config_version'],
+            'eligible_payload':{'input_hash':base['input_hash'],'text':base['text'],'source_metadata':base['source_metadata']},'locator_map':base['locator_map']})
+        calls = []
+
+        def response(exchange):
+            """Return a supplied-key suggestion; never select a canonical reference."""
+            body = json.loads(exchange.content)
+            data = json.loads(body['input'][0]['content'][0]['text'])
+            calls.append(data)
+            value = result(data)
+            card = value['candidates'][0]
+            card['source_facts'] = [{'fact_key':'category','subject':'service','kind':'category_label','source_value':'Mensa'}]
+            card['evidence'].append({**card['evidence'][0],'id':str(uuid4()),'path':'/source_facts/0/source_value'})
+            card['matches'] = propose(card['source_facts'], context)
+            return httpx.Response(200,json={'status':'completed','output':[{'type':'message','role':'assistant','content':[{'type':'output_text','text':json.dumps(value)}]}],
+                                          'usage':{'input_tokens':100,'output_tokens':20}})
+        actual = interpret(req,self.adapter(response,config))
+        self.assertEqual(actual['state'],'complete')
+        self.assertEqual(len(calls),1)
+        self.assertEqual(actual['candidates'][0]['matches'][0]['choices'][0]['candidate_key'],'catalog-1')
+        schema = output_schema(req)['properties']['candidates']['items']['properties']['matches']
+        self.assertEqual(schema['items']['properties']['choices']['items']['properties']['candidate_key']['enum'],['catalog-1'])
+        self.assertNotIn('selected',json.dumps(schema))

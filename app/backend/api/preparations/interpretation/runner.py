@@ -19,12 +19,15 @@ def build_request(claim: dict) -> dict:
     config = validate_config(claim['provider_config'])
     version = config.get('interpretation_version', 1)
     eligible = claim['eligible_payload']
-    return validate_request({'schema_version':version,'task':claim['task'],
+    request = {'schema_version':version,'task':claim['task'],
         'input_id':claim['input_id'],'input_hash':eligible['input_hash'],
         'config_version':claim['config_version'],'text':eligible['text'],
         'source_metadata':eligible['source_metadata'],'locator_map':claim['locator_map'],
         'field_dictionary_version':VERSION if version == 1 else VERSION_V2,'language_version':config['language_version'],
-        'taxonomy_version':config['taxonomy_version'],'requested_output_shape':OUTPUT_SHAPE if version == 1 else OUTPUT_SHAPE_V2})
+        'taxonomy_version':config['taxonomy_version'],'requested_output_shape':OUTPUT_SHAPE if version == 1 else OUTPUT_SHAPE_V2}
+    if 'catalog_context' in config:
+        request['catalog_context'] = config['catalog_context']
+    return validate_request(request)
 
 
 class Heartbeat(AbstractContextManager):

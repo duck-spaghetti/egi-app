@@ -7,6 +7,7 @@ import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from starlette.concurrency import run_in_threadpool
 
 from . import auth
 from .desk import Refused
@@ -50,18 +51,22 @@ async def sign_in(request: Request, module: Moderation = Depends(moderation)):
     """Sign in with login, password and, when the account has one, a TOTP code."""
     form = await module.form(request)
     module.check_post(request, form, signed_in=False)
-    row = module.desk.one('SELECT * FROM access.password_material(%s)', (form.get('login', '').strip().lower(),))
-    valid = auth.password_matches(row['password_hash'] if row else DUMMY_HASH, form.get('password', '')) and row is not None
-    second = bool(row and row['totp_secret'])
-    if valid and second:
-        valid = auth.code_matches(row['totp_secret'], form.get('code', ''))
-    if not valid:
-        return module.render(request, 'login.html', status=401, error='wrong_credentials')
-    token, digest = auth.new_token()
-    module.desk.one("SELECT access.open_session(%s,%s,'password',%s)", (row['account_id'], digest, second))
-    response = home_redirect()
-    module.start_session(response, token)
-    return response
+
+    def operation():
+        """Verify password/TOTP and open the session without blocking other requests."""
+        row = module.desk.one('SELECT * FROM access.password_material(%s)', (form.get('login', '').strip().lower(),))
+        valid = auth.password_matches(row['password_hash'] if row else DUMMY_HASH, form.get('password', '')) and row is not None
+        second = bool(row and row['totp_secret'])
+        if valid and second:
+            valid = auth.code_matches(row['totp_secret'], form.get('code', ''))
+        if not valid:
+            return module.render(request, 'login.html', status=401, error='wrong_credentials')
+        token, digest = auth.new_token()
+        module.desk.one("SELECT access.open_session(%s,%s,'password',%s)", (row['account_id'], digest, second))
+        response = home_redirect()
+        module.start_session(response, token)
+        return response
+    return await run_in_threadpool(operation)
 
 
 @router.post('/esci')
@@ -69,7 +74,7 @@ async def sign_out(request: Request, module: Moderation = Depends(moderation)):
     """End this browser's session."""
     form = await module.form(request)
     module.check_post(request, form)
-    module.desk.one('SELECT access.close_session(%s)', (module.session_hash(request),))
+    await run_in_threadpool(module.desk.one,'SELECT access.close_session(%s)', (module.session_hash(request),))
     response = home_redirect()
     module.end_session(response)
     return response
@@ -100,15 +105,16 @@ async def google_return(request: Request, code: str = '', state: str = '', modul
         issuer, subject = await module.oidc.identity(code, str(request.url_for('google_return')),
                                                      started['nonce'], started['verifier'])
         if started.get('invitation'):
-            account = module.desk.one('SELECT access.accept_invitation(%s,%s,NULL,%s,%s,NULL) AS account',
-                (auth.token_hash(started['invitation']), 'oidc', issuer, subject))['account']
+            accepted = await run_in_threadpool(module.desk.one,'SELECT access.accept_invitation(%s,%s,NULL,%s,%s,NULL) AS account',
+                (auth.token_hash(started['invitation']), 'oidc', issuer, subject))
+            account = accepted['account']
         else:
-            row = module.desk.one('SELECT account_id FROM access.oidc_account(%s,%s)', (issuer, subject))
+            row = await run_in_threadpool(module.desk.one,'SELECT account_id FROM access.oidc_account(%s,%s)', (issuer, subject))
             if row is None:
                 return module.render(request, 'login.html', status=401, error='unknown_identity')
             account = row['account_id']
         token, digest = auth.new_token()
-        module.desk.one("SELECT access.open_session(%s,%s,'oidc',false)", (account, digest))
+        await run_in_threadpool(module.desk.one,"SELECT access.open_session(%s,%s,'oidc',false)", (account, digest))
     except (OidcRefused, Refused) as refusal:
         return module.render(request, 'login.html', status=401, error=getattr(refusal, 'code', 'oidc_refused'))
     # A page, not a redirect: after a cross-site return the Strict cookie is only sent
@@ -135,31 +141,35 @@ async def accept_invitation(request: Request, token: str, module: Moderation = D
     """Accept an invitation with a password; the admin must also confirm a TOTP code."""
     form = await module.form(request)
     module.check_post(request, form, signed_in=False)
-    row = module.desk.one('SELECT * FROM access.read_invitation(%s)', (auth.token_hash(token),))
-    if row is None:
-        return module.render(request, 'message.html', status=404, message='invitation_invalid')
-    secret, code = form.get('totp_secret', ''), form.get('code', '').strip()
-    error = None
-    if form.get('password', '') != form.get('password_again', ''):
-        error = 'passwords_differ'
-    elif len(form.get('password', '')) < auth.MIN_PASSWORD:
-        error = 'password_too_short'
-    elif (row['role'] == 'admin' or code) and not auth.code_matches(secret, code):
-        error = 'wrong_code'
-    if error:
-        return module.render(request, 'invitation.html', status=400, invitation=row, token=token, error=error,
-                             totp_secret=secret, totp_uri=auth.totp_uri(secret, row['login_name']))
-    enrolled = secret if code else None
-    try:
-        account = module.desk.one('SELECT access.accept_invitation(%s,%s,%s,NULL,NULL,%s) AS account',
-            (auth.token_hash(token), 'password', auth.hash_password(form['password']), enrolled))['account']
-        session, digest = auth.new_token()
-        module.desk.one("SELECT access.open_session(%s,%s,'password',%s)", (account, digest, enrolled is not None))
-    except Refused as refusal:
-        return module.render(request, 'message.html', status=400, message=refusal.code)
-    response = home_redirect()
-    module.start_session(response, session)
-    return response
+
+    def operation():
+        """Hash/enrol the invitation and open its session off the event loop."""
+        row = module.desk.one('SELECT * FROM access.read_invitation(%s)', (auth.token_hash(token),))
+        if row is None:
+            return module.render(request, 'message.html', status=404, message='invitation_invalid')
+        secret, code = form.get('totp_secret', ''), form.get('code', '').strip()
+        error = None
+        if form.get('password', '') != form.get('password_again', ''):
+            error = 'passwords_differ'
+        elif len(form.get('password', '')) < auth.MIN_PASSWORD:
+            error = 'password_too_short'
+        elif (row['role'] == 'admin' or code) and not auth.code_matches(secret, code):
+            error = 'wrong_code'
+        if error:
+            return module.render(request, 'invitation.html', status=400, invitation=row, token=token, error=error,
+                                 totp_secret=secret, totp_uri=auth.totp_uri(secret, row['login_name']))
+        enrolled = secret if code else None
+        try:
+            account = module.desk.one('SELECT access.accept_invitation(%s,%s,%s,NULL,NULL,%s) AS account',
+                (auth.token_hash(token), 'password', auth.hash_password(form['password']), enrolled))['account']
+            session, digest = auth.new_token()
+            module.desk.one("SELECT access.open_session(%s,%s,'password',%s)", (account, digest, enrolled is not None))
+        except Refused as refusal:
+            return module.render(request, 'message.html', status=400, message=refusal.code)
+        response = home_redirect()
+        module.start_session(response, session)
+        return response
+    return await run_in_threadpool(operation)
 
 
 def accounts_page(request: Request, module: Moderation, person: dict, **context):
@@ -194,14 +204,18 @@ async def create_account(request: Request, module: Moderation = Depends(moderati
     """Create an account and show its one-time invitation link once."""
     form = await module.form(request)
     module.check_post(request, form)
-    person = admin(request, module)
-    token, digest = auth.new_token()
-    try:
-        module.desk.as_person(module.session_hash(request), 'SELECT access.create_account(%s,%s,%s,%s)',
-            (form.get('login', '').strip().lower(), form.get('display_name', '').strip(), form.get('role'), digest))
-    except Refused as refusal:
-        return accounts_page(request, module, person, error=refusal.code)
-    return accounts_page(request, module, person, link=f'{request.base_url}{PATH[1:]}/invito/{token}')
+
+    def operation():
+        """Check admin authority, write the account and render its result off-loop."""
+        person = admin(request, module)
+        token, digest = auth.new_token()
+        try:
+            module.desk.as_person(module.session_hash(request), 'SELECT access.create_account(%s,%s,%s,%s)',
+                (form.get('login', '').strip().lower(), form.get('display_name', '').strip(), form.get('role'), digest))
+        except Refused as refusal:
+            return accounts_page(request, module, person, error=refusal.code)
+        return accounts_page(request, module, person, link=f'{request.base_url}{PATH[1:]}/invito/{token}')
+    return await run_in_threadpool(operation)
 
 
 @router.post('/account/{account}/invito')
@@ -209,13 +223,17 @@ async def reissue(request: Request, account: str, module: Moderation = Depends(m
     """Issue a new invitation (recovery); its acceptance replaces every sign-in method."""
     form = await module.form(request)
     module.check_post(request, form)
-    person = admin(request, module)
-    token, digest = auth.new_token()
-    try:
-        module.desk.as_person(module.session_hash(request), 'SELECT access.reissue_invitation(%s,%s)', (account, digest))
-    except Refused as refusal:
-        return accounts_page(request, module, person, error=refusal.code)
-    return accounts_page(request, module, person, link=f'{request.base_url}{PATH[1:]}/invito/{token}')
+
+    def operation():
+        """Reissue the invitation and render the account state off-loop."""
+        person = admin(request, module)
+        token, digest = auth.new_token()
+        try:
+            module.desk.as_person(module.session_hash(request), 'SELECT access.reissue_invitation(%s,%s)', (account, digest))
+        except Refused as refusal:
+            return accounts_page(request, module, person, error=refusal.code)
+        return accounts_page(request, module, person, link=f'{request.base_url}{PATH[1:]}/invito/{token}')
+    return await run_in_threadpool(operation)
 
 
 @router.post('/account/{account}/disattiva')
@@ -223,12 +241,16 @@ async def deactivate(request: Request, account: str, module: Moderation = Depend
     """Deactivate an account: its sessions and invitations end at once."""
     form = await module.form(request)
     module.check_post(request, form)
-    person = admin(request, module)
-    try:
-        module.desk.as_person(module.session_hash(request), 'SELECT access.deactivate_account(%s)', (account,))
-    except Refused as refusal:
-        return accounts_page(request, module, person, error=refusal.code)
-    return accounts_page(request, module, person)
+
+    def operation():
+        """Deactivate under verified admin authority without holding the event loop."""
+        person = admin(request, module)
+        try:
+            module.desk.as_person(module.session_hash(request), 'SELECT access.deactivate_account(%s)', (account,))
+        except Refused as refusal:
+            return accounts_page(request, module, person, error=refusal.code)
+        return accounts_page(request, module, person)
+    return await run_in_threadpool(operation)
 
 
 @router.post('/sessione/{session}/revoca')
@@ -236,9 +258,15 @@ async def revoke(request: Request, session: str, module: Moderation = Depends(mo
     """Revoke one session of any account."""
     form = await module.form(request)
     module.check_post(request, form)
-    person = admin(request, module)
-    module.desk.as_person(module.session_hash(request), 'SELECT access.revoke_session(%s)', (session,))
-    return accounts_page(request, module, person)
+
+    def operation():
+        """Revoke the chosen session and render updated account state off-loop."""
+        person = admin(request, module)
+        module.desk.as_person(module.session_hash(request), 'SELECT access.revoke_session(%s)', (session,))
+        return accounts_page(request, module, person)
+
+
+    return await run_in_threadpool(operation)
 
 
 from .queue import router as queue_router  # noqa: E402  (after this module's routes, same prefix)

@@ -112,6 +112,8 @@ def mount_selected(application, configuration):
         application.include_router(moderation)
         from .api.preparations.router import router as preparations
         application.include_router(preparations)
+        from .api.preparations.catalog import router as preparation_catalog
+        application.include_router(preparation_catalog)
         from .api.preparations.pages import router as preparation_pages
         application.include_router(preparation_pages)
         from .api.preparations.review import router as community_review

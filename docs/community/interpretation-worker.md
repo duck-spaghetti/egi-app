@@ -17,11 +17,11 @@ Install the normal runtime lock, then the approved reproducible Reviewer artifac
   -r requirements-community.lock.txt
 ```
 
-The internal extra is `community`, pinned to egi-reviewer 0.3.1. The separate hash
+The internal extra is `community`, pinned to egi-reviewer 0.4.0. The separate hash
 lock requires wheel SHA-256
-`18b83ded49a89e916cda8ebafd1be80cf88cb642aa2e57011fa961d3e84dfdd2`.
+`226f7c9d88e3052e133cf37d41054330eb58d079f2e04075926f1dab477e3bf8`.
 It must not import a mutable neighboring checkout. The ordinary web application
-can still run without this worker-only extra; Community provider tests require it.
+can still run without the extra; local ranked suggestions return a safe unavailable response, while manual catalog browsing/selection remains available. Community worker/provider tests require it.
 
 WorkerSettings reads `EGI_PREPARATION_WORKER_DATABASE_URL` and `OPENAI_API_KEY`
 from the environment or the application's ignored `.env`. Keep that file private;
@@ -129,8 +129,22 @@ excludes canonical organization/classification components. Null cleaning preserv
 required fact metadata for independent Reviewer rejection; it cannot repair missing
 claims or turn model keys into canonical IDs. Existing pending v1 jobs stay compatible.
 
-The0.3.1 artifact is installed offline with the selected hash lock; no new dependency
-or live model/configuration is seeded. Native worker+HTTP tests use MockTransport
+EGI-116 verified the0.3.1 artifact offline. The current0.4.0 pin is listed above;
+no new dependency or live model/configuration is seeded. Native worker+HTTP tests use MockTransport
 only and prove extraction→server fact IDs→manual edit→selective moderation, known
 usage settlement and rejection of an old-client downgrade. Real model quality and
 provider calls remain under the existing EGI-112/113 human gates.
+
+## Optional frozen category context — EGI-119
+
+Reviewer0.4.0 adds an optional catalog_context to an explicit v2 immutable
+configuration. Native DB027 checks the actual published sealed-release labels,
+coverage, active terms, broader links, territory/axis, dates and canonical digest.
+Configuration version therefore binds the existing job reuse/cache identity.
+The worker passes that context and a conditional strict matches schema in the same
+single extraction exchange. It exposes supplied keys/digest/reasons, never an output
+canonical ID, role, selection or confidence percentage. Context-free v1/v2 remain
+compatible. Missing context causes no hidden ranking call; local manual matching
+remains separate from billing. Expired context fails before reservation/dispatch.
+Returned suggestions materialize as proposed/unresolved stable-fact resolutions;
+manual/cleared values and confirmed/ignored decisions survive refresh.
