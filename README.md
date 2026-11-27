@@ -913,3 +913,9 @@ clickable at every zoom, including through buildings; native geometry still uses
 scene depth. No automatic bus/tram text added. Late composition now also waits
 for idle when the initial load event already passed; first layer enable starts
 the request immediately, with camera-change debouncing retained.
+
+
+3D overlay stacking is explicit on MapLibre marker wrappers: transport10, service
+heads20, popups30, navigation/attribution40. Later transport reloads cannot cover
+service labels or steal their clicks. Label backgrounds are white at80% opacity;
+text/status/icons remain opaque, leaving underlying stops visible through the card.

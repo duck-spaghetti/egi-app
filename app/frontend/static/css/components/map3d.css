@@ -45,7 +45,7 @@ html[dir="rtl"] #map .maplibregl-ctrl-top-right { right:auto;left:calc(var(--map
 /* An integrated head extends from the same ground anchor as the compact category pin. */
 .map3d-pin { direction:ltr;display:flex;flex-direction:column;align-items:center;width:44px;overflow:visible; }
 .map3d-pin-body { display:flex;align-items:center;align-self:flex-start;width:max-content;max-width:304px; }
-.map3d-pin[data-labelled="true"] .map3d-pin-body { background:#fffef4f5;border-radius:24px;box-shadow:0 2px 8px #0003;border:1px solid white; }
+.map3d-pin[data-labelled="true"] .map3d-pin-body { background:rgb(255 255 255 / .8);border-radius:24px;box-shadow:0 2px 8px #0003;border:1px solid white; }
 .map3d-pin .site-pin { flex:none; }
 .map3d-pin[data-labelled="true"] .site-pin { box-shadow:none; }
 .map3d-pin[data-label-side="left"] .map3d-pin-body { flex-direction:row-reverse;align-self:flex-end; }
@@ -87,3 +87,14 @@ html[dir="rtl"] .map3d-site-label { direction:rtl; }
 .map3d-leader { position:absolute;left:50%;bottom:3px;overflow:visible;pointer-events:none;fill:none;stroke:#455a64b3;stroke-width:1.5;stroke-linecap:round; }
 .map3d-pin:focus-visible { outline:none; }
 .map3d-pin:focus-visible .map3d-pin-body { outline:3px solid #0570b5;outline-offset:3px;border-radius:24px; }
+
+/* DOM stacking is explicit: transport < service heads < popups < navigation.
+   MapLibre creates a transform context for each marker, so priority belongs on the wrapper. */
+#map.maplibregl-map { --map-transit-z:10;--map-service-z:20;--map-popup-z:30;--map-controls-z:40; }
+#map .maplibregl-marker.tl-icon { z-index:var(--map-transit-z); }
+#map .map3d-marker { z-index:var(--map-service-z);pointer-events:none; }
+#map .map3d-cluster { pointer-events:auto; }
+#map .maplibregl-popup { z-index:var(--map-popup-z); }
+#map .map3d-route-status,#map .map3d-buses { z-index:var(--map-controls-z); }
+#map .maplibregl-ctrl-top-left,#map .maplibregl-ctrl-top-right,
+#map .maplibregl-ctrl-bottom-left,#map .maplibregl-ctrl-bottom-right { z-index:var(--map-controls-z); }
