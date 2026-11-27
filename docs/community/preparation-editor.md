@@ -10,7 +10,8 @@ An operator selects or registers a source, creates a preparation, retains text a
 creates a blank card. The card and field layouts edit one payload, including separate
 service and location bodies, structured contacts/conditions/hours and disclosed
 advanced fields. The shared field dictionary reuses existing editorial vocabularies;
-PostgreSQL still validates all writes. Reference fields use canonical UUIDs. Broader
+PostgreSQL still validates all writes. Territories use the existing named options;
+other advanced reference fields use canonical UUIDs. Broader
 catalogue search is not supplied by this editor. A contact's publishability remains
 unset until the operator chooses it.
 
@@ -40,3 +41,10 @@ The application suite passed 170 tests with six external-prerequisite skips. Nod
 checks exercise actual draft-state provenance, stable retries, edits during save and
 three-way rebase. Final independent milestone review and provider-integrated user
 acceptance remain pending. No real provider requests were part of these checks.
+
+Follow-up on 2026-11-27: the sidebar's native input/select/fieldset minimum widths
+are constrained to its grid column. With the creation form expanded at the actual
+1280px browser width, all six visible controls fit and none overlaps the card.
+The browser's requested narrow viewport did not take effect (it remained 1280px),
+so this follow-up does not establish mobile behavior. The existing CSS breakpoint
+is retained. No state/permission behavior changed.

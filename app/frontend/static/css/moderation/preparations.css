@@ -2,6 +2,9 @@
 .preparation-heading { display:flex; align-items:baseline; justify-content:space-between; gap:1rem; }
 .preparation-heading h1 { font:2.4rem Fraunces,serif; margin:.25rem 0; }
 .preparation-layout { display:grid; grid-template-columns:16rem minmax(0,1fr); gap:1.25rem; align-items:start; }
+.preparation-layout > *, .preparation-layout .desk-form, .preparation-layout .desk-form label { min-width:0; }
+.preparation-layout .desk-form fieldset { min-inline-size:0; }
+.preparation-layout .desk-form input:not([type=checkbox]), .preparation-layout .desk-form select, .preparation-layout .desk-form textarea { box-sizing:border-box; min-width:0; max-width:100%; width:100%; }
 .preparation-sidebar { position:sticky; top:1rem; }
 .preparation-sidebar details { margin-top:1rem; border-top:1px solid var(--line); padding-top:1rem; }
 #preparation-workspace { display:grid; gap:1rem; }
