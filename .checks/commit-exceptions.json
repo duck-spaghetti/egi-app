@@ -71,6 +71,7 @@
     "13ac6fef49926a60de0f5c9e859f722c992197a2": "Already published on observed origin refs before development-checks; historical title exception",
     "1249030d6d37e5a656228d0cf5449d0e0ed22878": "Already published on observed origin refs before development-checks; historical title exception",
     "f1fb13d6d85b6ee27d69579d05f6c8fbf4de603b": "Already published on observed origin refs before development-checks; historical title exception",
-    "8bf30f274cfc4f9e8482322d38cbbebb837661dc": "Already published on observed origin refs before development-checks; historical title exception"
+    "8bf30f274cfc4f9e8482322d38cbbebb837661dc": "Already published on observed origin refs before development-checks; historical title exception",
+    "0566d60d8b911d20bd8999e306dfa89cbf652011": "Explicit user exception approved 2026-11-27: pre-existing unpublished saved-list checkpoint preserved for local feature integration; only this exact SHA, no history rewrite"
   }
 }

@@ -12,14 +12,16 @@
       "name": "database",
       "environment": "EGI_DATABASE_PROVIDER",
       "path": "../egi_database-development-checks",
-      "revision": "fd776a6f25314541ae4ce248dccd06e07d419190"
+      "revision": "b570c2003fb68ed71e11bfe7445f0dc4433a1b5f"
     },
     {
       "name": "reviewer",
       "environment": "EGI_REVIEWER_PROVIDER",
       "path": "../egi-reviewer-development-checks",
-      "revision": "752cc8e5a757666077f279bd4b877d398a664185",
-      "wheel_sha256": "1c64e7e236f2bd7e0d23afa870a07899aca3ef66649974da4a7ee6f97d9d01c6"
+      "revision": "80bac3f9b24d2bb348193ffa1ad5f8a7b71bbb9f",
+      "wheel_sha256": "7b68d4ac3272ae967df3a93650957970b97cdf9f347010e060cbbe494f05e616",
+      "python_environment": "EGI_REVIEWER_PYTHON",
+      "python": "../egi-reviewer-community-text/.venv/bin/python"
     }
   ],
   "consumer_wheel": {

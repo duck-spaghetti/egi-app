@@ -19,14 +19,17 @@ from unittest.mock import patch
 sys.path.insert(0,'scripts')
 from devchecks.resources import PrerequisiteError
 from check import main
-with patch('check.preflight',side_effect=PrerequisiteError('controlled below15 GiB')):
-    raise SystemExit(main(['--profile','integration','--json']))
+context = {'native_schema': Path.cwd(), 'excluded_files': {}, 'optional_skips': {}}
+with patch('check.prepare', return_value=context), patch('check.preflight',side_effect=PrerequisiteError('controlled below15 GiB')), patch('check.python_check') as native:
+    status = main(['--profile','integration','--json'])
+    native.assert_not_called()
+    raise SystemExit(status)
 '''
         result = subprocess.run([sys.executable, '-c', code], cwd=ROOT, capture_output=True, text=True)
         self.assertEqual(result.returncode, 2, result.stderr)
         report = json.loads(result.stdout)
         self.assertEqual(report['status'], 'blocked')
-        self.assertEqual([x['name'] for x in report['checks']], ['resource-preflight'])
+        self.assertEqual([x['name'] for x in report['checks']], ['integration-selection', 'resource-preflight'])
 
     def test_stage_exit_two_remains_blocked(self):
         """Browser/offline/PDF exit2 is blocked rather than a false product failure."""

@@ -18,7 +18,9 @@ def check_provider(root, entry, target):
     destination = root / '.local/integration'
     destination.mkdir(parents=True, exist_ok=True)
     try:
-        result = subprocess.run([sys.executable, target / 'scripts/check.py', '--profile', 'integration', '--json'],
+        interpreter = (os.environ.get(entry['python_environment'], str(root / entry['python']))
+                       if 'python_environment' in entry else sys.executable)
+        result = subprocess.run([interpreter, target / 'scripts/check.py', '--profile', 'integration', '--json'],
             cwd=target, env=environment, capture_output=True, text=True, timeout=900)
         (destination / (entry['name'] + '.json')).write_text(result.stdout)
         (destination / (entry['name'] + '.stderr.log')).write_text(result.stderr[-8192:])

@@ -15,7 +15,7 @@ The app owns orchestration only. It invokes each provider's existing
 `scripts/check.py --profile integration --json`, validates report schema, repository,
 profile, source, per-stage states and process exit, and preserves the actual reports
 under `.local/integration/`. The Reviewer wheel receipt must match the source and
-artifact hash in the manifest. Child failure, missing prerequisites or a mismatched
+artifact hash in the manifest. Locally, the Reviewer build can use the manifest's separate selected interpreter (`EGI_REVIEWER_PYTHON` overrides its path), so checking the provider does not replace the app's installed consumer wheel. Child failure, missing prerequisites or a mismatched
 success report produce a non-success result. Supervised resource runs retain exact
 ownership and teardown; paid IA and arbitrary live database selection are excluded.
 
@@ -59,3 +59,12 @@ before push. CI uses identified checkout revisions and preserves reports/artifac
 Required-check settings and controlled negative/positive remote evidence are recorded
 in the workspace execution record. Native Save PDF remains separate acceptance;
 CI does not manufacture a native-dialog result or authorize final merge/deployment.
+
+The app workflow checks out each exact provider/schema/consumer source from the
+manifest under ignored `.local/providers/` paths. It installs the existing app
+locks, selected setuptools75.1.0/wheel0.43.0 and pinned npm lock; Chromium comes
+from the selected Playwright version. Rebuilding the Community consumer uses its
+original fixed SOURCE_DATE_EPOCH=315532800 and the hash-locked wheel requirement.
+PostgreSQL18/PostGIS and Sqitch run against disposable owned fixtures. Reports,
+provider output, browser traces and PDFs are retained with the PR head identity.
+These automatic checks need no API keys and do not dispatch paid model requests.

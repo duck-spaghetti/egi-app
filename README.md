@@ -26,7 +26,7 @@ checks. Explicit native/live suites are reported as Integration selections. The 
 optional sibling-importer drift case reports its test identity/reason if absent;
 other unexpected skips block the profile. Complete is the default delivery profile and includes actual browser, offline and
 generated-PDF stages. See [browser verification](docs/browser-verification.md). Integration owns explicitly configured native/cross-repository
-checks and is also currently blocked until its owning integration stage exists.
+checks through identified provider commands; see [Integration verification](docs/integration-verification.md).
 Exit codes:0 passed,1 failed,2 prerequisite-blocked. JSON schema1 includes source
 commit, observed per-check state, named Python outcomes, reasons and durations.
 Quick is not evidence of Complete success. Native desktop print remains separate.
@@ -44,7 +44,7 @@ separate from synthetic browser verification.
 and requires a clean worktree matching the pushed tip, passing Complete, and passing
 Integration when shared developer/product boundaries changed. Required report status,
 profile and source identity must agree with the process exit. Hook bypass cannot
-hide an invalid new commit from range validation. CI adoption is session3 work.
+hide an invalid new commit from range validation. PR-to-dev CI runs the same policy, Complete and composed Integration; its job identity is `EGI / app`. Remote rule and validation evidence is recorded separately from workflow configuration.
 
 Ordinary titles use `EGI-<positive number>: <summary>`. Git-generated merge messages
 require merge context/parents; automatic reverts identify an existing target. Exact
