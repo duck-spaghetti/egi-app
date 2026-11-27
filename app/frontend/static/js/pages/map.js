@@ -28,7 +28,7 @@ export function createMapPage(context, dependencies={}) {
   cityOptions: [],
   filters: {
     cats: new Set(), offersOff: new Set(),
-    q: "", source: "", issue: "", access: "", audience: "", meal: "", level: "", section: "all", order: "name", openNow: false,
+    q: "", source: "", issue: "", access: "", audience: "", meal: "", level: "", section: "all", order: "name", openNow: false, favoritesOnly: false,
   },
   taxonomy: {needs: [], offers: [], audiences: [], access: [], meal_times: [], paths: [], course_levels: []},
   view: "map",
@@ -44,7 +44,7 @@ export function createMapPage(context, dependencies={}) {
  const transit=factories.transport({scope,http,sites,emit});
  const services=factories.services({context,scope,loader,sites,transit,translate:i18n.t,emit});
  const map=factories.map({context,sites,describe:services.describe,emit,leaflet:dependencies.leaflet||globalThis.L});
- const search=factories.search({scope,describe:services.describe,emit,debug});
+ const search=factories.search({scope,describe:services.describe,emit,debug,translate:i18n.t});
  const origin=factories.origin({context,scope,http,contains:map.contains,translate:i18n.t,emit});
  const cycle=factories.cycleways();
  let mounted=false, loading=null, languageGeneration=0, refreshInFlight=false;
@@ -53,23 +53,29 @@ export function createMapPage(context, dependencies={}) {
   chooseReferencePoint:origin.choose,geocodeAddress:origin.search,locateUser:origin.locate,loadOriginTransit:transit.origin}});
 
  function snapshot(){return structuredClone(state);}
+ function discoverySnapshot(){
+  const view=snapshot();
+  if(view.filters.favoritesOnly){view.catalogPois=view.pois;view.pois=services.savedServices(view);}
+  return view;
+ }
  function refresh(){
   if(scope.signal.aborted)return;
-  let view=snapshot();services.update(view);transit.update(view);origin.update(view);
-  const list=search.select(view);state.matchedIds=new Set(list.map(row=>row.id));view=snapshot();
+  let view=discoverySnapshot();services.update(view);transit.update(view);origin.update(view);
+  const list=search.select(view);state.matchedIds=new Set(list.map(row=>row.id));view=discoverySnapshot();
   services.update(view,list);search.update(view);
   map.update(view,state.focusSiteKey?state.pois.filter(row=>sites.key(row)===state.focusSiteKey):list);
   shell.update();
  }
  function renderFilters(){search.update(snapshot());shell.languages();shell.cities();}
  function resetFilters(){
-  Object.assign(state.filters,{cats:new Set(),offersOff:new Set(),q:'',issue:'',access:'',audience:'',meal:'',level:'',section:'all',openNow:false});
+  Object.assign(state.filters,{cats:new Set(),offersOff:new Set(),q:'',issue:'',access:'',audience:'',meal:'',level:'',section:'all',openNow:false,favoritesOnly:false,savedCollection:null});
+  state.savedEntries=null;state.savedListName=null;
   document.getElementById('service-query').value='';document.getElementById('open-now-filter').checked=false;
   document.getElementById('section-filter').value='all';refresh();
  }
  function select(id){
   if(scope.signal.aborted)return;
-  state.selectedId=id;services.update(snapshot());void services.show(id);
+  state.selectedId=id;services.update(discoverySnapshot());void services.show(id);
  }
  async function language(code){
   const generation=++languageGeneration;
@@ -86,13 +92,33 @@ export function createMapPage(context, dependencies={}) {
   if(!context.canonical || refreshInFlight || scope.signal.aborted)return;
   refreshInFlight=true;
   const generation=languageGeneration;
-  try{const data=await services.load(state.lang);scope.check();if(generation!==languageGeneration)return;Object.assign(state,data);refresh();services.refreshHours();}
+  try{if(state.filters.favoritesOnly)await services.reloadFavorites();
+   const data=await services.load(state.lang);scope.check();if(generation!==languageGeneration)return;Object.assign(state,data);refresh();services.refreshHours();}
   catch(error){if(!scope.signal.aborted)services.refreshHours();}
   finally{refreshInFlight=false;}
  }
  function emit(type,payload={}){
   if(scope.signal.aborted)return;
   switch(type){
+   case 'favoritesChanged':{
+    const unavailable=new Set(payload.unavailable || []);
+    const closeSelected=unavailable.has(String(state.selectedId));
+    if(unavailable.size)state.pois=state.pois.filter(poi=>!unavailable.has(String(poi.id)));
+    if(mounted && (state.filters.favoritesOnly || unavailable.size))refresh();
+    if(closeSelected){
+      const shown=document.getElementById('sheet-detail').classList.contains('shown');
+      if(shown)shell.close();services.clearDetail();state.selectedId=null;
+      if(shown)document.getElementById('list-title')?.focus();
+    }
+    break;}
+
+   case 'showFavorites':void services.openSaved?.();break;
+   case 'savedMap':resetFilters();state.filters.favoritesOnly=true;state.filters.savedCollection=payload.id;
+    state.savedEntries=payload.entries;state.savedListName=payload.name;state.focusSiteKey=null;
+    shell.close();if(state.view!=='map')shell.toggle();refresh();
+    if(payload.selectId)select(payload.selectId);break;
+   case 'allServices':shell.close();resetFilters();
+    document.getElementById(state.view==='list' ? 'list-title' : 'view-toggle')?.focus();break;
    case 'filter':state.filters[payload.key]=payload.value;refresh();break;
    case 'toggleNeed':{
     const slug=payload.slug;
@@ -142,6 +168,7 @@ export function createMapPage(context, dependencies={}) {
     refresh();renderFilters();
     if(context.localLayers!==false){void transit.summaries();scope.every(transit.summaries,300000);}
     scope.every(()=>{services.refreshHours();if(state.filters.openNow)refresh();void refreshOpening();},30000);
+    globalThis.addEventListener?.('online',()=>{if(state.filters.favoritesOnly)void services.reloadFavorites();},{signal:scope.signal});
     document.addEventListener('visibilitychange',()=>{if(!document.hidden){services.refreshHours();void refreshOpening();}},{signal:scope.signal});
    }catch(error){
     if(scope.signal.aborted)return;

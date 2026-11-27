@@ -1,0 +1,60 @@
+{% extends 'moderation/base.html' %}
+{% block body %}
+<section class="desk-card">
+  <p class="hint"><a href="/moderazione/coda">{{ t('moderation.queue.back') }}</a></p>
+  <h1>{{ t('moderation.kinds.' ~ item.kind) }}{% if item.category %} · {{ t('contribute.intake.categories.' ~ item.category) }}{% endif %}</h1>
+  {% if service_name %}<p>{{ t('moderation.contribution.service') }} <strong>{{ service_name }}</strong>
+    · <a href="/moderazione/servizio/{{ item.service_id }}">{{ t('moderation.contribution.open_workspace') }}</a></p>{% endif %}
+  <p><span class="badge state-{{ item.state }}">{{ t('moderation.contribution_states.' ~ item.state) }}{% if item.waiting_reason %}: {{ t('moderation.reasons.' ~ item.waiting_reason) }}{% endif %}</span>
+    {% if item.claimed_by_name %}{{ t('moderation.queue.claimed_by', name=item.claimed_by_name) }}{% endif %}</p>
+  {% if item.text %}<blockquote class="desk-quote">{{ item.text }}</blockquote>{% endif %}
+  {% if item.contact %}<p>{{ t('moderation.contribution.contact') }} <code>{{ item.contact }}</code></p>{% endif %}
+  {% if item.proposals %}
+  <h2>{{ t('moderation.contribution.proposals') }}</h2>
+  {% include 'moderation/proposal_actions.html' %}
+  {% endif %}
+</section>
+{% block community_acceptance %}{% endblock %}
+{% if item.state != 'closed' %}
+<section class="desk-card">
+  <h2>{{ t('moderation.contribution.work') }}</h2>
+  <div class="desk-actions">
+    {% if not item.claimed_by %}
+    <form method="post" action="/moderazione/contributo/{{ item.contribution_id }}/presa"><input type="hidden" name="form_token" value="{{ form_token }}" /><input type="hidden" name="action" value="claim" /><button type="submit">{{ t('moderation.contribution.claim') }}</button></form>
+    {% elif item.claimed_by == person.actor_id %}
+    <form method="post" action="/moderazione/contributo/{{ item.contribution_id }}/presa"><input type="hidden" name="form_token" value="{{ form_token }}" /><input type="hidden" name="action" value="release" /><button type="submit" class="link">{{ t('moderation.contribution.release') }}</button></form>
+    {% else %}
+    <form method="post" action="/moderazione/contributo/{{ item.contribution_id }}/presa"><input type="hidden" name="form_token" value="{{ form_token }}" /><input type="hidden" name="action" value="take_over" /><button type="submit">{{ t('moderation.contribution.take_over') }}</button></form>
+    {% endif %}
+    <form method="post" action="/moderazione/contributo/{{ item.contribution_id }}/presa" class="desk-inline-form">
+      <input type="hidden" name="form_token" value="{{ form_token }}" /><input type="hidden" name="action" value="reassign" />
+      <select name="assignee">{% for p in people %}<option value="{{ p.actor_id }}">{{ p.display_name }}</option>{% endfor %}</select>
+      <button type="submit" class="link">{{ t('moderation.contribution.reassign') }}</button>
+    </form>
+    <form method="post" action="/moderazione/contributo/{{ item.contribution_id }}/attesa" class="desk-inline-form">
+      <input type="hidden" name="form_token" value="{{ form_token }}" />
+      <select name="reason"><option value="">{{ t('moderation.contribution.resume') }}</option>
+        {% for code in reasons %}{% if code != 'submitter' or item.contact %}<option value="{{ code }}" {% if item.waiting_reason == code %}selected{% endif %}>{{ t('moderation.reasons.' ~ code) }}</option>{% endif %}{% endfor %}</select>
+      <button type="submit" class="link">{{ t('moderation.contribution.set_waiting') }}</button>
+    </form>
+  </div>
+</section>
+{% endif %}
+{% if item.state != 'closed' %}
+<section class="desk-card">
+  <h2>{{ t('moderation.review.close') }}</h2>
+  {% if not item.service_id %}<form method="get" class="desk-filters"><label>{{ t('moderation.review.find_publication') }}<input name="q" value="{{ publication_query }}" /></label><button>{{ t('moderation.services.find') }}</button></form>{% endif %}
+  <form method="post" action="/moderazione/contributo/{{ item.contribution_id }}/chiudi" class="desk-form">
+    <input type="hidden" name="form_token" value="{{ form_token }}" />
+    <label>{{ t('moderation.review.outcome') }}<select name="outcome">{% for o in outcomes %}<option value="{{ o }}">{{ t('moderation.review.outcomes.' ~ o) }}</option>{% endfor %}</select></label>
+    <label>{{ t('moderation.review.publication') }}<select name="publication"><option value="">—</option>{% for p in publications %}<option value="{{ p.publication_id }}">{{ p.name or '—' }}</option>{% endfor %}</select></label>
+    <label>{{ t('moderation.review.reason') }}<textarea name="reason" rows="2"></textarea></label>
+    <button>{{ t('moderation.review.close') }}</button><p class="hint">{{ t('moderation.review.close_hint') }}</p>
+  </form>
+</section>
+{% else %}<p class="desk-notice">{{ t('moderation.review.outcomes.' ~ item.outcome) }}</p>{% endif %}
+<section class="desk-card">
+  <h2>{{ t('moderation.contribution.history') }}</h2>
+  <ol class="desk-history">{% for e in item.events %}<li>{{ e.created_at[:16].replace('T', ' ') }} · {{ e.actor_name or t('moderation.contribution.visitor') }} · {{ t('moderation.events.' ~ e.action) }}</li>{% endfor %}</ol>
+</section>
+{% endblock %}

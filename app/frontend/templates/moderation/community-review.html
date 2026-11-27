@@ -1,0 +1,50 @@
+{% extends 'moderation/contribution.html' %}
+{% block head %}
+<link rel="stylesheet" href="/static/css/moderation/preparations.css" />
+<script type="module" src="/static/js/features/preparations/review.js"></script>
+{% endblock %}
+{% block community_acceptance %}
+<section class="desk-card">
+  <h2>{{ t('community.review_accepted_title') if community.resolution else t('community.review_title') }}</h2>
+  <p>{{ t('community.review_snapshot') }}</p>
+  <p><strong>{{ community.snapshot.source_metadata.name }}</strong> · {{ community.snapshot.submitted_at[:16].replace('T',' ') }}</p>
+  {% if community.diagnostics %}<p class="desk-notice">{{ t('community.review_incomplete') }}</p>{% endif %}
+  {% if community.service_id %}<p><a class="button" href="/moderazione/servizio/{{ community.service_id }}">{{ t('community.review_open_workspace') }}</a></p>{% endif %}
+  {% if community.resolution %}<p class="desk-notice">{{ t('community.review_accepted') }}</p>{% endif %}
+  <script id="community-review-context" type="application/json">{{ community|tojson }}</script>
+  <input id="community-review-token" type="hidden" value="{{ form_token }}" />
+  <p id="review-error" class="desk-error" role="alert" hidden></p>
+  {% if not community.closed and not community.resolution %}<div id="review-proposal-choices"></div>{% endif %}
+  <div class="preparation-view-switch" role="group" aria-label="{{ t('community.fields_view') }}"><button type="button" id="review-card" aria-pressed="true">{{ t('community.card') }}</button><button type="button" id="review-fields" aria-pressed="false">{{ t('community.fields_view') }}</button></div>
+  <div id="review-editor" class="preparation-preview"></div>
+  <aside id="review-field-evidence" class="preparation-checks" hidden></aside>
+  {% if community.resolution %}<details><summary>{{ t("community.review_original_snapshot") }}</summary><div id="review-original-editor" class="preparation-preview"></div></details>{% endif %}
+  <details><summary>{{ t('community.evidence') }}</summary>{% for evidence in community.snapshot.evidence %}<blockquote class="desk-quote">{{ evidence.quote or evidence.note or '' }}</blockquote>{% endfor %}</details>
+  {% if not community.closed and not community.resolution %}
+  <details open><summary>{{ t('community.review_compare') }}</summary><div id="review-comparison"></div></details>
+  <form id="community-accept-form" class="desk-form">
+    <label>{{ t('community.review_reason') }}<textarea id="review-reason" rows="2" maxlength="1000" required></textarea></label>
+    <fieldset><legend>{{ t('community.review_observation') }}</legend><p class="hint">{{ t('community.review_observation_hint') }}</p>
+      <label>{{ t('community.review_method') }}<select id="review-method"><option value="">{{ t('community.not_set') }}</option>{% for method in community.methods %}<option value="{{ method }}">{{ t('community.method_labels.' ~ method) }}</option>{% endfor %}</select></label>
+      <label>{{ t('community.review_note') }}<textarea id="review-note" rows="2" maxlength="1000"></textarea></label>
+      <label class="check"><input id="review-observed" type="checkbox" />{{ t('community.review_observed') }}</label>
+    </fieldset>
+    <p id="review-pending-status" class="hint" role="status" hidden></p><button id="review-accept-button" type="submit">{{ t('community.review_accept') }}</button><p class="hint">{{ t('community.review_separate_publish') }}</p>
+  </form>
+  {% endif %}
+</section>
+{% if community.organizations %}<section class="desk-card"><h2>{{ t('community.ref_org_publication_title') }}</h2><p class="hint">{{ t('community.ref_org_publication_hint') }}</p>
+{% for organization in community.organizations %}<article class="community-organization-publication"><h3>{{ organization.name }}</h3>
+<details><summary>{{ t('community.ref_org_view') }}</summary><p>{{ organization.body.name }}</p>{% if organization.body.description %}<p>{{ organization.body.description }}</p>{% endif %}{% if organization.body.organization_type %}<p>{{ organization.body.organization_type }}</p>{% endif %}{% if organization.body.website %}<p>{{ organization.body.website }}</p>{% endif %}</details>
+{% if organization.has_draft %}<p class="hint">{{ t('community.ref_org_has_changes') if organization.public else t('community.ref_org_needs_publication') }}</p><form class="desk-form community-publish-organization" data-organization="{{ organization.organization_id }}" data-working="{{ organization.working }}" data-public="{{ organization.public or '' }}"><label>{{ t('community.ref_publish_reason') }}<input name="reason" maxlength="1000" required /></label><button type="submit">{{ t('community.ref_publish_org') }}</button></form>
+{% else %}<p>{{ t('community.ref_org_published') }}</p>{% endif %}</article>{% endfor %}</section>{% endif %}
+<section class="desk-card"><h2>{{ t('community.review_admission') }}</h2>
+  {% set admission_sources = [{'source_id': community.snapshot.source_id, 'name': community.snapshot.source_metadata.name, 'admitted': community_source_admitted}] %}
+  {% if community_observation_source and community_observation_source.source_id != community.snapshot.source_id %}{% set admission_sources = admission_sources + [community_observation_source] %}{% endif %}
+  {% for source in admission_sources %}<div><h3>{{ source.name }}</h3>
+    {% if source.admitted %}<p>{{ t('community.review_source_admitted') }}</p>
+    {% elif person.role == 'admin' %}<form class="desk-form community-admit-source" data-source="{{ source.source_id }}"><label>{{ t('community.review_admission_reason') }}<input name="reason" required /></label><button>{{ t('community.review_admit') }}</button></form>
+    {% else %}<p class="hint">{{ t('community.review_source_needs_admin') }}</p>{% endif %}
+  </div>{% endfor %}
+</section>
+{% endblock %}

@@ -1,0 +1,147 @@
+/* Community uses the public font/color foundations and the editorial controls. */
+.preparation-heading { display:flex; align-items:baseline; justify-content:space-between; gap:1rem; }
+.preparation-heading h1 { font:2.4rem Fraunces,serif; margin:.25rem 0; }
+.preparation-layout { display:grid; grid-template-columns:minmax(0,1fr); gap:1.25rem; align-items:start; }
+.preparation-layout > *, .preparation-layout .desk-form, .preparation-layout .desk-form label { min-width:0; }
+.preparation-layout .desk-form fieldset { min-inline-size:0; }
+.preparation-layout .desk-form input:not([type=checkbox]), .preparation-layout .desk-form select, .preparation-layout .desk-form textarea { box-sizing:border-box; min-width:0; max-width:100%; width:100%; }
+.preparation-sidebar { position:static; }
+.preparation-sidebar #preparation-list { display:flex; flex-wrap:wrap; gap:.5rem; max-height:9rem; overflow:auto; }
+.preparation-sidebar #create-preparation { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.preparation-initial-text { grid-column:1/-1; }
+.preparation-workbench { display:grid; grid-template-columns:minmax(15rem,.8fr) minmax(0,1.2fr); gap:1.25rem; align-items:start; }
+.preparation-source-column, .preparation-card-column { min-width:0; display:grid; gap:1rem; }
+.preparation-source-column { position:sticky; top:1rem; max-height:calc(100vh - 2rem); overflow:auto; }
+.preparation-source-column textarea { min-height:14rem; resize:vertical; }
+.preparation-source-column .desk-actions { flex-wrap:wrap; }
+.preparation-source-passage { white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; line-height:1.7; }
+.preparation-source-passage mark { background:#f2d890; color:var(--ink); padding:.1rem 0; }
+.preparation-service-card { border:1px solid var(--line); border-radius:.7rem; background:var(--paper); overflow:hidden; }
+.preparation-card-header, .preparation-card-section, .preparation-card-extra, .preparation-card-source { padding:1.15rem 1.4rem; }
+.preparation-card-section, .preparation-card-extra, .preparation-card-source { border-top:1px solid var(--line); }
+.preparation-card-section h3 { margin:0 0 .75rem; font:700 .95rem "IBM Plex Sans",sans-serif; }
+.preparation-card-metadata { display:flex; flex-wrap:wrap; gap:.75rem; }
+.preparation-eyebrow { font:600 .7rem "IBM Plex Mono",monospace; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); }
+.preparation-service-card .preparation-control input:not([type=checkbox]), .preparation-service-card .preparation-control textarea, .preparation-service-card .preparation-control select { background:transparent; border-color:transparent; border-bottom:1px dashed var(--line); padding:.4rem .2rem; border-radius:0; }
+.preparation-service-card .preparation-control input:hover, .preparation-service-card .preparation-control textarea:hover, .preparation-service-card .preparation-control select:hover { border-color:var(--ink-soft); }
+.preparation-service-card .preparation-control[data-field=name] textarea { font:900 1.9rem/1.15 Fraunces,serif; letter-spacing:-.01em; resize:vertical; }
+.preparation-service-card .preparation-control[data-field=description] textarea { min-height:4rem; }
+.preparation-card-header .preparation-control>span:first-child, .preparation-card-section>.preparation-control>span:first-child { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.preparation-service-card .preparation-control .hint { font-size:.7rem; color:var(--ink-soft); }
+.preparation-service-card .preparation-control .hint button { font-size:.7rem; padding:.2rem .35rem; }
+.preparation-service-card .preparation-control:not(:focus-within):not(:hover) .hint>button:not([data-evidence]) { opacity:0; }
+.preparation-service-card .preparation-repeat { border-left:0; padding:0; margin:0; }
+.preparation-service-card .preparation-repeat>fieldset { min-width:0; padding:.6rem; }
+.preparation-contact-extra { margin:.75rem 0 0; font-size:.85rem; }
+.preparation-card-source { display:grid; gap:.35rem; background:var(--bg); }
+.preparation-hours-line { display:grid; gap:.3rem; font-size:.9rem; }
+.preparation-checks { border:1px solid var(--line); background:var(--bg); border-radius:.4rem; padding:.8rem; font-size:.85rem; margin:.75rem 0; }
+.preparation-sidebar details { margin-top:1rem; border-top:1px solid var(--line); padding-top:1rem; }
+#preparation-workspace { display:grid; gap:1rem; }
+#preparation-workspace[hidden], [hidden] { display:none !important; }
+.preparation-cards { display:flex; flex-wrap:wrap; gap:.5rem; }
+.preparation-cards li { min-width:0; max-width:100%; }
+.preparation-cards button { max-width:100%; white-space:normal; overflow-wrap:anywhere; text-align:left; }
+.preparation-cards button[aria-current=true] { outline:2px solid var(--accent); outline-offset:2px; }
+.preparation-preview { display:grid; gap:1.25rem; margin:1.5rem 0; }
+.preparation-section { border-top:1px solid var(--line); padding-top:1rem; }
+.preparation-section h2 { font:1.7rem Fraunces,serif; }
+.preparation-control { display:grid; gap:.3rem; margin:.6rem 0; }
+.preparation-control input, .preparation-control textarea, .preparation-control select { box-sizing:border-box; width:100%; font:inherit; padding:.55rem .65rem; border:1px solid var(--line); border-radius:.3rem; background:var(--paper); color:var(--ink); }
+.preparation-control input[type=checkbox] { width:auto; justify-self:start; }
+.preparation-control[data-field=name] input { font:1.7rem Fraunces,serif; }
+.preparation-control[data-field=description] textarea { min-height:6rem; line-height:1.6; }
+.preparation-control .hint { display:flex; gap:.5rem; align-items:baseline; flex-wrap:wrap; }
+.preparation-control button { font-size:.8rem; }
+.preparation-repeat { border-left:2px solid var(--line); padding:.4rem 0 .8rem 1rem; margin:.6rem 0; }
+.preparation-repeat fieldset { border:1px solid var(--line); border-radius:.3rem; padding:.75rem; margin:.5rem 0; }
+.preparation-fields .preparation-control { grid-template-columns:minmax(9rem,1fr) minmax(12rem,2fr); align-items:start; }
+.preparation-fields .preparation-control .hint { grid-column:2; }
+.preparation-fields .preparation-control[data-field=name] input { font:inherit; }
+.preparation-view-switch { display:flex; gap:.25rem; }
+.preparation-view-switch button[aria-pressed=false] { background:var(--line); color:var(--ink); }
+#card-evidence blockquote { margin:.5rem 0; padding:.65rem; border-left:3px solid var(--accent); background:var(--bg); white-space:pre-wrap; }
+#conflict-panel { border:1px solid var(--accent); padding:1rem; margin:1rem 0; }
+#conflict-fields fieldset { margin:.75rem 0; border:1px solid var(--line); }
+#source-text { width:100%; box-sizing:border-box; }
+button:disabled { cursor:default; opacity:.55; }
+@media(max-width:640px) { .preparation-workbench { grid-template-columns:1fr; } .preparation-source-column { position:static; max-height:none; overflow:visible; } }
+@media(max-width:800px) { .preparation-layout { grid-template-columns:1fr; } .preparation-sidebar #create-preparation { grid-template-columns:1fr; } .preparation-heading { display:block; } .preparation-fields .preparation-control { grid-template-columns:1fr; } .preparation-fields .preparation-control .hint { grid-column:1; } }
+/* Insertion follows the prototype's hierarchy while retaining real draft controls. */
+.community-desk .preparation-heading h1 { font:800 32px/1.2 Fraunces,Georgia,serif; letter-spacing:-.8px; margin:0 0 10px; }
+.community-desk .preparation-heading p { font-size:13px; line-height:1.7; color:var(--ink-soft); }
+.preparation-step { margin:0; color:var(--ink-faint); text-transform:uppercase; letter-spacing:1.6px; font:9px "IBM Plex Mono",monospace; }
+.community-desk .preparation-heading .preparation-step { font:9px "IBM Plex Mono",monospace; margin-bottom:12px; }
+.community-desk .preparation-sidebar { display:flex; flex-wrap:wrap; gap:20px; border:0; background:transparent; padding:0 0 14px; border-radius:0; border-bottom:1px solid var(--line); }
+.community-desk .preparation-sidebar details { border:0; padding:0; margin:0; min-width:0; }
+.community-desk .preparation-sidebar details[open] { flex-basis:100%; }
+.community-desk .preparation-sidebar summary { font-size:12px; cursor:pointer; padding:9px 12px; border:1px solid var(--line); border-radius:7px; background:var(--paper); }
+.community-desk .preparation-sidebar details[open]>summary { margin-bottom:16px; }
+.community-desk #preparation-workspace>.desk-card:first-child { border:0; background:transparent; padding:0; }
+.community-desk #workspace-title { font:500 12px "IBM Plex Sans",sans-serif; margin:0; }
+.community-desk #workspace-refresh,.community-desk #workspace-trash,.community-desk #workspace-restore { font-size:10px; padding:5px 8px; }
+.community-desk .preparation-workbench { grid-template-columns:minmax(280px,.47fr) minmax(0,1fr); gap:28px; }
+.community-desk .preparation-source-column { position:static; max-height:none; overflow:visible; gap:16px; }
+.community-desk .preparation-card-column { gap:16px; }
+.community-desk .preparation-source-column>.desk-card>details>summary { font:700 18px Fraunces,serif; margin-bottom:14px; }
+.community-desk .preparation-source-column textarea { min-height:245px; font-size:11px; line-height:1.8; background:var(--bg); }
+.community-desk .preparation-source-column .desk-actions { gap:10px; }
+.community-desk .preparation-source-column .desk-actions button,.community-desk .preparation-source-column .desk-actions a { font-size:10px; }
+.community-desk #card-editor { border:0; background:transparent; padding:0; }
+.community-desk .preparation-card-column>.desk-card:first-of-type { padding:0; border:0; background:transparent; }
+.preparation-editor-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+.preparation-editor-heading h2 { font:700 23px Fraunces,serif; margin:0 0 10px; }
+.preparation-editor-heading p { font-size:12px; line-height:1.7; margin:0; color:var(--ink-soft); }
+.community-desk .preparation-view-switch { border:1px solid var(--line); border-radius:8px; padding:4px; gap:2px; background:#eee9dd; }
+.community-desk .preparation-view-switch button { padding:8px 12px; font-size:11px; }
+.community-desk .preparation-view-switch button[aria-pressed=false] { background:transparent; border-color:transparent; }
+.community-desk .preparation-save-actions { margin:10px 0; }
+.community-desk .preparation-preview { margin:22px 0; }
+.community-desk .preparation-card-header { padding:26px 32px 20px; }
+.community-desk .preparation-card-section { padding:18px 32px; border-top:0; }
+.community-desk .preparation-card-section h3 { font:600 10px "IBM Plex Sans",sans-serif; letter-spacing:.8px; text-transform:uppercase; }
+.community-desk .preparation-card-source { padding:22px 32px; background:#eee9dd; }
+.community-desk .preparation-card-metadata { align-items:flex-start; justify-content:space-between; gap:12px; }
+.community-desk .preparation-card-metadata .preparation-repeat { flex:1; min-width:0; }
+.community-desk .preparation-card-metadata>.preparation-control { max-width:120px; margin:0; }
+.community-desk .preparation-service-card .preparation-control:not(:focus-within):not(:hover) .hint>button:not([data-evidence]) { display:none; }
+.community-desk .preparation-card-metadata .hint { gap:3px 8px; }
+.community-desk .preparation-category-choice select { max-width:100%; width:100%; border:0; color:var(--accent); background:transparent; font-size:11px; padding:8px 0; }
+.community-desk .preparation-service-card .preparation-control input:not([type=checkbox]),.community-desk .preparation-service-card .preparation-control textarea,.community-desk .preparation-service-card .preparation-control select { border:1px solid transparent; padding:3px 0; font-size:13px; line-height:1.7; }
+.community-desk .preparation-service-card .preparation-control input:hover,.community-desk .preparation-service-card .preparation-control textarea:hover,.community-desk .preparation-service-card .preparation-control select:hover { border-color:var(--line); }
+.community-desk .preparation-service-card .preparation-control[data-field=name] textarea { font:800 32px/1.15 Fraunces,serif; letter-spacing:-.5px; min-height:38px; }
+.community-desk .preparation-service-card .preparation-control[data-field=description] textarea { min-height:38px; }
+.community-desk .preparation-service-card .preparation-control .hint { font-size:9px; line-height:1.6; }
+.community-desk .preparation-service-card .hint button[data-evidence] { border:0; padding:0; color:var(--accent); background:transparent; font-size:9px; }
+.community-desk .preparation-card-place { margin-top:12px; }
+.community-desk .preparation-card-place .preparation-repeat>fieldset { border:0; padding:0; }
+.community-desk .preparation-card-place .preparation-repeat>fieldset>legend { display:none; }
+.community-desk .preparation-card-place .preparation-control>span:first-child { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.community-desk .preparation-card-place details { font-size:10px; color:var(--ink-soft); margin-top:8px; }
+.community-desk .preparation-card-extra { padding:16px 32px; font-size:11px; }
+@media(max-width:1100px) { .community-desk .preparation-workbench { grid-template-columns:1fr; } }
+@media(max-width:760px) { .community-desk .preparation-card-header,.community-desk .preparation-card-section,.community-desk .preparation-card-source,.community-desk .preparation-card-extra { padding-inline:20px; } .preparation-editor-heading { flex-wrap:wrap; } }
+/* Keep inline editing soft-edged while retaining the card's transparent fields. */
+.community-desk .preparation-service-card .preparation-control :is(input:not([type=checkbox], [type=radio]), textarea, select) { border-radius:7px; }
+/* Literal source claims stay visible before canonical reference resolution. */
+.preparation-literal-group { margin:14px 0; min-width:0; }
+.preparation-literal-group h3 { margin:0 0 6px; font:600 10px "IBM Plex Sans",sans-serif; text-transform:uppercase; letter-spacing:.7px; color:var(--ink-soft); }
+.preparation-literal-original { font-size:11px; line-height:1.7; color:var(--ink-soft); overflow-wrap:anywhere; }
+.preparation-literal-control { min-width:0; }
+.community-desk .preparation-card-header .preparation-literal-group[data-fact-kind=organization_name] input { font-size:16px; }
+.community-desk .preparation-card-metadata .preparation-literal-group { flex:1 1 180px; margin:0; }
+.community-desk .preparation-card-metadata .preparation-literal-group input { color:var(--accent); }
+/* Catalog choices share the card and field views, without exposing identifier inputs. */
+.preparation-resolution { margin-top:8px; font-size:12px; font-weight:400; min-width:0; }
+.preparation-resolution>summary { color:var(--accent); cursor:pointer; overflow-wrap:anywhere; }
+.preparation-resolution>div { padding:12px 0; display:grid; gap:10px; }
+.preparation-resolution label { display:grid; gap:4px; color:var(--ink-soft); font-size:11px; }
+.preparation-resolution input,.preparation-resolution select { width:100%; max-width:100%; min-width:0; box-sizing:border-box; }
+.preparation-resolution fieldset { display:grid; gap:10px; border:1px solid var(--line); padding:12px; min-width:0; }
+.preparation-reference-results { display:grid; gap:8px; max-height:280px; overflow:auto; min-width:0; }
+.preparation-reference-results button { text-align:left; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+.preparation-reference-results>div { padding:8px; border:1px solid var(--line); border-radius:6px; }
+.preparation-literal-tools { border-top:1px solid var(--line); padding-top:12px; display:grid; gap:8px; }
+.preparation-literal-tools label { display:grid; gap:4px; font-size:11px; }
+.community-desk .preparation-service-card .preparation-resolution .hint { font-size:11px; }
+.community-organization-publication { padding:14px 0; border-bottom:1px solid var(--line); }

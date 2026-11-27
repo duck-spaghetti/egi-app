@@ -1,0 +1,7 @@
+{% extends 'moderation/base.html' %}
+{% block body %}
+<section class="desk-card narrow">
+  <p>{{ t('moderation.errors.' ~ message) }}</p>
+  <p><a href="/moderazione">{{ t('moderation.back_home') }}</a></p>
+</section>
+{% endblock %}

@@ -1,6 +1,6 @@
 import {escapeHtml,categoryCaption,folded,distanceKm} from "../../format.js";
 /** createSearch owns its behavior; dependencies and snapshots are explicit. */
-export function createSearch({scope,describe,emit,debug=false}) {
+export function createSearch({scope,describe,emit,debug=false,translate=(_key,_params,fallback)=>fallback}) {
 let state={pois:[],categories:[],filters:{cats:new Set(),offersOff:new Set()},taxonomy:{}};
 let facets=null;
 const DEBUG_MODE=debug;
@@ -91,7 +91,7 @@ function renderActiveFilters() {
   if (!summary) return;
   summary.innerHTML = chips.length
     ? chips.map(c => `<span class="filter-chip">${escapeHtml(c)}</span>`).join("")
-    : `<span class="filter-none">Nessun filtro attivo · tutti i servizi</span>`;
+    : `<span class="filter-none">${state.filters.favoritesOnly ? escapeHtml(translate('favorites.onDevice',{},'Servizi salvati sul dispositivo')) : "Nessun filtro attivo · tutti i servizi"}</span>`;
   const count = document.getElementById("list-filter-count");
   if (count) { count.hidden = !chips.length; count.textContent = String(chips.length); }
 }

@@ -1,16 +1,13 @@
 """Exercise the actual public facade on an independently owned disposable cluster.
 
-EGI_DATABASE_REPO and EGI_SQITCH select the explicit schema/fixture prerequisite.
+EGI_DATABASE_REPO selects the schema/fixture prerequisite; see tests/native.py.
 No importer, private captures, installed preview or retained database is reused.
 """
 
 import getpass
-import os
 from pathlib import Path
-import shutil
 import subprocess
 import sys
-import tempfile
 import unittest
 
 import psycopg
@@ -19,8 +16,7 @@ from app.backend.api.directory.projection import cards
 from app.backend.db.database import Db, DirectoryUnavailable
 from app.backend.config import DirectorySettings
 
-REPOSITORY = os.environ.get("EGI_DATABASE_REPO")
-PG = Path(os.environ.get("EGI_PG_BIN", "/Library/PostgreSQL/18/bin"))
+from tests.native import REPOSITORY, Cluster
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -31,32 +27,12 @@ class NativeDirectoryTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Create only this test's socket-only database and load controlled fixtures."""
-        cls.base = Path(tempfile.mkdtemp(prefix="egi-app-read-", dir="/private/tmp"))
-        cls.addClassCleanup(cls.cleanup)
-        cls.environment = {**os.environ, "PGHOST": str(cls.base), "PGPORT": "65437", "PGDATABASE": "egi_app_contract"}
-        subprocess.run([PG/"initdb", "-D", cls.base/"data", "-A", "trust", "--no-locale", "--encoding=UTF8"],
-                       check=True, stdout=subprocess.DEVNULL)
-        with (cls.base/"data/postgresql.conf").open("a") as stream:
-            stream.write(f"\nlisten_addresses=''\nunix_socket_directories='{cls.base}'\nport=65437\n")
-        subprocess.run([PG/"pg_ctl", "-D", cls.base/"data", "-l", cls.base/"server.log", "-w", "start"],
-                       check=True, stdout=subprocess.DEVNULL)
-        subprocess.run([PG/"createdb", "egi_app_contract"], env=cls.environment, check=True)
-        subprocess.run([PG/"psql", "-X", "-v", "ON_ERROR_STOP=1", "-c",
-                        "REVOKE TEMPORARY ON DATABASE egi_app_contract FROM PUBLIC"],
-                       env=cls.environment, check=True, stdout=subprocess.DEVNULL)
-        subprocess.run([os.environ.get("EGI_SQITCH", "sqitch"), "deploy", "--db-client", PG/"psql", "db:pg:egi_app_contract"],
-                       cwd=REPOSITORY, env=cls.environment, check=True, stdout=subprocess.DEVNULL)
-        subprocess.run([PG/"psql", "-X", "-v", "ON_ERROR_STOP=1", "-f", Path(REPOSITORY)/"tests/contract/fixtures.sql",
-                        "-f", Path(REPOSITORY)/"tests/contract/helpers.sql", "-f", ROOT/"tests/canonical-fixture.sql"],
-                       env=cls.environment, check=True, stdout=subprocess.DEVNULL)
+        cls.cluster = Cluster(65437, "egi_app_contract")
+        cls.addClassCleanup(cls.cluster.close)
+        cls.base, cls.environment = cls.cluster.base, cls.cluster.environment
+        cls.cluster.file(Path(REPOSITORY)/"tests/contract/fixtures.sql", Path(REPOSITORY)/"tests/contract/helpers.sql",
+                         ROOT/"tests/canonical-fixture.sql")
         cls.dsn = f"host={cls.base} port=65437 dbname=egi_app_contract user=egi_app_test_reader"
-
-    @classmethod
-    def cleanup(cls):
-        """Stop and remove only the cluster allocated by this test class."""
-        if (cls.base/"data/postmaster.pid").exists():
-            subprocess.run([PG/"pg_ctl", "-D", cls.base/"data", "-m", "immediate", "-w", "stop"], stdout=subprocess.DEVNULL)
-        shutil.rmtree(cls.base)
 
     def test_public_facade_and_role_boundary(self):
         """Native public reads exclude pending/private fields and deny raw table access."""

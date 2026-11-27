@@ -1,0 +1,24 @@
+{% extends 'moderation/base.html' %}
+{% block body %}
+<section class="desk-card narrow">
+  <h1>{{ t('moderation.invitation.title', name=invitation.display_name) }}</h1>
+  <p>{{ t('moderation.invitation.login', login=invitation.login_name) }}</p>
+  {% if google %}
+  <a class="button" href="/moderazione/google?invito={{ token }}">{{ t('moderation.invitation.google') }}</a>
+  <p class="desk-or">{{ t('moderation.sign_in.or') }}</p>
+  {% endif %}
+  <form method="post" action="/moderazione/invito/{{ token }}" class="desk-form">
+    <label>{{ t('moderation.invitation.password') }}<input name="password" type="password" autocomplete="new-password" minlength="12" required /></label>
+    <label>{{ t('moderation.invitation.password_again') }}<input name="password_again" type="password" autocomplete="new-password" minlength="12" required /></label>
+    <fieldset>
+      <legend>{{ t('moderation.invitation.totp_title') }}</legend>
+      <p class="hint">{{ t('moderation.invitation.totp_required' if invitation.role == 'admin' else 'moderation.invitation.totp_optional') }}</p>
+      <p class="hint">{{ t('moderation.invitation.totp_key') }} <code>{{ totp_secret }}</code></p>
+      <p class="hint"><a href="{{ totp_uri }}">{{ t('moderation.invitation.totp_link') }}</a></p>
+      <input type="hidden" name="totp_secret" value="{{ totp_secret }}" />
+      <label>{{ t('moderation.sign_in.code') }}<input name="code" inputmode="numeric" autocomplete="one-time-code" {% if invitation.role == 'admin' %}required{% endif %} /></label>
+    </fieldset>
+    <button type="submit">{{ t('moderation.invitation.submit') }}</button>
+  </form>
+</section>
+{% endblock %}

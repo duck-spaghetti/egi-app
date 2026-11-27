@@ -211,25 +211,27 @@ function courseFlags(raw) {
   return `${raw.freshness?.stale ? '<span class="flag-hours">dato da verificare · pagina non aggiornata da oltre 12 mesi</span>' : ""}${raw.summer_closure ? '<span class="flag-hours">chiusa in estate</span>' : ""}`;
 }
 
-function renderServiceHeader(poi) {
+function renderServiceHeader(poi, {actions="",notice=""} = {}) {
   const raw=poi.raw || {};
   const cat=resolveCategory(poi) || {};
   const address=poi.address || "";
   const status=sourceOpeningStatus(raw.hours_display);
   const today=todayHours(raw.hours_display);
   const report=reportErrorAction(poi);
+  const stillValid=stillValidHref(poi);
   const distance=serviceDistance(poi);
   const organiser=serviceOrganiser(poi);
   return `<header class="service-head">
-    <div class="service-head-row">${categoryBadge(cat)}${distance ? `<span class="service-distance">${escapeHtml(distance)}</span>` : ""}<button type="button" class="service-close" data-close-service aria-label="Chiudi la scheda">Chiudi</button></div>
+    <div class="service-head-row">${categoryBadge(cat)}${distance ? `<span class="service-distance">${escapeHtml(distance)}</span>` : ""}<div class="service-head-actions">${actions}<button type="button" class="service-close" data-close-service aria-label="Chiudi la scheda">Chiudi</button></div></div>
     <h2 class="service-title">${escapeHtml(serviceTitle(poi))}</h2>
     <p class="service-kind">${escapeHtml(serviceKind(poi))}</p>
     <p class="service-where">${escapeHtml(address || raw.placement?.label || "")}</p>
     <p class="service-status ${status.kind}" data-opening-service="${escapeHtml(poi.id)}"><strong>${escapeHtml(status.label)}</strong>${today ? `<span class="service-today">${escapeHtml(today)}</span>` : ""}${hoursNeedReview(raw.hours_display) ? '<span class="flag-hours">orari da verificare</span>' : ""}${courseFlags(raw)}<small hidden></small></p>
     <div class="service-extra">
       ${organiser ? `<p class="service-line"><span class="service-key">Organizzato da</span> ${escapeHtml(organiser)}</p>` : ""}
-      <p class="service-line service-sources"><span class="service-key">Fonti</span> ${sourceNames(poi).map(n=>`<span class="source-chip">${escapeHtml(n)}</span>`).join("")}<button type="button" class="flag-data" data-jump="fonti">da verificare</button>${report ? `<a class="service-report" href="${escapeHtml(report.href)}" aria-label="Segnala un errore" title="Segnala un errore"><img src="/static/assets/icons/default/report.svg" alt="" aria-hidden="true"></a>` : ""}</p>
+      <p class="service-line service-sources"><span class="service-key">Fonti</span> ${sourceNames(poi).map(n=>`<span class="source-chip">${escapeHtml(n)}</span>`).join("")}<button type="button" class="flag-data" data-jump="fonti">da verificare</button>${report ? `<a class="service-report" href="${escapeHtml(report.href)}" aria-label="Segnala un errore" title="Segnala un errore"><img src="/static/assets/icons/default/report.svg" alt="" aria-hidden="true"></a>` : ""}${stillValid ? `<a class="service-still-valid" href="${escapeHtml(stillValid)}">${escapeHtml(t("map.still_valid_action", {}, "Ancora valido?"))}</a>` : ""}</p>
     </div>
+    ${notice}
   </header>
   <nav class="service-anchors" aria-label="Sezioni della scheda">${SERVICE_SECTIONS.map(([id,label],i)=>`<button type="button" data-jump="${id}" class="${i===0 ? "on" : ""}">${label}</button>`).join("")}</nav>`;
 }
@@ -331,7 +333,7 @@ function renderContacts(contacts) {
   const activeContacts = contacts.filter((contact) => contact?.is_active !== false);
   const actions = contactActions(activeContacts);
   if (!actions.length) {
-    return `<p style="margin:0;font-size:14px">${escapeHtml(t("common.not_available"))}</p>`;
+    return `<p style="margin:0;font-size:.875rem">${escapeHtml(t("common.not_available"))}</p>`;
   }
 
   // Rows (r2 restyle): icon, value, kind; phones, then e-mail, then websites and the rest.
@@ -353,7 +355,7 @@ function renderContacts(contacts) {
 function renderCost(poi) {
   const label = costLabel(poi.cost_tag);
   const note = poi.cost_note ? `<span style="display:block;color:var(--ink-soft);margin-top:4px">${escapeHtml(poi.cost_note)}</span>` : "";
-  return `<p style="margin:0;font-size:14px">${escapeHtml(label)}${note}</p>`;
+  return `<p style="margin:0;font-size:.875rem">${escapeHtml(label)}${note}</p>`;
 }
 
 function contactActions(contacts) {
@@ -451,6 +453,15 @@ function directionsAction(poi) {
     external: true,
     priority: 0,
   };
+}
+
+function stillValidHref(poi) {
+  if (!poi?.id) return null;
+  const url = new URL("/contribuisci", window.location.origin);
+  url.searchParams.set("lang", normalizeLang(snapshot().lang));
+  url.searchParams.set("poi_id", String(poi.id));
+  url.searchParams.set("issue", "still_valid");
+  return url.pathname + url.search;
 }
 
 function reportErrorAction(poi) {

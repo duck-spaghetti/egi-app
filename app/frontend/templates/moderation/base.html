@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>{% block title %}{{ t('moderation.title') }}{% endblock %} · EGI</title>
+    {% block refresh %}{% endblock %}
+    <link rel="stylesheet" href="/static/css/foundations/fonts.css" />
+    <link rel="stylesheet" href="/static/css/foundations/tokens.css" />
+    <link rel="stylesheet" href="/static/css/moderation/moderation.css" />
+    {% if person %}<link rel="stylesheet" href="/static/css/moderation/community-shell.css" />{% endif %}
+    {% block head %}{% endblock %}
+  </head>
+  <body class="desk{% if person %} community-desk{% endif %}">
+    {% if person %}
+    <aside class="community-sidebar">
+      <a class="community-brand" href="/moderazione"><span class="community-brand-mark" aria-hidden="true">◌</span><span>{{ t('community.brand') }}<small>by EGI</small></span></a>
+      <p class="community-nav-label">{{ t('community.workspace_label') }}</p>
+      <nav aria-label="{{ t('community.workspace_label') }}">
+        <a href="/moderazione/contribuisci"{% if request.url.path.startswith('/moderazione/contribuisci') %} aria-current="page"{% endif %}><span aria-hidden="true">＋</span>{{ t('community.insertion_nav') }}</a>
+        <a href="/moderazione/servizi"{% if request.url.path.startswith('/moderazione/servizi') %} aria-current="page"{% endif %}><span aria-hidden="true">▤</span>{{ t('community.catalog_nav') }}</a>
+        <a href="/moderazione/coda"{% if request.url.path.startswith('/moderazione/coda') or request.url.path.startswith('/moderazione/contributo') %} aria-current="page"{% endif %}><span aria-hidden="true">☷</span>{{ t('community.moderation_nav') }}</a>
+        {% block nav %}{% endblock %}
+        {% if person.role == 'admin' %}<a href="/moderazione/account">{{ t('moderation.nav.accounts') }}</a>{% endif %}
+      </nav>
+      <p class="community-sidebar-footer">{{ t('community.workspace_footer') }}</p>
+    </aside>
+    <header class="community-topbar"><span>{{ t('community.workspace_label') }} <span aria-hidden="true"> / </span><strong>{% block breadcrumb %}{{ t('moderation.title') }}{% endblock %}</strong></span><div class="community-person"><span class="community-avatar" aria-hidden="true">{{ person.display_name[:2] }}</span><span>{{ person.display_name }}</span><form method="post" action="/moderazione/esci"><input type="hidden" name="form_token" value="{{ form_token }}" /><button type="submit" class="link">{{ t('moderation.nav.sign_out') }}</button></form></div></header>
+    {% else %}
+    <header class="desk-header">
+      <a class="desk-brand" href="/moderazione">{{ t('moderation.title') }}</a>
+    </header>
+    {% endif %}
+    <main class="desk-main{% if person %} community-main{% endif %}">
+      {% if error %}<p class="desk-error" role="alert">{{ t('moderation.errors.' ~ error) }}</p>{% endif %}
+      {% block body %}{% endblock %}
+    </main>
+  </body>
+</html>

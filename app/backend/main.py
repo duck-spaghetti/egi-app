@@ -12,6 +12,12 @@ from .config import Configuration, ROOT
 from .dependencies import Resources
 from .diagnostics import safe_response
 from .exceptions import ApplicationError
+from .api.moderation.desk import Refused
+from fastapi.responses import RedirectResponse
+
+# Database refusals that have their own moderation message; others read "refused".
+MESSAGE_CODES = {'admin_required', 'last_admin', 'account_not_active', 'account_not_reissuable',
+                 'display_name_required', 'second_factor_required', 'sign_in_refused', 'already_in_use'}
 
 
 def create_app(configuration=None, overrides=None):
@@ -61,6 +67,17 @@ def create_app(configuration=None, overrides=None):
         """Retain status codes while withholding HTTP exception contents."""
         return respond(request, error.status_code, 'invalid_request' if error.status_code == 422 else 'directory_unavailable')
 
+    @application.exception_handler(Refused)
+    async def refused(request: Request, error: Refused):
+        """A database refusal on a moderation page: an expired session goes back to sign-in."""
+        module = request.app.state.resources.moderation
+        if error.code == 'session_invalid':
+            response = RedirectResponse('/moderazione', status_code=303)
+            module.end_session(response)
+            return response
+        return module.render(request, 'message.html', status=403 if error.code.endswith('required') else 400,
+                             message=error.code if error.code in MESSAGE_CODES else 'refused')
+
     @application.middleware('http')
     async def private_responses(request: Request, call_next):
         """Contain unexpected failures and identify the selected data mode."""
@@ -80,7 +97,9 @@ def mount_selected(application, configuration):
         return
     from .api.pages.router import router as pages
     from .api.address_search.router import router as search
+    from .api.contribute.router import router as contribute
     application.include_router(pages)
+    application.include_router(contribute)
     application.include_router(search)
     if configuration.canonical:
         from .api.directory.router import router as directory
@@ -88,6 +107,17 @@ def mount_selected(application, configuration):
     else:
         from .api.preview.router import router as preview
         application.include_router(preview)
+    if configuration.editorial:
+        from .api.moderation.router import router as moderation
+        application.include_router(moderation)
+        from .api.preparations.router import router as preparations
+        application.include_router(preparations)
+        from .api.preparations.catalog import router as preparation_catalog
+        application.include_router(preparation_catalog)
+        from .api.preparations.pages import router as preparation_pages
+        application.include_router(preparation_pages)
+        from .api.preparations.review import router as community_review
+        application.include_router(community_review)
     if not configuration.canonical or configuration.local_layers:
         from .api.transport.router import router as transport
         from .api.cycleways.router import router as cycleways

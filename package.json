@@ -1,0 +1,12 @@
+{
+  "name": "egi-app-dev-checks",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint app/frontend/static/js tests --max-warnings=0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "eslint": "10.15.0"
+  }
+}

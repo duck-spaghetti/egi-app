@@ -1,0 +1,77 @@
+/** Actual browser state: provenance, stable retries and concurrent recovery. */
+const assert=require('node:assert/strict');
+const {environment}=require('./module_fixture.cjs');
+(async()=>{
+ const {load}=environment();const {PreparationDraft}=await load('features/preparations/draft.js');
+ const version={id:'v1',payload:{service:{name:'Original',description:'Source description',contacts:[{value:'123'}]},location:{kind:'none'},target:{kind:'new'},outcome:'review',field_origins:{},evidence:[{id:'quote',path:'/service/name'},{id:'other',path:'/service/description'}]}};
+ const draft=new PreparationDraft('item',version);
+ draft.edit('/service/name','Corrected');
+ assert.equal(draft.payload.evidence.length,1);
+ assert.equal(draft.payload.field_origins['/service/name'].state,'manual');
+ const first=draft.attempt('request1');draft.edit('/service/description',undefined);
+ assert.equal(draft.payload.field_origins['/service/description'].state,'cleared');
+ assert.equal(JSON.stringify(draft.attempt('request2')),JSON.stringify(first));
+ draft.acknowledge({items:[{item_id:'item',after:'v2'}]});
+ assert.equal(draft.dirty,true);assert.equal(draft.version,'v2');
+ assert.equal(draft.attempt('request3').changes[0].payload.service.description,undefined);
+ draft.edit('/service/name','Second correction');
+ const remote=structuredClone(version);remote.id='v3';remote.payload.service.name='Another person';remote.payload.service.contacts[0].value='456';
+ const conflicts=draft.rebase(remote);assert.equal(conflicts.length,1);assert.equal(conflicts[0].path,'/service/name');
+ assert.equal(draft.payload.service.name,'Second correction');
+ draft.rebase(remote,{'/service/name':'local'});
+ assert.equal(draft.payload.service.name,'Second correction');assert.equal(draft.payload.service.contacts[0].value,'456');
+ assert.equal(draft.version,'v3');assert.equal(draft.pending,null);
+ const another=new PreparationDraft('item',version);another.edit('/service/name','Mine');another.rebase(remote,{'/service/name':'remote'});
+ assert.equal(another.payload.service.name,'Another person');
+ const factVersion={id:'f1',payload:{...structuredClone(version.payload),schema_version:2,
+  source_facts:[{fact_id:'org',subject:'service',kind:'organization_name',source_value:'Source Org',value:'Source Org'},
+   {fact_id:'category',subject:'service',kind:'category_label',source_value:'Source category',value:'Source category'}],
+  resolutions:[{fact_id:'org',state:'confirmed',context:{},candidates:[],selected:{organization_id:'existing'},confirmation:{actor_id:'author'}}],
+  evidence:[{id:'literal-proof',path:'/source_facts/0/source_value',quote:'Source Org'}],field_origins:{}}};
+ const facts=new PreparationDraft('facts',factVersion);facts.edit('/source_facts/0/value','Corrected Org');
+ assert.equal(facts.payload.field_origins['/source_facts/0/value'].state,'manual');
+ assert.equal(facts.payload.source_facts[0].source_value,'Source Org');assert.equal(facts.payload.evidence.length,1);
+ assert.equal(facts.payload.resolutions[0].state,'unresolved');assert.equal(facts.payload.resolutions[0].selected,undefined);
+ const remoteFacts=structuredClone(factVersion);remoteFacts.id='f2';remoteFacts.payload.source_facts.reverse();
+ remoteFacts.payload.source_facts[0].value='Remote category';remoteFacts.payload.evidence[0].path='/source_facts/1/source_value';
+ assert.deepEqual(Array.from(facts.rebase(remoteFacts)),[]);
+ assert.equal(facts.payload.source_facts[0].value,'Remote category');assert.equal(facts.payload.source_facts[1].value,'Corrected Org');
+ assert.equal(facts.payload.evidence[0].path,'/source_facts/1/source_value');
+ assert.equal(facts.payload.field_origins['/source_facts/1/value'].state,'manual');
+ facts.edit('/source_facts/1/value',undefined);assert.equal(facts.payload.field_origins['/source_facts/1/value'].state,'cleared');
+ assert.equal(facts.payload.evidence.length,1);
+ const competing=new PreparationDraft('facts',factVersion);competing.edit('/source_facts/0/value','My org');
+ remoteFacts.payload.source_facts[1].value='Other org';
+ const factConflicts=competing.rebase(remoteFacts);assert.equal(factConflicts.length,1);assert.equal(factConflicts[0].path,'/source_facts/0/value');
+ competing.rebase(remoteFacts,{'/source_facts/0/value':'local'});
+ assert.equal(competing.payload.source_facts[1].value,'My org');assert.equal(competing.payload.source_facts[0].value,'Remote category');
+ assert.equal(facts.payload.resolutions[0].confirmation,undefined);
+ const decisions=new PreparationDraft('facts',factVersion);
+ decisions.resolveFact('category',{state:'ignored',context:{},candidates:[]});
+ const reordered=structuredClone(factVersion);reordered.id='next';reordered.payload.source_facts.reverse();
+ decisions.rebase(reordered);
+ assert.equal(decisions.payload.resolutions.find(r=>r.fact_id==='category').state,'ignored');
+ const sameFact=new PreparationDraft('facts',factVersion);
+ sameFact.resolveFact('category',{state:'proposed',context:{axis_id:'axis'},candidates:[{target:{term_id:'one'},rank:1,reason:'chosen'}]});
+ const competingDecision=structuredClone(factVersion);competingDecision.id='other';competingDecision.payload.resolutions.push({fact_id:'category',state:'ignored',context:{},candidates:[]});
+ assert.equal(sameFact.rebase(competingDecision)[0].path,'/resolutions/category');
+ sameFact.rebase(competingDecision,{'/resolutions/category':'local'});
+ assert.equal(sameFact.payload.resolutions.find(r=>r.fact_id==='category').state,'proposed');
+ const staleDecision=new PreparationDraft('facts',factVersion);
+ staleDecision.resolveFact('category',{state:'confirmed',context:{},candidates:[],selected:{target:{term_id:'one'}}});
+ competingDecision.payload.source_facts[1].value='Another category';
+ assert.equal(staleDecision.rebase(competingDecision)[0].stale,true);
+ staleDecision.rebase(competingDecision,{'/resolutions/category':'local'});
+ assert.equal(staleDecision.payload.resolutions.find(r=>r.fact_id==='category').state,'unresolved');
+ const fragment={fact:{fact_id:'added',kind:'organization_name',subject:'service',source_value:'Alfa',value:'Alfa'},evidence:{id:'exact',path:'/source_facts/0/source_value',quote:'Alfa'},field_origins:{'/source_facts/0/source_value':{state:'manual'},'/source_facts/0/value':{state:'manual'}}};
+ staleDecision.addSourceFact(fragment);staleDecision.addSourceFact(fragment);
+ assert.equal(staleDecision.payload.source_facts.filter(f=>f.fact_id==='added').length,1);
+ assert.equal(staleDecision.payload.evidence.at(-1).path,'/source_facts/2/source_value');
+ const removedFact=new PreparationDraft('facts',factVersion);
+ removedFact.resolveFact('org',{state:'ignored',context:{},candidates:[]});
+ const withoutOrg=structuredClone(factVersion);withoutOrg.id='removed';withoutOrg.payload.source_facts.shift();withoutOrg.payload.resolutions=[];withoutOrg.payload.evidence=[];
+ assert.equal(removedFact.rebase(withoutOrg)[0].missing,true);
+ removedFact.rebase(withoutOrg,{'/resolutions/org':'local'});
+ assert.equal(removedFact.payload.source_facts[1].fact_id,'org');assert.equal(removedFact.payload.evidence[0].path,'/source_facts/1/source_value');
+ console.log('Preparation draft: provenance, immutable retries, dirty saves and explicit conflict recovery passed.');
+})().catch(error=>{console.error(error);process.exitCode=1;});
