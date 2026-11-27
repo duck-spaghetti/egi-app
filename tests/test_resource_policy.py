@@ -37,3 +37,28 @@ class DiskPolicyTests(unittest.TestCase):
             self.assertGreaterEqual(len(run.record['source']),40)
         finally:
             run.close()
+
+    def test_metadata_failures_roll_back_before_postgres_start(self):
+        """Unavailable identity or metadata storage cannot leave unrecorded directories."""
+        from contextlib import ExitStack
+        from unittest.mock import patch
+        from devchecks.resources import OwnedCluster, ResourceRun
+        root=Path(__file__).resolve().parents[1]
+        for target in ('process_identity','source_identity','_write'):
+            with tempfile.TemporaryDirectory() as parent, ExitStack() as stack:
+                parent=Path(parent).resolve()
+                stack.enter_context(patch('devchecks.resources.process_identity',return_value='controlled'))
+                stack.enter_context(patch('devchecks.resources.source_identity',return_value={'source':'0'*40,'worktree':str(root)}))
+                stack.enter_context(patch('devchecks.resources.'+target,side_effect=PermissionError('controlled metadata failure')))
+                with self.assertRaises(PermissionError):
+                    ResourceRun(root,parent)
+                self.assertEqual(list(parent.iterdir()),[])
+        with patch('devchecks.resources.process_identity',return_value='controlled'):
+            run=ResourceRun(root)
+        with run.activate():
+            with patch.object(OwnedCluster,'save',side_effect=OSError('controlled record failure')):
+                with patch.object(OwnedCluster,'command') as command:
+                    with self.assertRaises(OSError):
+                        OwnedCluster(root,'/Library/PostgreSQL/18/bin')
+                    command.assert_not_called()
+            self.assertEqual([p.name for p in run.path.iterdir()],['run.json'])

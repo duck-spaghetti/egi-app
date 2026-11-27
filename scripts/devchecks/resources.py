@@ -146,20 +146,38 @@ def _directory(path, inode, uid):
         raise CleanupError('Resource directory ownership changed')
 
 
+@contextmanager
+def metadata_directory(prefix, parent):
+    """Roll back a new private directory if its pre-start metadata initialization fails."""
+    path = Path(tempfile.mkdtemp(prefix=prefix, dir=parent))
+    identity = path.stat()
+    try:
+        yield path
+    except BaseException as primary:
+        try:
+            _directory(path, identity.st_ino, identity.st_uid)
+            if not shutil.rmtree.avoids_symlink_attacks:
+                raise CleanupError('Platform lacks symlink-safe removal')
+            shutil.rmtree(path)
+        except BaseException as cleanup:
+            raise CleanupError(f'Metadata allocation failed; preserve {path}; cleanup: {cleanup}') from primary
+        raise
+
+
 class ResourceRun:
     """Attribute temporary clusters to one runner and recover only that runner's children."""
 
     def __init__(self, repository, root=DEFAULT_ROOT):
         """Create private run metadata before allocating database resources."""
-        self.path = Path(tempfile.mkdtemp(prefix='egi-resource-', dir=Path(root).resolve()))
-        self.token = secrets.token_hex(32)
-        self.record = {'schema_version': 1, 'run_id': uuid.uuid4().hex,
-                       'path': str(self.path), 'inode': self.path.stat().st_ino,
-                       'uid': os.getuid(), 'repository': str(Path(repository).resolve()),
-                       'owner_pid': os.getpid(), 'owner_identity': process_identity(os.getpid()),
-                       'created_at': time.time(), 'capability_hash': hashlib.sha256(self.token.encode()).hexdigest(),
-                       **source_identity(repository)}
-        _write(self.path / 'run.json', self.record)
+        with metadata_directory('egi-resource-', Path(root).resolve()) as self.path:
+            self.token = secrets.token_hex(32)
+            self.record = {'schema_version': 1, 'run_id': uuid.uuid4().hex,
+                           'path': str(self.path), 'inode': self.path.stat().st_ino,
+                           'uid': os.getuid(), 'repository': str(Path(repository).resolve()),
+                           'owner_pid': os.getpid(), 'owner_identity': process_identity(os.getpid()),
+                           'created_at': time.time(), 'capability_hash': hashlib.sha256(self.token.encode()).hexdigest(),
+                           **source_identity(repository)}
+            _write(self.path / 'run.json', self.record)
 
     @classmethod
     def inherited(cls):
@@ -250,17 +268,22 @@ class OwnedCluster:
         if self.own_run:
             self.run = ResourceRun(repository, root)
         self.run.validate()
-        self.path = Path(tempfile.mkdtemp(prefix='pg-', dir=self.run.path))
-        self.binary = Path(binary).resolve()
-        self.data = self.path / 'data'
-        self.record = {'schema_version': 1, 'path': str(self.path), 'data': str(self.data),
-                       'inode': self.path.stat().st_ino, 'uid': os.getuid(),
-                       'run_id': self.run.record['run_id'], 'binary': str(self.binary),
-                       'created_at': time.time(), 'server_pid': None, 'server_identity': None,
-                       'phase': 'allocated'}
-        self.save()
-        self.environment = {k: v for k, v in os.environ.items() if not k.startswith('PG')}
-        self.environment.update(PGHOST=str(self.path), PGPORT=str(port), PGDATABASE=database)
+        try:
+            with metadata_directory('pg-', self.run.path) as self.path:
+                self.binary = Path(binary).resolve()
+                self.data = self.path / 'data'
+                self.record = {'schema_version': 1, 'path': str(self.path), 'data': str(self.data),
+                               'inode': self.path.stat().st_ino, 'uid': os.getuid(),
+                               'run_id': self.run.record['run_id'], 'binary': str(self.binary),
+                               'created_at': time.time(), 'server_pid': None, 'server_identity': None,
+                               'phase': 'allocated'}
+                self.save()
+                self.environment = {k: v for k, v in os.environ.items() if not k.startswith('PG')}
+                self.environment.update(PGHOST=str(self.path), PGPORT=str(port), PGDATABASE=database)
+        except BaseException:
+            if self.own_run:
+                self.run.close()
+            raise
         try:
             self.command('initdb', '-D', self.data, '-A', 'trust', '--no-locale', '--encoding=UTF8')
             with (self.data / 'postgresql.conf').open('a') as stream:
