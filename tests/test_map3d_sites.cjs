@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict');const {environment}=require('./module_fixture.cjs');
 (async()=>{
- const {clusterSites,clusterAppearance,siteLabel,placeSiteHeads,hitsMapControls,MAX_HEAD_OFFSET}=await environment().load('features/map3d/sites.js');
+ const {clusterSites,clusterAppearance,siteLabel,placeSiteHeads,MAX_HEAD_OFFSET}=await environment().load('features/map3d/sites.js');
  const project=([x,y])=>({x,y}),sites=[{lng:63,lat:10},{lng:65,lat:10},{lng:200,lat:10}];
  assert.deepEqual(Array.from(clusterSites(sites,project,14),g=>g.members.length).sort(),[1,2],'neighbours across grid boundary merge');
  assert.equal(clusterSites(sites,project,16).length,3,'close zoom preserves each site');
@@ -9,7 +9,7 @@ const assert=require('node:assert/strict');const {environment}=require('./module
  for(let a=0;a<groups.length;a++)for(let b=a+1;b<groups.length;b++)assert(Math.hypot(groups[a].point.x-groups[b].point.x,groups[a].point.y-groups[b].point.y)>=64);
  assert(clusterAppearance(64).size>clusterAppearance(2).size);assert.notEqual(clusterAppearance(64).background,clusterAppearance(2).background);
  const close=[0,1,2].map(i=>({site:{serviceIds:[String(i)]},members:[{}],lngLat:[12.5+i*.00001,41.9],point:{x:400+i*4,y:350+i*2}}));
- const view={width:1000,height:700,zoom:17};assert(hitsMapControls({left:50,right:100,top:180,bottom:240},view),'new left camera rail is reserved');assert(hitsMapControls({left:900,right:980,top:100,bottom:160},view),'right mode rail remains reserved');assert(hitsMapControls({left:900,right:980,top:180,bottom:240},{...view,rtl:true}),'RTL camera rail is reserved opposite modes');assert(!hitsMapControls({left:300,right:360,top:180,bottom:240},view));assert(hitsMapControls({left:300,right:360,top:180,bottom:240},{...view,controls:[{left:310,right:340,top:170,bottom:250}]}),'measured control bounds override fallback rails');const heads=placeSiteHeads(close,view),overlap=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
+ const view={width:1000,height:700,zoom:17};const heads=placeSiteHeads(close,view),overlap=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
  const denseHeads=Array.from({length:8},(_,i)=>({site:{serviceIds:[String(i)]},members:[{}],point:{x:400+i*2,y:350},lngLat:[12.5+i*.00001,41.9]}));
  const compact=placeSiteHeads(denseHeads,view);assert(Math.max(...[...compact.values()].map(p=>Math.hypot(p.dx,p.dy-21)))<=64,'dense service leaders remain within64px instead of89px');
  const positions=[...heads.values()];assert(positions.some(p=>p.dx||p.dy));for(let i=0;i<positions.length;i++){assert(Math.hypot(positions[i].dx,positions[i].dy)<=MAX_HEAD_OFFSET);for(let j=0;j<i;j++)assert(!overlap(positions[i].box,positions[j].box),'distinct close heads must not overlap');}
@@ -18,10 +18,21 @@ const assert=require('node:assert/strict');const {environment}=require('./module
   for(let i=0;i<placed.length;i++)for(let j=0;j<i;j++)assert(!overlap(placed[i].box,placed[j].box),`nearby civic markers remain separate at z${zoom}`);
  }
  const moving=close.map(g=>({...g,previous:heads.get(g)}));
- const stable=placeSiteHeads(moving,view);for(const g of moving){const p=stable.get(g);assert(p.dx*g.previous.dx+p.dy*g.previous.dy>=0,'a valid direction is retained when shortening');assert(Math.hypot(p.dx,p.dy)<=Math.hypot(g.previous.dx,g.previous.dy),'reuse does not lengthen a valid candidate');}
+ const stable=placeSiteHeads(moving,view);for(const g of moving){const p=stable.get(g);assert.equal(p.dx,g.previous.dx,'valid horizontal offsets do not compact during movement');assert.equal(p.dy,g.previous.dy,'valid vertical offsets do not compact during movement');}
  const sideBlocked=close.slice(0,2).map(g=>({...g,previous:heads.get(g)}));
- const turned=placeSiteHeads(sideBlocked,{...view,controls:[{left:300,right:370,top:250,bottom:345}]});
- assert(turned.get(sideBlocked[1]).dx>0,'blocked previous direction uses free space on the other side');
+ const underControls=placeSiteHeads(sideBlocked,{...view,controls:[{left:300,right:370,top:250,bottom:345}]});
+ const withoutControls=placeSiteHeads(sideBlocked,view);
+ for(const g of sideBlocked)assert.deepEqual({...underControls.get(g)},{...withoutControls.get(g)},'UI rectangles must not deflect POI heads');
+ const lone=[{site:{serviceIds:['lone']},members:[{}],point:{x:70,y:220},previous:{dx:36,dy:0}}];
+ for(const point of [{x:70,y:220},{x:12,y:35},{x:980,y:680}]){
+  lone[0].point=point;const p=placeSiteHeads(lone,{...view,width:390,height:844,controls:[{left:0,right:150,top:0,bottom:335}]}).get(lone[0]);
+  assert.equal(p.dx,36,'an isolated valid offset is not shortened, even behind UI or beyond an edge');assert.equal(p.dy,0);
+ }
+ const conflict=sideBlocked.map(g=>({...g,point:{...g.point}}));
+ conflict[1].point={x:conflict[0].point.x-conflict[1].previous.dx,y:conflict[0].point.y};
+ const repaired=placeSiteHeads(conflict,view);
+ assert.notEqual(repaired.get(conflict[1]).dx,conflict[1].previous.dx,'an actual POI collision still triggers relocation');
+ assert(!overlap(repaired.get(conflict[0]).box,repaired.get(conflict[1]).box));
  // Retained screen projections of the five Giolitti sites; anonymous IDs preserve deterministic ordering.
  const streetViews=[[[716.645,379.474],[633.052,331.84],[640,338],[586.951,293.957],[643.74,338.633]],
   [[693.597,288.476],[631.192,342.967],[640,338],[572.265,378.792],[640.893,335.364]],

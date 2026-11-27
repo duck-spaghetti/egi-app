@@ -1,13 +1,3 @@
-/** Conservative map-space footprints shared by service heads and their expanded labels. */
-export function hitsMapControls(box,{width,height,rtl=false,controls=null}){
- if(controls)return controls.some(c=>box.left<c.right&&box.right>c.left&&box.top<c.bottom&&box.bottom>c.top);
- const camera=(rtl?box.right>width-140:box.left<140)&&box.right>0&&box.top<312&&box.bottom>100;
- const modes=(rtl?box.left<140:box.right>width-140)&&box.top<270;
- const brand=box.left<150&&box.top<125;
- const navigation=box.bottom>height-115&&(box.left<110||box.right>width-110||box.left<width/2+85&&box.right>width/2-85);
- return camera||modes||brand||navigation;
-}
-
 import {iconPath} from '../map/pins.js';
 import {escapeHtml,categoryCaption} from '../../format.js';
 /** Screen-space site clustering and progressive labels; editorial/service rules stay upstream. */
@@ -23,7 +13,7 @@ const HEAD_CANDIDATES=[[0,0],...[180,0,210,330,240,300,270,150,30,120,60,90].fla
  })).filter(([dx,dy])=>Math.hypot(dx,dy-21)<=MAX_LEADER_LENGTH)];
 
 /** Separate nearby site heads in screen space; feet and source grouping never move. */
-export function placeSiteHeads(layout,{width,height,zoom,selectedId,rtl=false,controls=null}){
+export function placeSiteHeads(layout,{zoom,selectedId}){
  const result=new Map();if(zoom<STEM_ZOOM)return result;
  const cells=new Map(),owners=new Map(),size=64,intersects=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
  let repairBudget=256;
@@ -48,17 +38,15 @@ export function placeSiteHeads(layout,{width,height,zoom,selectedId,rtl=false,co
  const distance=group=>!focus?0:group.lngLat&&focus.lngLat?
   Math.hypot(group.lngLat[0]-focus.lngLat[0],group.lngLat[1]-focus.lngLat[1]):Math.hypot(group.point.x-focus.point.x,group.point.y-focus.point.y);
  const identity=group=>group.key||String(group.site.serviceIds?.slice().sort().join(',')||`${group.lngLat}`);
- const screen={width,height,rtl,controls};
- const inFrame=box=>box.left>=4&&box.right<=width-4&&box.top>=4&&box.bottom<=height-4;
  const at=(point,dx,dy)=>{
   const box=boxAt(point,dx,dy);
-  return inFrame(box)&&!hitsMapControls(box,screen)&&!hits(box)?{dx,dy,box}:null;
+  return !hits(box)?{dx,dy,box}:null;
  };
  /** Repair a greedy dead end by relocating at most two heads, with a shared per-pass work cap. */
  function repair(group){
   for(const [dx,dy] of HEAD_CANDIDATES){
    if(repairBudget<=0)return null;
-   const box=boxAt(group.point,dx,dy);if(!inFrame(box)||hitsMapControls(box,screen))continue;
+   const box=boxAt(group.point,dx,dy);
    const conflicts=new Set();let fixed=false;
    visitCells(box,row=>{for(const other of row)if(intersects(box,other)){if(!owners.has(other)){fixed=true;return true;}conflicts.add(other);if(conflicts.size>2)return true;}return false;});
    if(fixed)continue;
@@ -91,10 +79,10 @@ export function placeSiteHeads(layout,{width,height,zoom,selectedId,rtl=false,co
  for(const {group} of ordered){
   let placed=null;
   const previous=group.previous;
-  // Keep a valid direction, shortening along it only when a substantial reduction fits.
+  // A valid offset is persistent: neither UI/viewport overlap nor available shorter paths move it.
   if(previous&&previous.dx**2+previous.dy**2<=MAX_HEAD_OFFSET**2&&previous.dx**2+(previous.dy-21)**2<=MAX_LEADER_LENGTH**2){
    const held=at(group.point,previous.dx,previous.dy);
-   if(held)placed=previous.dx===0&&previous.dy===0?held:at(group.point,0,0)||at(group.point,previous.dx*.75,previous.dy*.75)||held;
+   if(held)placed=held;
   }
   if(!placed)for(const [dx,dy] of HEAD_CANDIDATES){
    placed=at(group.point,dx,dy);if(placed)break;

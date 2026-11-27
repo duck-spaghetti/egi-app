@@ -887,9 +887,12 @@ identical line/mesh data is not resent to the renderer worker. Explicit wrapper
 stacking is transport10, service20, popup30, navigation40. Service label backgrounds
 are white80%, text/status/icons opaque. Source feet stay fixed while service heads
 try stable screen offsets up to56px (leaders at most64px), connected by leaders.
-Heads try a bounded fan of directions and shorten only when there is room; zoom
-never forces necessary separation to zero. Source-space proximity prioritizes
-the selected site's neighbours, and valid directions are retained where possible.
+Heads try a bounded fan of directions for POI collisions and retain each valid
+offset exactly, even when a shorter path becomes available. UI overlays and
+viewport edges do not redirect heads; controls remain above them. Existing zoom-out
+clustering is unchanged. Source-space proximity prioritizes the selected site's
+neighbours. Secondary labels retain their side when possible and may be clipped
+or suppressed for viewport/POI collisions without moving the head.
 One bounded collision pass updates existing heads/SVG endpoints in MapLibre's
 own render frame during zoom, rotation and pan; there is no second layout RAF loop
 or service-content rebuild. The spatial index uses numeric cells and a capped

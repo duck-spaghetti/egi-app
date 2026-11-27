@@ -105,8 +105,8 @@ the existing M2 preview and port 4317 are not changed.
 
 The original zoom-scaled candidate set collapsed distinct civic heads at
 intermediate zooms. The corrected planner uses a bounded fan with 56px maximum
-head displacement and 64px maximum SVG leader length. It retains valid directions
-and shortens only when a collision-free position exists. Source-space proximity
+head displacement and 64px maximum SVG leader length. It retains valid offsets exactly (the stability amendment below supersedes the
+earlier automatic shortening policy). Source-space proximity
 puts the selected site's neighbours before distant markers. A capped local repair
 can relocate at most two blocking heads per repair; the shared work cap prevents
 an unbounded search in saturated views.
@@ -181,3 +181,45 @@ collection; exploratory runs are retained separately from the final summary.
 Physical-phone acceptance remains pending. Neither synthetic marker fixtures nor
 desktop frame observations replace it. The complete R1 review preview remains on
 4324; the temporary comparison server uses 4325. R2 remains outside this work.
+
+## EGI-120 stability amendment: UI overlays never repel POIs
+
+User review on 2026-11-27 identified camera buttons and other interface elements
+redirecting nearby heads during pan. The planner now considers only other POI
+heads, source feet and existing clusters. UI rectangles and viewport edges are
+not placement obstacles; navigation remains above services through existing
+stacking. A still-valid bounded offset persists exactly, including when an
+unshifted or shorter path becomes available. A real POI collision can still
+relocate it. Zoom-out clustering keeps its existing threshold (z15). No source
+coordinate, data acquisition, building or transport behavior changes.
+
+Secondary labels no longer avoid UI rectangles or reserve an artificial toolbar
+margin. They prefer their existing side when it fits. Viewport/POI collisions
+can still flip or suppress secondary content without redirecting the icon.
+
+Evidence against frozen ecf0a55, desktop in-app browser, viewport 1280 × 676, DPR 2:
+
+- A real camera-control crossing reproduced **25/109 offset changes before**;
+  the correction has **0/109**, including 25 frames beneath the control. The
+  same button survives and DOM hit testing confirms controls remain on top.
+- Via Giolitti with all 594 retained records: **0/36** static overlap failures
+  across z14, 14.9, 15, 15.5, 16, 16.5, 17, 17.5, 18 and four bearings; clusters
+  remain present in all eight checks below z15. **0/109** gesture failures;
+  maximum observed leader 59.9px, under the unchanged 64px bound.
+- Three 100-marker zoom runs: layout CPU p95 **0.8/0.7/0.6ms**, versus
+  **0.7/0.7/0.5ms** before; pan/rotation **0.4/0.3/0.4ms**, versus
+  **0.5/0.6/0.5ms**. All remain under the existing 1ms budget. Samples establish
+  budget compliance, not a statistically significant overall speedup.
+- Corrected frame p95: zoom **16.7/17.3/16.8ms**, pan **16.8/17.0/16.8ms**;
+  before: zoom **16.7/16.8/17.5ms**, pan **16.8/16.8/16.8ms**. No gap over
+  33.4ms; button/body/markup identity, SVG alignment and source coordinates pass.
+  Peak corrected JS heap was 59.8MiB; this excludes GPU/process memory. Phone
+  acceptance and GPU profiling remain pending.
+- All **22 Node suites pass**, including a regression that first failed on
+  ecf0a55: panning a nearby group under UI/beyond viewport boundaries must retain
+  all valid offsets, while a new real POI collision must still trigger separation.
+  Existing four map HTTP tests are reused unchanged: this correction changes
+  only frontend placement and its tests/documentation.
+
+The local stability-evidence collection retains the raw runs and final summary;
+exploratory mislabeled comparisons are excluded. R1 remains in human review.

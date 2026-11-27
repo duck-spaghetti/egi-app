@@ -1,5 +1,5 @@
 import {siteMarkers,USER_DOT_HTML,USER_DOT_LABEL} from "../map/pins.js";
-import {clusterSites,clusterAppearance,siteLabel,placeSiteHeads,siteHeadBox,hitsMapControls,CLUSTER_DISTANCE,STEM_ZOOM,NAME_ZOOM,DETAIL_ZOOM} from "./sites.js";
+import {clusterSites,clusterAppearance,siteLabel,placeSiteHeads,siteHeadBox,CLUSTER_DISTANCE,STEM_ZOOM,NAME_ZOOM,DETAIL_ZOOM} from "./sites.js";
 import {egiStyle,liftBridgeLabels} from "./style.js";
 /** createMap3d: the 3D mode's map module, on MapLibre GL JS, with the current map's interface.
  *
@@ -148,7 +148,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   for(const group of layout)if(group.label){
    const {headPoint:p,label:l}=group,box={left:p.x+l.left,right:p.x+l.right,top:p.y+l.top,bottom:p.y+l.bottom};
    const blocked=box.left<0||box.right>runtime.screen.width||box.top<0||box.bottom>runtime.screen.height||
-    hitsMapControls(box,runtime.screen)||labels.some(other=>intersects(box,other))||
+    labels.some(other=>intersects(box,other))||
     layout.some(other=>other!==group&&intersects(box,siteHeadBox(other.headPoint)));
    const entry=runtime.markers.get(group.key),hidden=String(blocked);if(entry.el.dataset.labelColliding!==hidden)entry.el.dataset.labelColliding=hidden;
    if(!blocked)labels.push(box);
@@ -163,10 +163,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
   runtime.layout=[];
   if(visible){
    const viewport=map.getContainer?.(),screenWidth=viewport?.clientWidth||Infinity,screenHeight=viewport?.clientHeight||Infinity;
-   // Read the actual UI once before writing markers; safe areas/RTL/stack heights cannot drift from layout.
-   const originBox=viewport?.getBoundingClientRect?.(),scene=viewport?.parentElement||viewport;
-   const controls=originBox&&scene?.querySelectorAll?[...scene.querySelectorAll('.maplibregl-ctrl,.map-mode-tools,.map-brand,.map-city-tag,.floating-actions .nav-btn,.floating-actions .view-toggle')].map(el=>el.getBoundingClientRect()).filter(b=>b.width>0&&b.height>0).map(b=>({left:b.left-originBox.left,right:b.right-originBox.left,top:b.top-originBox.top,bottom:b.bottom-originBox.top})):null;
-   runtime.screen={width:screenWidth,height:screenHeight,rtl:document.documentElement?.dir==='rtl',controls};
+   runtime.screen={width:screenWidth,height:screenHeight};
    const onscreen=screenWidth===Infinity?entries:entries.filter(site=>{const p=map.project([site.lng,site.lat]);return p.x>=-120&&p.x<=screenWidth+120&&p.y>=-120&&p.y<=screenHeight+120;});
    const layout=cluster(onscreen).map(group=>{
     const {site,members}=group,count=members.length;
@@ -174,7 +171,7 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
     const key=count===1?`site:${site.serviceIds.slice().sort().join(',')}`:`${lngLat[0].toFixed(6)},${lngLat[1].toFixed(6)},${count}`;
     return {...group,key,lngLat,point:map.project(lngLat),previous:runtime.markers.get(key)?.head};
    });
-   const heads=placeSiteHeads(layout,{width:screenWidth,height:screenHeight,zoom:map.getZoom(),selectedId:state.selectedId,rtl:document.documentElement?.dir==='rtl',controls});
+   const heads=placeSiteHeads(layout,{zoom:map.getZoom(),selectedId:state.selectedId});
    runtime.layout=layout;
    for(const group of layout){const head=heads.get(group);group.headPoint=head?{x:group.point.x+head.dx,y:group.point.y+head.dy}:group.point;}
    for(const group of layout){
@@ -206,7 +203,6 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
      const anchored=map.getZoom()>=STEM_ZOOM,detail=selected||map.getZoom()>=DETAIL_ZOOM;
      const maxWidth=Math.min(detail?260:200,Math.max(130,(screenWidth-50)/2-30));
      const statusLength=Math.max(0,...(site.statuses||[]).map(s=>s?.label?.length||0),(site.statuses||[]).length>1?48:0);
-     const rtl=document.documentElement?.dir==='rtl';
      const intersects=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
      let placement=null;
      // Try a narrower integrated head before dropping information in a dense view.
@@ -216,14 +212,13 @@ export function createMap3d({context,sites,describe,emit,maplibre,pmtiles,transl
       const categoryCount=(site.allCategories||site.categories||[]).length;
       const secondaryHeight=categoryCount>1?23*Math.ceil(categoryCount/columns):site.kinds?.length?20:0;
       const labelHeight=detail?33+secondaryHeight+14*statusLines:44;
-      const preferred=headPoint.x+30+width>screenWidth-140;
+      const preferred=entry.el.dataset.labelSide?entry.el.dataset.labelSide==='left':headPoint.x+30+width>screenWidth;
       for(const leftSide of [preferred,!preferred]){
        const left=leftSide?headPoint.x-30-width:headPoint.x-24,right=leftSide?headPoint.x+24:headPoint.x+30+width;
        const height=Math.max(44,labelHeight),box={left,right,top:headPoint.y-46-height/2,bottom:headPoint.y-46+height/2};
        const inFrame=box.left>=0&&box.right<=screenWidth&&box.top>=0&&box.bottom<=screenHeight;
        const hitsPin=layout.some(other=>other!==group&&intersects(box,siteHeadBox(other.headPoint)));
-       const hitsTools=hitsMapControls(box,{width:screenWidth,height:screenHeight,rtl,controls});
-       if(inFrame&&!hitsTools&&!hitsPin&&!labels.some(b=>intersects(box,b))){placement={width,leftSide,box,height};break;}
+       if(inFrame&&!hitsPin&&!labels.some(b=>intersects(box,b))){placement={width,leftSide,box,height};break;}
       }
       if(placement)break;
      }

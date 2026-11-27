@@ -2,7 +2,9 @@
 const assert=require('node:assert/strict');
 const {environment}=require('./module_fixture.cjs');
 (async()=>{
- const frames=new Map();let id=0,gl,writes=0,described=0;
+ const frames=new Map();let id=0,gl,writes=0,described=0,panX=0,panY=0;
+ const ui={getBoundingClientRect:()=>({left:45,right:145,top:100,bottom:335,width:100,height:235})};
+ const container={clientWidth:1280,clientHeight:800,getBoundingClientRect:()=>({left:0,top:0}),parentElement:{querySelectorAll:()=>[ui]}};
  const env=environment(),createElement=env.document.createElement;
  env.document.createElement=()=>{
   const el=createElement(),path=createElement();let html='';
@@ -17,8 +19,8 @@ const {environment}=require('./module_fixture.cjs');
   on(k,f){(this.handlers[k]||=[]).push(f);}off(k,f){this.handlers[k]=(this.handlers[k]||[]).filter(h=>h!==f);}
   fire(k){for(const f of this.handlers[k]||[])f();}addControl(c){c.onAdd?.(this);}
   getPitch(){return 45;}getZoom(){return this.zoom;}
-  project([x,y]){return {x:600+(x-12.5)*30000,y:400+(y-41.9)*30000};}
-  getContainer(){return {clientWidth:1280,clientHeight:800};}remove(){}
+  project([x,y]){return {x:600+(x-12.5)*30000+panX,y:400+(y-41.9)*30000+panY};}
+  getContainer(){return container;}remove(){}
  }
  class Marker{
   constructor(o){this.o=o;markers.push(this);}setLngLat(ll){this.ll=ll;return this;}
@@ -37,10 +39,15 @@ const {environment}=require('./module_fixture.cjs');
  const shifted=buttons.find(b=>Math.abs(parseFloat(b.style['--site-head-x']))>0);assert(shifted);
  const offset=()=>parseFloat(shifted.style['--site-head-x']),initial=offset();
  const flush=()=>gl.fire('render');
- const htmlWrites=writes,descriptions=described;
+ let htmlWrites=writes;const descriptions=described;
  gl.zoom=16.75;gl.fire('move');gl.zoom=16.5;gl.fire('move');assert.equal(writes,htmlWrites,'camera events defer writes to the map render frame');
  flush();assert.equal(offset(),initial,'do not shorten a necessary separation into a collision');
  assert.equal(Number(shifted.querySelector().attributes.d.split('L')[1].split(' ')[0]),offset(),'leader endpoint moves with head');
+ const offsets=buttons.map(b=>[b.style['--site-head-x'],b.style['--site-head-y']]);
+ panX=-530;panY=-180;gl.fire('move');flush();
+ assert.deepEqual(buttons.map(b=>[b.style['--site-head-x'],b.style['--site-head-y']]),offsets,'pan behind camera controls and viewport edge must not deflect heads');
+ gl.fire('moveend');assert.deepEqual(buttons.map(b=>[b.style['--site-head-x'],b.style['--site-head-y']]),offsets,'settled layout also ignores UI and viewport obstacles');
+ panX=0;panY=0;gl.fire('move');flush();gl.fire('moveend');htmlWrites=writes;
  gl.project=([x,y])=>({x:600-(x-12.5)*30000,y:400+(y-41.9)*30000});gl.fire('move');flush();
  assert.equal(writes,htmlWrites,'rotation placement must not replace pin content');
  gl.zoom=17;gl.fire('move');flush();
