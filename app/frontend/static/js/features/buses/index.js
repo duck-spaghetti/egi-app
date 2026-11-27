@@ -12,8 +12,8 @@ export function createBuses({scope,http,translate:t,
  reduced=Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches),
  frame=globalThis.requestAnimationFrame?.bind(globalThis),cancel=globalThis.cancelAnimationFrame?.bind(globalThis),
  clock=()=>Date.now(),container=null,host=document,delay=setTimeout,undelay=clearTimeout}){
- let map=null,visible=false,disposed=false,request=null,timer=null,tick=null,animation=null,lines=[],snapshot=null,received=0,generation=0;
- let shown=new Map(),transition=null,statusKey='',lastData=null;const cleanup=[];
+ let map=null,transportScene=null,visible=false,disposed=false,request=null,timer=null,tick=null,animation=null,lines=[],snapshot=null,received=0,generation=0;
+ let shown=new Map(),transition=null,statusKey='',lastData=null,sceneVisible=null;const cleanup=[];
  const panel=document.createElement('div');panel.className='map3d-buses';
  const button=document.createElement('button');button.type='button';button.className='btn';
  const input=document.createElement('input');input.type='text';input.maxLength=2000;
@@ -29,11 +29,14 @@ export function createBuses({scope,http,translate:t,
  function own(event,fn){map.on(event,fn);cleanup.push(()=>map.off?.(event,fn));}
  function ensure(){
   if(disposed||map.isStyleLoaded?.()===false||map.getSource(SOURCE))return;
-  map.addSource(SOURCE,{type:'geojson',data:empty(),attribution:'Roma Mobilità · CC BY-SA'});lastData=null;
+  map.addSource(SOURCE,{type:'geojson',data:empty(),attribution:'Roma Mobilità · CC BY-SA'});lastData=null;sceneVisible=null;
   for(const [id,old,opacity] of [[LAYERS[0],false,.9],[LAYERS[1],true,.3]])map.addLayer({id,minzoom:15,type:'fill-extrusion',source:SOURCE,filter:['==',['get','old'],old],paint:{'fill-extrusion-color':'#f5c400','fill-extrusion-height':4.8,'fill-extrusion-opacity':opacity}});
   map.addLayer({id:LAYERS[2],type:'symbol',source:SOURCE,minzoom:16,layout:{'text-field':['get','code'],'text-font':['Noto Sans Regular'],'text-size':13,'text-allow-overlap':false},paint:{'text-color':'#302800','text-halo-color':'#fff','text-halo-width':1.5,'text-opacity':['case',['get','old'],.3,1]}});
  }
  function draw(data){
+  const records=data.features.map(f=>({id:f.id,coordinates:f.properties._position,bearing:f.properties._bearing,old:f.properties.old}));
+  const custom=transportScene?.setVehicles(records)||false;
+  if(custom!==sceneVisible){for(const id of LAYERS.slice(0,2))if(map.getLayer?.(id))map.setLayoutProperty?.(id,'visibility',custom?'none':'visible');sceneVisible=custom;}
   const source=map.getSource(SOURCE);if(!source)return;
   const encoded=JSON.stringify(data);if(encoded===lastData)return;
   source.setData(data);lastData=encoded;
@@ -52,7 +55,7 @@ export function createBuses({scope,http,translate:t,
    const lat=previous?previous.lat+(vehicle.lat-previous.lat)*p:vehicle.lat;
    const bearing=vehicle.bearing??(previous&&(previous.lon!==vehicle.lon||previous.lat!==vehicle.lat)?(Math.atan2((vehicle.lon-previous.lon)*Math.cos(lat*RAD),vehicle.lat-previous.lat)/RAD+360)%360:previous?.bearing??0);
    next.set(vehicle.id,{lon,lat,bearing});
-   features.push({type:'Feature',id:vehicle.id,geometry:footprint(lon,lat,bearing),properties:{code:vehicle.code||'',old:vehicle.age===null||vehicle.age+elapsed>120}});
+   features.push({type:'Feature',id:vehicle.id,geometry:footprint(lon,lat,bearing),properties:{code:vehicle.code||'',old:vehicle.age===null||vehicle.age+elapsed>120,_position:[lon,lat],_bearing:bearing}});
   }
   shown=next;draw({type:'FeatureCollection',features});say(features.length?'live':'empty');
  }
@@ -78,8 +81,8 @@ export function createBuses({scope,http,translate:t,
  button.addEventListener('click',()=>setVisible(!visible),{signal:scope.signal});
  input.addEventListener('input',()=>setLines(input.value.split(',')),{signal:scope.signal});
  host.addEventListener('visibilitychange',schedule,{signal:scope.signal});
- function mount(attach){attach(m=>{map=m;(container||map.getContainer()).appendChild(panel);if(container){container.hidden=false;panel.classList.add("in-layers");}own('moveend',schedule);own('zoom',()=>{if(!active()){stop();snapshot=null;render();}});own('load',()=>{ensure();render();});ensure();setVisible(false);
+ function mount(attach){attach((m,engine)=>{map=m;transportScene=engine?.transportScene||null;(container||map.getContainer()).appendChild(panel);if(container){container.hidden=false;panel.classList.add("in-layers");}own('egi:transport-scene',()=>render());own('moveend',schedule);own('zoom',()=>{if(!active()){stop();snapshot=null;render();}});own('load',()=>{ensure();render();});ensure();setVisible(false);
   const age=()=>{if(disposed)return;if(active()&&snapshot&&!animation)render();tick=delay(age,1000);};tick=delay(age,1000);});}
- function dispose(){disposed=true;visible=false;stop();undelay(tick);for(const fn of cleanup)fn();panel.remove?.();for(const id of [...LAYERS].reverse())if(map?.getLayer?.(id))map.removeLayer(id);if(map?.getSource(SOURCE))map.removeSource(SOURCE);}
+ function dispose(){transportScene?.setVehicles([]);disposed=true;visible=false;stop();undelay(tick);for(const fn of cleanup)fn();panel.remove?.();for(const id of [...LAYERS].reverse())if(map?.getLayer?.(id))map.removeLayer(id);if(map?.getSource(SOURCE))map.removeSource(SOURCE);}
  return {mount,setVisible,setLines,refreshLabels,reload:load,dispose};
 }

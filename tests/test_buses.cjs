@@ -32,5 +32,11 @@ const assert=require('node:assert/strict');const {environment,element}=require('
  const polygon=footprint(12.5,41.9,0).coordinates[0];const width=(polygon[1][0]-polygon[0][0])*111320*Math.cos(41.9*Math.PI/180);const length=(polygon[2][1]-polygon[1][1])*111320;
  assert(Math.abs(width-4)<.001);assert(Math.abs(length-18)<.001);
  layer.dispose();assert.equal(map.layers.length,0);assert.equal(jobs.size,0);
+ // The shared scene consumes eligible observations; native recovery and labels remain separate.
+ const snapshots=[],visibility=[];let sceneReady=true;const shared={setVehicles(records){snapshots.push(JSON.parse(JSON.stringify(records)));return sceneReady;}};
+ map.setLayoutProperty=(id,key,value)=>visibility.push([id,key,value]);map.zoom=15;now=1000000;response={...response,stale:false,feed_timestamp:1000,now:1000};
+ const second=createBuses({scope:{signal:new AbortController().signal},http:{request:async()=>({ok:true,json:async()=>response})},translate:k=>k,reduced:true,host,clock:()=>now,delay,undelay});
+ second.mount(fn=>fn(map,{transportScene:shared}));second.setVisible(true);await second.reload();assert.equal(snapshots.at(-1)[0].id,'v');assert.equal(JSON.stringify(snapshots.at(-1)[0].coordinates),'[12.5,41.9]');assert(visibility.slice(-2).every(v=>v[2]==='none'),'native boxes hidden when custom models are ready');
+ sceneReady=false;handlers['egi:transport-scene']();assert(visibility.slice(-2).every(v=>v[2]==='visible'),'renderer failure restores boxes');second.setVisible(false);assert.equal(snapshots.at(-1).length,0,'hidden buses clear shared instances');second.dispose();assert.equal(jobs.size,0);
  console.log('PASS: bus off/zoom/visibility gates, POST line filter, old positions, stale feed, timed expiry, reduced motion, disposal and dimensions');
 })().catch(e=>{console.error(e);process.exitCode=1;});

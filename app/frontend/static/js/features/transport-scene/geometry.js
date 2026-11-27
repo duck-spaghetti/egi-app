@@ -26,6 +26,8 @@ export function signMeshes(){
 export function busMesh(distant=false){
  const b=builder();b.box(0,0,.65,4,18,3.5,'#e9bd27');if(distant){b.box(0,-7.6,3.9,3.3,2,.9,'#224655');return b.mesh();}
  b.box(0,0,4.15,3.7,17,.65,'#ede5c7');
+ for(const y of [-9.08,9.08])b.box(0,y,.7,3.8,.12,.25,'#42484b');
+ b.box(0,2,4.5,2.1,3,.3,'#d9d3b9');b.box(2.06,-5,1,.04,2.1,2.7,'#294956');
  b.box(0,-9.03,1.7,3.4,.04,2.25,'#214656'); // Front (north) differs clearly from yellow rear.
  for(const x of [-2.03,2.03]){b.box(x,-.4,2.1,.04,13,1.5,'#335869');for(const y of [-5.8,5.8])b.box(x,y,.1,.25,1.8,1.45,'#303436');}
  for(const x of [-1.25,1.25]){b.box(x,9.03,1.1,.55,.05,.65,'#a82d32');b.box(x,-9.06,1,.5,.05,.25,'#fff1cb');}

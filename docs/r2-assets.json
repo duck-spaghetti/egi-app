@@ -12,5 +12,17 @@
   "meshes": {
     "source": "app/frontend/static/js/features/transport-scene/geometry.js",
     "provenance": "Original procedural metre-space geometry, no downloaded model"
+  },
+  "measured": {
+    "jsSourceBytes": 17427,
+    "gzipJsBytes": 6799,
+    "meshBytes": 24192,
+    "triangles": {
+      "pole": 12,
+      "board": 12,
+      "bus": 204,
+      "distant": 24
+    },
+    "instanceBytes300combined": 19200
   }
 }

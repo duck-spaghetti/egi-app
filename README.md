@@ -906,13 +906,14 @@ Service opening labels show known closing times and the next known opening using
 the schedule timezone, without inventing boundaries for incomplete/24h schedules.
 The verification qualifier is omitted per user choice; provenance remains in cards.
 
-## R2 transport renderer proposal
+## R2 readable transport
 
-[R2 design proposal](docs/r2-renderer-proposal.md) records EGI-122: alternatives,
-shared ownership, original asset plan, depth-aware picking experiment and proposed
-budgets. R2 is authorized whole-set with local commits; concrete architecture,
-asset and test-boundary approval remains required before EGI-123/124 adoption.
-The user approved the concrete proposal and isolated experiment; the experiment
-passed. [R2 execution/evidence](docs/r2-rendering.md) records the shared scene,
-original atlas, depth-aware selection and native recovery. Whole-set execution
-continues to buses before final milestone review.
+The approved [shared renderer](docs/r2-renderer-proposal.md) uses one map-owned
+WebGL2 scene for original Roman-inspired sign boards and low-poly bus instances.
+Boards face the camera; poles and source coordinates stay fixed. Native depth
+blocks physical selection behind buildings; keyboard/HTML discovery and existing
+popups remain. Native representations provide recovery without duplicate drawing.
+No new library, font, model acquisition, feed or prediction behavior is introduced.
+[R2 execution and evidence](docs/r2-rendering.md) records budgets, ownership,
+asset provenance, desktop/lifecycle checks and pending physical-phone acceptance.
+Work is local-commit only and remains subject to final R2 review before C.

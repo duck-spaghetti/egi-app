@@ -52,7 +52,7 @@ export function createTransportScene({map,maplibre,onStopSelect=()=>{},loadAtlas
  function fail(){if(disposed||failed)return;failed=true;ready=false;cancelPick();release();if(map.getLayer?.(SCENE_ID))map.removeLayer(SCENE_ID);notify();}
  function local(record){const c=maplibre.MercatorCoordinate.fromLngLat(record.coordinates);return {...record,x:(c.x-origin.x)/unit,y:(c.y-origin.y)/unit,z:0,scale:c.meterInMercatorCoordinateUnits()/unit};}
  function replace(records,type){
-  if(disposed)return false;const keyed=new Map();for(const r of records){const key=String(type==='sign'?r.key:r.id);if(!Array.isArray(r.coordinates)||!r.coordinates.every(Number.isFinite))continue;keyed.set(key,{...r,key});}
+  if(disposed)return false;const keyed=new Map();for(const r of records){const key=String(type==='sign'?r.key:r.id);if(!Array.isArray(r.coordinates)||r.coordinates.length!==2||!r.coordinates.every(Number.isFinite)||Math.abs(r.coordinates[0])>180||Math.abs(r.coordinates[1])>=85.051129)continue;keyed.set(key,{...r,key});}
   const values=[...keyed.values()],encoded=JSON.stringify(values);
   if(type==='sign'){if(encoded!==signKey){signKey=encoded;signs=values.map(local);signDirty=true;cancelPick();map.triggerRepaint?.();}}
   else if(encoded!==vehicleKey){vehicleKey=encoded;vehicles=values.map(local);vehicleDirty=true;cancelPick();map.triggerRepaint?.();}
@@ -60,6 +60,7 @@ export function createTransportScene({map,maplibre,onStopSelect=()=>{},loadAtlas
  }
  function compile(g,type,source){const shader=g.createShader(type);g.shaderSource(shader,source);g.compileShader(shader);if(!g.getShaderParameter(shader,g.COMPILE_STATUS)){g.deleteShader(shader);throw Error('transport shader');}return shader;}
  function initialize(g){
+  if((map.getProjection?.()?.type||'mercator')!=='mercator')throw Error('unsupported transport projection');
   if(gpu||disposed||failed||!image||g.isContextLost())return;
   if(!g.createQuery||(map.getProjection?.()?.type||'mercator')!=='mercator')throw Error('unsupported transport context/projection');
   const saved=stateOf(g,{upload:true}),created=[];let vs=null,fs=null;
@@ -80,10 +81,10 @@ export function createTransportScene({map,maplibre,onStopSelect=()=>{},loadAtlas
   if(p.queries){if(!p.queries.every(q=>g.getQueryParameter(q.query,g.QUERY_RESULT_AVAILABLE))){map.triggerRepaint();return;}
    const winner=p.queries.find(q=>g.getQueryParameter(q.query,g.QUERY_RESULT));const key=winner?.record.key;cancelPick();if(key)onStopSelect(key);return;
   }
-  const c=map.getContainer(),x=Math.floor(p.point.x*g.drawingBufferWidth/c.clientWidth),y=Math.floor((c.clientHeight-p.point.y)*g.drawingBufferHeight/c.clientHeight);
+  const c=map.getContainer(),x=Math.floor(p.point.x*g.drawingBufferWidth/c.clientWidth),y=g.drawingBufferHeight-1-Math.floor(p.point.y*g.drawingBufferHeight/c.clientHeight);
   if(x<0||y<0||x>=g.drawingBufferWidth||y>=g.drawingBufferHeight){cancelPick();return;}
   g.enable(g.SCISSOR_TEST);g.scissor(x,y,1,1);g.colorMask(false,false,false,false);g.depthMask(false);p.queries=[];
-  for(const {record} of p.candidates){const query=g.createQuery();g.bindBuffer(g.ARRAY_BUFFER,gpu.pick);g.bufferData(g.ARRAY_BUFFER,packed([record]),g.STREAM_DRAW);g.beginQuery(g.ANY_SAMPLES_PASSED,query);draw(g,0,gpu.pick,1);draw(g,1,gpu.pick,1);g.endQuery(g.ANY_SAMPLES_PASSED);p.queries.push({query,record});}
+  for(const {record,kind} of p.candidates){const query=g.createQuery();g.bindBuffer(g.ARRAY_BUFFER,gpu.pick);g.bufferData(g.ARRAY_BUFFER,packed([record]),g.STREAM_DRAW);g.beginQuery(g.ANY_SAMPLES_PASSED,query);draw(g,kind,gpu.pick,1);g.endQuery(g.ANY_SAMPLES_PASSED);p.queries.push({query,record});}
   g.disable(g.SCISSOR_TEST);g.colorMask(true,true,true,true);map.triggerRepaint();
  }
  const layer={id:SCENE_ID,type:'custom',renderingMode:'3d',onAdd(m,g){try{initialize(g);}catch(error){queueMicrotask(fail);}},
