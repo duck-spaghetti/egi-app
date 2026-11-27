@@ -1,3 +1,4 @@
+import {createStopNames} from './stop-names.js';
 /* Scheduled metro/tram/bus layer for the EGI map.
  *
  * TransportLayer.create(map, elements) owns everything about transport on the map:
@@ -203,11 +204,15 @@ const TransportLayer = (() => {
     if (!map.getPane("transportLines")) map.createPane("transportLines").style.zIndex = 350;
     if (!map.getPane("transportStops")) map.createPane("transportStops").style.zIndex = 450;
     const layer = L.layerGroup().addTo(map);
+    const names=createStopNames(map.getContainer());
+    const refreshNames=()=>names.refresh(map.getZoom());
     const syncDetail = () => {
       map.getContainer().classList.toggle("tl-detail", map.getZoom() >= DETAIL_ZOOM || Boolean(focused));
       map.getContainer().classList.toggle("tl-focused", Boolean(focused));
     };
-    ownMap("zoomend", syncDetail);
+    ownMap("zoomend", ()=>{syncDetail();refreshNames();});
+    ownMap("moveend",refreshNames);
+    ownMap("resize",refreshNames);
     const modes = new Set(elements.modes ? MODES.filter(mode=>elements.modes[mode]?.checked) : MODES);
     let visible = false;
     let features = [];
@@ -231,10 +236,10 @@ const TransportLayer = (() => {
     function render() {
       popupOpen = false;
       held = null;
-      layer.clearLayers();
+      names.clear();layer.clearLayers();
       syncDetail();
       if (disposed || !visible) return;
-      const labelled = new Set();
+      const labelled = new Set(),stops=[];
       for (const feature of features) {
         const props = feature.properties;
         const geometry = feature.geometry;
@@ -243,7 +248,7 @@ const TransportLayer = (() => {
           const station = props.kind === "station" || props.transport_type === "metro" || props.transport_type === "rail";
           const ids = props.stop_ids || [props.stop_id];
           const near = Boolean(focused && ids.some(id => focused.stopIds.has(id)));
-          L.marker([lat, lng], {
+          const marker=L.marker([lat, lng], {
             icon: L.divIcon({className: "tl-icon", html: stopIconHtml(props, near), iconSize: null}),
             keyboard: true,
             title: props.name,
@@ -251,11 +256,12 @@ const TransportLayer = (() => {
             pane: "transportStops",
           }).bindPopup(popupHtml(props), {maxWidth: 280})
             .on("popupopen", event => {
-              popupOpen = true;
+              popupOpen = true;refreshNames();
               if (!props.untimed) loadDepartures(event.popup, ids, props);
             })
             .on("popupclose", releasePopup)
             .addTo(layer);
+          stops.push({element:marker.getElement?.(),props,near});
         } else {
           const style = focused ? focusLineStyle(props.transport_type, props.color, props.code) : lineStyle(props.transport_type, props.color);
           if (focused && !labelled.has(props.route_id)) {
@@ -266,11 +272,12 @@ const TransportLayer = (() => {
           }
           L.geoJSON(geometry, {style, interactive: true, pane: "transportLines"})
             .bindPopup(routePopupHtml(props))
-            .on("popupopen", () => { popupOpen = true; })
+            .on("popupopen", () => { popupOpen = true;refreshNames(); })
             .on("popupclose", releasePopup)
             .addTo(layer);
         }
       }
+      names.update(stops,map.getZoom());
     }
 
     async function load() {
@@ -309,12 +316,13 @@ const TransportLayer = (() => {
     }
 
     function releasePopup() {
+      if(disposed)return;
       popupOpen = false;
       if (held) {
         features = held;
         held = null;
         render();
-      }
+      }else refreshNames();
     }
 
     /** Fill an open stop popup with the next departures of its (focused) lines. */
@@ -329,7 +337,7 @@ const TransportLayer = (() => {
       } catch (_error) { /* shown as unavailable */ }
       if (disposed || listeners.signal.aborted || !popup.isOpen()) return;
       // setContent, not DOM edits: Leaflet's popup.update() re-renders the bound HTML.
-      popup.setContent(popupHtml(props, departuresHtml(data)));
+      popup.setContent(popupHtml(props, departuresHtml(data)));refreshNames();
     }
 
     function schedule() {
@@ -393,7 +401,7 @@ const TransportLayer = (() => {
     ownMap("moveend", schedule);
     const interval=setInterval(load,60000);
     setVisible(false);
-    return {setVisible, isVisible: () => visible, reload: load, focus, clearFocus, focusedRoutes: () => focused?.routeIds || null, dispose(){disposed=true;visible=false;listeners.abort();request?.abort();clearTimeout(timer);clearInterval(interval);for(const clean of cleanup)clean();layer.off?.();layer.remove?.();chip.remove?.();}};
+    return {setVisible, isVisible: () => visible, reload: load, focus, clearFocus, focusedRoutes: () => focused?.routeIds || null, dispose(){disposed=true;visible=false;listeners.abort();request?.abort();clearTimeout(timer);clearInterval(interval);for(const clean of cleanup)clean();names.dispose();layer.off?.();layer.remove?.();chip.remove?.();}};
   }
 
   return {DETAIL_ZOOM, TRAIN_GLYPH, UNTIMED_NOTE, routePopupHtml, directionTimes, realtimeText, alertsHtml, realtimeNote, create, statusText, viewportQuery, lineStyle, focusLineStyle, lineLabelPoint, colorForLine, stopIconHtml, popupHtml, lineColor, departuresHtml, timeText, wheelchairText};

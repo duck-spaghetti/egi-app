@@ -6,14 +6,14 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
  const calls=[];const responses={};
  const fetch=async(url,options={})=>{calls.push({url,body:options.body?JSON.parse(options.body):null});
   const key=Object.keys(responses).find(k=>url.startsWith(k));return {ok:true,json:async()=>responses[key]};};
- const env=environment({fetch});
+ const frames=new Map();let frameId=0;const env=environment({fetch,requestAnimationFrame:fn=>{frames.set(++frameId,fn);return frameId;},cancelAnimationFrame:id=>frames.delete(id)});
  const {TransportLayerGL}=await env.load('features/transport/layer-gl.js');
  const {TransportLayer}=await env.load('features/transport/layer.js');
  const {CycleLayerGL}=await env.load('features/cycleways/layer-gl.js');
  const {CycleLayer}=await env.load('features/cycleways/layer.js');
  const created={markers:[],popups:[]};
  class Marker{constructor(o){this.options=o;this.removed=false;created.markers.push(this);} setLngLat(l){this.lngLat=l;return this;} addTo(){return this;} remove(){this.removed=true;}}
- class Popup{constructor(o){this.options=o;created.popups.push(this);} setLngLat(l){this.lngLat=l;return this;} setHTML(h){this.html=h;return this;} addTo(){return this;} on(){} remove(){this.removed=true;}}
+ class Popup{constructor(o){this.options=o;created.popups.push(this);} setLngLat(l){this.lngLat=l;return this;} setHTML(h){this.html=h;return this;} addTo(){return this;} on(name,fn){(this.handlers||={})[name]=fn;} remove(){if(this.removed)return;this.removed=true;this.handlers?.close?.();}}
  const maplibre={Marker,Popup};
  function fakeMap(){
   const container=element();container.clientWidth=800;container.clientHeight=600;
@@ -48,10 +48,13 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
  const popup=created.popups.at(-1);assert.match(popup.html,/Battistini/);
  assert(calls.some(c=>c.url.startsWith('/api/preview/transit/departures?stops=s1')));
  // Focus on lines: chip, fit, label marker; dispose removes layers, source and markers.
+ await transit.reload(); // Hold a fresh response behind the open popup.
  transit.focus({routeIds:['MA'],label:'Linea A',points:[[41.9,12.49],[41.91,12.5]]});
  assert.equal(transit.focusedRoutes()[0],'MA');assert(map.fitted);
- transit.dispose();assert.equal(map.layers.length,0);assert.equal(map.sources['egi-transport-lines'],undefined);
+ transit.dispose();assert.equal(frames.size,0,"popup teardown with held data must not queue name work");assert.equal(map.layers.length,0);assert.equal(map.sources['egi-transport-lines'],undefined);
  assert.equal(created.markers.filter(m=>!m.removed).length,0);
+ const second=TransportLayerGL.create(fakeMap(),{},maplibre);second.setVisible(true);await second.reload();
+ created.markers.filter(m=>!m.removed).at(-1).options.element.click();await wait(20);second.dispose();assert.equal(frames.size,0,'popup teardown without held data must not queue name work');
  // Cycleways: same body as the current map's layer, features drawn, same status text.
  const cmap=fakeMap();cmap.zoom=13.2;const ctoggle=element(),cstatus=element();
  const way={type:'Feature',geometry:{type:'LineString',coordinates:[[12.46,41.89],[12.5,41.9]]},properties:{kind:'track',label:'Pista su carreggiata',name:'Tevere'}};

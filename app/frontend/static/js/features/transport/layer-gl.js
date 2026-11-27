@@ -1,3 +1,4 @@
+import {createStopNames} from './stop-names.js';
 import {TransportLayer} from "./layer.js";
 /* Transit layer of the 3D mode: the scheduled metro/rail/tram/bus layer on MapLibre.
  *
@@ -40,6 +41,8 @@ function create(map, elements, maplibre) {
   const modes = new Set(elements.modes ? ["metro", "rail", "tram", "bus"].filter(mode => elements.modes[mode]?.checked) : ["metro", "rail", "tram", "bus"]);
   let visible = false, features = [], request = null, timer = null, focused = null, popup = null, held = null;
   let markers = [];
+  const names=createStopNames(map.getContainer());
+  const refreshNames=()=>names.refresh(leafletZoom(map));
   const chip = document.createElement("div");
   chip.className = "tl-focus-chip"; chip.hidden = true;
   map.getContainer().appendChild(chip);
@@ -75,21 +78,23 @@ function create(map, elements, maplibre) {
     popup = new maplibre.Popup({maxWidth: "280px", focusAfterOpen: true}).setLngLat(lngLat).setHTML(html).addTo(map);
     const current = popup;
     current.on?.("close", () => { if (popup === current) { popup = null; release(); } });
-    onOpen?.(current);
+    refreshNames();onOpen?.(current);
   }
 
   function release() {
-    if (held) { features = held; held = null; render(); }
+    if(disposed)return;
+    if (held) { features = held; held = null; render(); }else refreshNames();
   }
 
   function render() {
+    names.clear();
     for (const marker of markers) marker.remove();
     markers = [];
     syncDetail();
     const source = map.getSource?.(LINES);
     const shown = disposed || !visible ? [] : features;
     source?.setData({type: "FeatureCollection", features: shown.filter(f => f.geometry.type !== "Point").map(f => lineFeature(f, focused))});
-    const labelled = new Set();
+    const labelled = new Set(),stops=[];
     for (const feature of shown) {
       const props = feature.properties;
       if (feature.geometry.type !== "Point") {
@@ -112,12 +117,14 @@ function create(map, elements, maplibre) {
       const el = document.createElement("button");
       el.type = "button"; el.className = "tl-icon tl-gl-stop"; el.title = props.name; el.setAttribute("aria-label", props.name);
       el.innerHTML = TransportLayer.stopIconHtml(props, near);
+      stops.push({element:el,props,near});
       el.addEventListener("click", event => {
         event.stopPropagation?.();
         openPopup([lng, lat], TransportLayer.popupHtml(props), current => { if (!props.untimed) loadDepartures(current, ids, props); });
       });
       markers.push(new maplibre.Marker({element: el, anchor: "center"}).setLngLat([lng, lat]).addTo(map));
     }
+    names.update(stops,leafletZoom(map));
   }
 
   async function load() {
@@ -157,7 +164,7 @@ function create(map, elements, maplibre) {
       if (response.ok) data = await response.json();
     } catch (_error) { /* shown as unavailable */ }
     if (disposed || listeners.signal.aborted || popup !== current) return;
-    current.setHTML(TransportLayer.popupHtml(props, TransportLayer.departuresHtml(data)));
+    current.setHTML(TransportLayer.popupHtml(props, TransportLayer.departuresHtml(data)));refreshNames();
   }
 
   function schedule() { if (disposed) return; clearTimeout(timer); timer = setTimeout(load, 180); }
@@ -215,8 +222,10 @@ function create(map, elements, maplibre) {
       setVisible(modes.size > 0);
     }, {signal: listeners.signal});
   }
+  ownMap("moveend", refreshNames);
+  ownMap("resize", refreshNames);
   ownMap("moveend", schedule);
-  ownMap("zoomend", syncDetail);
+  ownMap("zoomend", ()=>{syncDetail();refreshNames();});
   const interval = setInterval(load, 60000);
   setVisible(false);
   return {setVisible, isVisible: () => visible, reload: load, focus, clearFocus, focusedRoutes: () => focused?.routeIds || null,
@@ -224,7 +233,7 @@ function create(map, elements, maplibre) {
       disposed = true; visible = false; listeners.abort(); request?.abort(); clearTimeout(timer); clearInterval(interval);
       for (const clean of cleanup) clean();
       for (const marker of markers) marker.remove();
-      markers = []; popup?.remove(); popup = null; chip.remove?.();
+      names.dispose();markers = []; popup?.remove(); popup = null; chip.remove?.();
       for (const id of LINE_LAYERS) if (map.getLayer?.(id)) map.removeLayer(id);
       if (map.getSource?.(LINES)) map.removeSource(LINES);
     }};

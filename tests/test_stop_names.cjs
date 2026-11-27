@@ -1,0 +1,32 @@
+/** Exercise collision/zoom policy and actual DOM-name ownership without changing transport behavior. */
+const assert=require('node:assert/strict');const {performance}=require('node:perf_hooks');const {environment,element}=require('./module_fixture.cjs');
+(async()=>{
+ const env=environment();const {placeStopNames,createStopNames}=await env.load('features/transport/stop-names.js');
+ const viewport={left:0,top:0,right:800,bottom:600,width:800,height:600};
+ const stop=(name,x,y,type='bus',near=false)=>({name,key:name,near,props:{transport_type:type},box:{left:x-12,right:x+12,top:y-12,bottom:y+12}});
+ const a=stop('Termini',200,200,'metro'),b=stop('Volturno',500,200),empty=stop('',400,300);
+ assert.equal(placeStopNames([a,b,empty],viewport,[],15).size,0);
+ assert.equal(placeStopNames([a,b],viewport,[],16).size,1,'stations first');
+ assert.equal(placeStopNames([a,b],viewport,[],17).size,2,'bus names at closer zoom');
+ assert.equal(placeStopNames([{...b,near:true}],viewport,[],14).size,1,'focused nearby stop wins');
+ const obstacles=[{left:218,right:400,top:170,bottom:230}];
+ const placed=placeStopNames([a],viewport,obstacles,17).get(a);assert(placed.right<a.box.left,'try the other side before hiding');
+ assert.equal(placeStopNames([a],viewport,[viewport],17).size,0,'fully occupied view hides the optional name');
+ const dense=Array.from({length:400},(_,i)=>stop('Fermata '+i,20+i%25*31,20+Math.floor(i/25)*35,i%5?'bus':'metro'));
+ const start=performance.now(),names=placeStopNames(dense,viewport,[],17);const milliseconds=performance.now()-start;
+ const intersects=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
+ const boxes=[...names.values()];for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++)assert(!intersects(boxes[i],boxes[j]));
+ assert(names.size<dense.length);console.log(JSON.stringify({stops:dense.length,labels:names.size,milliseconds:+milliseconds.toFixed(2)}));
+ // Both map engines call this same owner with existing symbol/root rectangles.
+ const root=element();root.getBoundingClientRect=()=>viewport;root.querySelectorAll=()=>[];
+ const button=element();button.getBoundingClientRect=()=>({left:190,right:210,top:190,bottom:210,width:20,height:20});button.querySelector=()=>button;
+ const entry={element:button,props:{transport_type:'metro',name:'<img onerror=bad>',stop_ids:['a']}};
+ const owner=createStopNames(root);owner.update([entry],16);assert.equal(entry.label.textContent,'<img onerror=bad>');assert.equal(entry.label.innerHTML,'');assert.equal(entry.label.hidden,false);
+ owner.refresh(15);assert.equal(entry.label.hidden,true);owner.clear();
+ let offReads=0;const offRoot=element();offRoot.getBoundingClientRect=()=>{offReads++;return viewport;};offRoot.querySelectorAll=()=>[];const off=createStopNames(offRoot);off.update([],17);off.refresh(17);assert.equal(offReads,0,'inactive layer has no geometry work');off.dispose();
+ let queued,reads=0;const delayed=environment({requestAnimationFrame:fn=>{queued=fn;return 1;},cancelAnimationFrame(){}});
+ const {createStopNames:deferredOwner}=await delayed.load('features/transport/stop-names.js');
+ const laterRoot=element();laterRoot.getBoundingClientRect=()=>{reads++;return viewport;};laterRoot.querySelectorAll=()=>[];
+ const later=deferredOwner(laterRoot);later.update([{element:button,props:entry.props}],16);later.dispose();queued();later.refresh(17);later.update([],17);assert.equal(reads,0,'disposed name work never reads or mutates the detached map');
+ console.log('PASS: progressive stop names, focus priority, collision suppression, safe text and shared DOM owner');
+})().catch(e=>{console.error(e);process.exitCode=1;});

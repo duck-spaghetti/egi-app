@@ -817,3 +817,14 @@ a pending reference intent and an in-flight route. Explicit cancellation also dr
 the intent. Cached legacy opening labels and current-day calendar emphasis refresh
 on the existing 30-second timer and when the page becomes visible. Narrow labels
 wrap the status qualification, adapt their width and avoid the map toolbar.
+
+Transport stop/station names are optional annotations shared by flat and 3D maps.
+Stations start at Leaflet-equivalent z16, bus/tram stops at z17 (3D uses one zoom
+level less); highlighted nearby stops may be named earlier. Focused stops and
+stations take priority. Names try either side, above/below and a narrower width;
+they are suppressed when they cannot fit around other stop symbols/line-code
+boxes, names, service heads, controls or open popups. Full names remain in the
+existing accessible/title text and departure popup. Raster/canvas basemap text
+is outside this DOM collision planner. Labels update after settled camera changes,
+resize/data refresh, with one owned animation-frame callback for DOM positioning;
+there are no per-frame rebuilds or additional feed/network requests.
