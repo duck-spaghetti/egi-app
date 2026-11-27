@@ -84,3 +84,10 @@ class ProfileCommandTests(unittest.TestCase):
         self.assertEqual(code, 2, result)  # Fixture still lacks ESLint; Python must pass.
         self.assertEqual(result['source'], source)
         self.assertEqual(next(item for item in result['checks'] if item['name'] == 'python')['status'], 'passed')
+
+    def test_actual_profile_report_is_retained_for_hook_diagnostics(self):
+        """A suppressed hook stdout still leaves the same source and failed/blocked details."""
+        code, result = self.command()
+        self.assertEqual(code, 2)
+        saved = json.loads((self.root / '.local/checks/quick.json').read_text())
+        self.assertEqual(saved, result)

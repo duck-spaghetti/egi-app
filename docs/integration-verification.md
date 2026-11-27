@@ -55,7 +55,9 @@ source mismatches and exit/report disagreements propagate to the app boundary.
 
 Commit-msg, pre-push and CI invoke the same canonical title policy. Shared check,
 configuration, workflow and contract changes require Integration as well as Complete
-before push. The owning app command clears inherited `GIT_*` routing variables
+before push. App profile results are retained at `.local/checks/<profile>.json`,
+including failures captured by a hook; stdout and exit semantics remain unchanged.
+The owning app command clears inherited `GIT_*` routing variables
 before checking its explicit root, so hooks cannot redirect disposable test repositories
 or the report source identity. CI uses identified checkout revisions and preserves reports/artifacts.
 Required-check settings and controlled negative/positive remote evidence are recorded
