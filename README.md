@@ -919,3 +919,12 @@ the request immediately, with camera-change debouncing retained.
 heads20, popups30, navigation/attribution40. Later transport reloads cannot cover
 service labels or steal their clicks. Label backgrounds are white at80% opacity;
 text/status/icons remain opaque, leaving underlying stops visible through the card.
+
+3D metro overlays summarise nearby (150 m) same-named platforms at every zoom,
+including the source abbreviation `S.`/`San`. Interchanges retain all line chips
+in one marker (for example A/C at San Giovanni), avoiding competing station labels.
+Native signs still use every unmodified source point; their clicks request that
+point's departures, whereas the summary requests all constituent platforms.
+These GTFS points describe platforms/directions, not verified pedestrian entrances.
+Metro network lines use 42% opacity and dashes; the 3D GPU scales their width from
+3 px at zoom 13 to 7.5 px at zoom 19. Focused routes retain their stronger styling.

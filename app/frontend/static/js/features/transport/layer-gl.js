@@ -1,4 +1,5 @@
 import {createPaline,nativeMode,stopKey} from './paline-gl.js';
+import {stationMarkers} from './station-markers.js';
 import {createStopNames} from './stop-names.js';
 import {TransportLayer} from "./layer.js";
 /* Transit layer of the 3D mode: the scheduled metro/rail/tram/bus layer on MapLibre.
@@ -42,7 +43,11 @@ function create(map, elements, maplibre) {
   const modes = new Set(elements.modes ? ["metro", "rail", "tram", "bus"].filter(mode => elements.modes[mode]?.checked) : ["metro", "rail", "tram", "bus"]);
   let visible = false, features = [], request = null, timer = null, focused = null, popup = null, held = null;
   let markers = new Map(),lineData=null;
-  const paline=createPaline(map,key=>{const entry=markers.get(key);if(entry)selectStop(entry);});
+  const paline=createPaline(map,key=>{
+    if(disposed||!visible)return;
+    const source=features.find(f=>f.geometry.type==='Point'&&stopKey(f)===key);
+    if(source)selectStop({lngLat:source.geometry.coordinates,props:source.properties,ids:source.properties.stop_ids||[source.properties.stop_id]});
+  });
   const names=createStopNames(map.getContainer());
   const refreshNames=()=>names.refresh(leafletZoom(map));
   const chip = document.createElement("div");
@@ -61,7 +66,8 @@ function create(map, elements, maplibre) {
     if (disposed || map.getSource?.(LINES)) return;
     map.addSource(LINES, {type: "geojson", data: {type: "FeatureCollection", features: []}});
     const before = beforeLabels(map);
-    const paint = {"line-color": ["get", "_color"], "line-width": ["get", "_width"], "line-opacity": ["get", "_opacity"]};
+    const width=scale=>["case",["==",["get","transport_type"],"metro"],["*",["get","_width"],scale],["get","_width"]];
+    const paint = {"line-color": ["get", "_color"], "line-width": ["interpolate",["linear"],["zoom"],13,width(1),19,width(2.5)], "line-opacity": ["get", "_opacity"]};
     map.addLayer({id: LINE_LAYERS[0], type: "line", source: LINES, filter: ["!", ["get", "_dashed"]],
       layout: {"line-cap": "round", "line-join": "round"}, paint}, before);
     map.addLayer({id: LINE_LAYERS[1], type: "line", source: LINES, filter: ["get", "_dashed"],
@@ -105,7 +111,7 @@ function create(map, elements, maplibre) {
     const encoded=JSON.stringify(lines);
     if(source&&encoded!==lineData){source.setData(lines);lineData=encoded;}
     const labelled = new Set(),stops=[];
-    for (const feature of shown) {
+    for (const feature of stationMarkers(shown)) {
       const props = feature.properties;
       if (feature.geometry.type !== "Point") {
         if (focused && !labelled.has(props.route_id)) {
@@ -140,7 +146,7 @@ function create(map, elements, maplibre) {
       const el=entry.element,signature=JSON.stringify([props,near,native?null:anchored]);
       entry.props=props;entry.ids=ids;entry.lngLat=[lng,lat];
       if(entry.signature!==signature){
-        el.className=`tl-icon tl-gl-stop${anchored||native?' tl-point-detail':''}${native?` tl-native-stop tl-native-${props.transport_type==='metro'?'metro':'road'}-stop`:''}`;el.title=props.name;el.setAttribute('aria-label',props.name);
+        el.className=`maplibregl-marker tl-icon tl-gl-stop${anchored||native?' tl-point-detail':''}${native?` tl-native-stop tl-native-${props.transport_type==='metro'?'metro':'road'}-stop`:''}`;el.title=props.name;el.setAttribute('aria-label',props.name);
         el.innerHTML=native?`<span class="tl-compact">${TransportLayer.stopIconHtml(props,near,false)}</span>`:TransportLayer.stopIconHtml(props,near,anchored);entry.signature=signature;
       }
       const position=JSON.stringify([lng,lat]);if(entry.position!==position){entry.marker.setLngLat([lng,lat]);entry.position=position;}

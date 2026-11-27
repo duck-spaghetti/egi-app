@@ -45,7 +45,7 @@ const TransportLayer = (() => {
 
   /** Leaflet path options: thin, semi-transparent network lines that stay under services. */
   function lineStyle(mode, color) {
-    if (mode === "metro") return {color: lineColor(mode, color), weight: 3, opacity: 0.6};
+    if (mode === "metro") return {color: lineColor(mode, color), weight: 3, opacity: 0.42, dashArray: "8 4"};
     if (mode === "tram") return {color: lineColor(mode, color), weight: 2, opacity: 0.55};
     if (mode === "rail") return {color: lineColor(mode, color), weight: 2.5, opacity: 0.5, dashArray: "8 4"};
     return {color: BUS_COLOR, weight: 1.5, opacity: 0.35};

@@ -43,7 +43,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
  const drawn=map.sources['egi-transport-lines'].data.features;
  assert.equal(drawn.length,2);assert.equal(drawn[0].properties._color,'#e27439');assert.equal(drawn[1].properties._dashed,true);
  const stops=created.markers.filter(m=>!m.removed);assert.equal(stops.length,1);
- assert(stops[0].options.element.innerHTML.includes(TransportLayer.stopIconHtml(stop.properties,false)));assert(stops[0].options.element.className.includes('tl-native-stop'),'compact wrapper exists before fade so zoom needs no HTML swap');
+ assert(stops[0].options.element.innerHTML.includes(TransportLayer.stopIconHtml(stop.properties,false)));assert(stops[0].options.element.className.includes('maplibregl-marker'),'retain MapLibre positioning/stacking class after refreshing stop markup');assert(stops[0].options.element.className.includes('tl-native-stop'),'compact wrapper exists before fade so zoom needs no HTML swap');
  same(stops[0].lngLat,[12.49,41.9]);assert.match(status.textContent,/Rete programmata per 2026-11-26/);
  const stableStart=created.markers.length,sourceUpdates=map.sources['egi-transport-lines'].updates;
  const started=performance.now();for(let i=0;i<10;i++)await transit.reload();
@@ -73,6 +73,14 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
  highMap.handlers.find(h=>h[0]==='click'&&h.length===2)[1](sharedEvent);highMap.handlers.find(h=>h[0]==='click'&&h[1]==='egi-transport-lines-solid')[2](sharedEvent);assert.equal(created.popups.length,popupCount+1,'native selection is not overwritten by the route hit');
  const referenceEvent={...sharedEvent,egiStopPicked:false,egiReferencePicked:true};const beforeReference=created.popups.length;highMap.handlers.find(h=>h[0]==='click'&&h[1]==='egi-transport-lines-solid')[2](referenceEvent);assert.equal(created.popups.length,beforeReference,'route click respects reference selection');
  second.dispose();assert.equal(frames.size,0,'popup teardown without held data must not queue name work');
+ const sibling={...individual,id:'stop:platform-b',geometry:{type:'Point',coordinates:[12.4904,41.9002]},properties:{...individual.properties,stop_id:'platform-b'}};
+ responses['/api/preview/transport'].features=[line,individual,sibling];const groupedMap=fakeMap();groupedMap.zoom=18;
+ const grouped=TransportLayerGL.create(groupedMap,{},maplibre);grouped.setVisible(true);await grouped.reload();
+ const summaries=created.markers.filter(m=>!m.removed);assert.equal(summaries.length,1,'two metro platforms retain only one overlay');
+ const nativeKeys=new Set(groupedMap.sources['egi-transport-paline'].data.features.map(f=>f.properties.key));assert.equal(nativeKeys.size,2,'both native signs survive overlay grouping');
+ summaries[0].options.element.click();await wait(20);assert(calls.at(-1).url.includes('stops=platform-a%2Cplatform-b'),'summary requests both platforms');
+ groupedMap.hits=[{layer:{id:'egi-transport-paline-metro'},properties:{key:'stop:platform-b'}}];groupedMap.handlers.find(h=>h[0]==='click'&&h.length===2)[1]({point:{x:100,y:100}});await wait(20);assert(calls.at(-1).url.includes('stops=platform-b'),'native sign keeps individual departures');const beforeOff=created.popups.length;grouped.setVisible(false);groupedMap.handlers.find(h=>h[0]==='click'&&h.length===2)[1]({point:{x:100,y:100}});assert.equal(created.popups.length,beforeOff,'stale native worker hit cannot reopen a hidden layer');grouped.dispose();
+
  const lateMap=fakeMap();let styleReady=false;lateMap.isStyleLoaded=()=>styleReady;const late=TransportLayerGL.create(lateMap,{},maplibre);assert(!lateMap.sources['egi-transport-paline']);styleReady=true;lateMap.handlers.find(h=>h[0]==='idle')[1]();assert(lateMap.sources['egi-transport-paline'],'idle initializes late-composed layers without waiting forever for load');late.dispose();
  // Cycleways: same body as the current map's layer, features drawn, same status text.
  const cmap=fakeMap();cmap.zoom=13.2;const ctoggle=element(),cstatus=element();
