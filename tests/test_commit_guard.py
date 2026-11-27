@@ -59,6 +59,16 @@ class CommitGuardTests(unittest.TestCase):
         tip = self.commit("Bypassed invalid title")
         self.assertNotEqual(self.command("range", self.base, tip).returncode, 0)
 
+    def test_workflow_changes_require_integration(self):
+        """A workflow edit cannot be delivered with only a passing Complete profile."""
+        workflow = self.root / '.github/workflows/checks.yml'
+        workflow.parent.mkdir(parents=True)
+        workflow.write_text('name: Synthetic workflow\n')
+        tip = self.commit('EGI-140: Change workflow boundary')
+        (self.root / '.git/check-mode').write_text('integration-only')
+        update = f'refs/heads/checks {tip} refs/heads/checks {self.base}\n'
+        self.assertNotEqual(self.command('pre-push', input=update).returncode, 0)
+
     def test_exact_legacy_exception_does_not_exempt_another_commit(self):
         """Only an inventoried published identity is grandfathered."""
         legacy = self.commit("Historical fixture")

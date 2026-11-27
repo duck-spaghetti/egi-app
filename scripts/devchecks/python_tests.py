@@ -42,14 +42,20 @@ def integration_file(path):
     return path.stem.endswith("_native") or path.name == "test_preview_http.py"
 
 
-def check(root, profile):
-    """Run discovered fixture-backed cases; isolate native/live applicability."""
+def check(root, profile, *, excluded_files=None, optional_skips=None):
+    """Run selected cases; retain domain exclusions and exact optional prerequisite reasons."""
     started = time.monotonic()
     root = Path(root)
     sys.path.insert(0, str(root))
     suite = unittest.TestSuite()
     omitted = []
+    excluded_files = excluded_files or {}
+    optional_skips = optional_skips or {}
     for path in sorted((root / "tests").rglob("test*.py")):
+        relative = str(path.relative_to(root))
+        if relative in excluded_files:
+            omitted.append({'name': relative, 'status': 'skipped', 'reason': excluded_files[relative]})
+            continue
         if integration_file(path) and profile != "integration":
             omitted.append({"name": str(path.relative_to(root)), "status": "skipped",
                             "reason": "Selected by Integration, not fixture-backed Quick"})
@@ -60,7 +66,8 @@ def check(root, profile):
         return Check("python", "blocked", "No Python test cases discovered")
     stream = io.StringIO()
     result = unittest.TextTestRunner(stream=stream, verbosity=2, resultclass=Results).run(suite)
-    unexpected = [item for item in result.observations if item["status"] == "skipped" and not (
+    unexpected = [item for item in result.observations if item["status"] == "skipped" and
+        optional_skips.get(item['name']) != item.get('reason') and not (
         profile != "integration" and
         item["name"].endswith("test_transport.ContractDriftTests.test_vendored_fixture_matches_importer") and
         item["reason"] == "sibling egi-importer checkout not present")]

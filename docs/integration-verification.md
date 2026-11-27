@@ -1,0 +1,61 @@
+# Identified cross-repository Integration
+
+Run `python scripts/check.py --profile integration --json` using the selected
+app environment and native PostgreSQL18/PostGIS/Sqitch prerequisites. Complete
+remains a separate required profile; neither one substitutes for the other.
+
+`.checks/integration.json` identifies the app comparison base, each owning
+database/Reviewer check source, the Community native-schema source and the
+consumer Reviewer wheel. Exact clean source revisions and wheel/installed-file
+bytes are verified before importing native tests or executing provider commands.
+Explicit environment variables in that manifest can select another filesystem
+location for the same revision; they cannot silently select a different source.
+
+The app owns orchestration only. It invokes each provider's existing
+`scripts/check.py --profile integration --json`, validates report schema, repository,
+profile, source, per-stage states and process exit, and preserves the actual reports
+under `.local/integration/`. The Reviewer wheel receipt must match the source and
+artifact hash in the manifest. Child failure, missing prerequisites or a mismatched
+success report produce a non-success result. Supervised resource runs retain exact
+ownership and teardown; paid IA and arbitrary live database selection are excluded.
+
+Two Reviewer identities are deliberate: the dev provider verifies its current
+package/source/build, while the Community consumer uses its separately approved
+immutable0.4.0 wheel from151888f. The native Community schema is947487f, separate
+from the dev database provider's SQL/Sqitch checks. This consumes preserved feature
+contracts without merging unrelated database/Reviewer product work into this effort.
+
+## Applicability
+
+The specification makes native, retained-pilot and sibling checks mandatory when
+their contracts change or they are explicitly requested. The app manifest/base
+and actual changed paths determine the selected domains. Uncommitted tracked
+changes are included when checking a candidate.
+
+- Canonical/Community native suites and the owning database/Reviewer checks are
+  required for this integration. Missing selected prerequisites block the profile.
+- The historical315-record live preview suite is named as unselected when its
+  source/transport/cycleway APIs have not changed. Supplying `EGI_APP_BASE_URL`
+  explicitly selects it; changing those contracts makes the URL mandatory. It is
+  not run against an arbitrary current canonical demo or replaced by synthetic data.
+- The private sibling importer byte-drift case is optional for unchanged transport
+  payload fixtures/network contracts and remains named with its prerequisite reason.
+  A changed transport contract requires the sibling fixture instead of waiving it.
+  Importer/source enforcement is outside this milestone's initial repository scope.
+- Every other unexpected skip in a selected suite still blocks. No historical
+  skip count, blanket test exception or permissive mock replaces native properties.
+
+The shared Python observer accepts these explicit caller selections without
+embedding app-domain policy in provider repositories. Existing provider callers
+retain their original default behavior. Fixtures prove unselected live setup is
+not imported, unknown selected skips block, and actual provider child errors,
+source mismatches and exit/report disagreements propagate to the app boundary.
+
+## Delivery and CI
+
+Commit-msg, pre-push and CI invoke the same canonical title policy. Shared check,
+configuration, workflow and contract changes require Integration as well as Complete
+before push. CI uses identified checkout revisions and preserves reports/artifacts.
+Required-check settings and controlled negative/positive remote evidence are recorded
+in the workspace execution record. Native Save PDF remains separate acceptance;
+CI does not manufacture a native-dialog result or authorize final merge/deployment.

@@ -27,7 +27,7 @@ def integration_needed(root, base, tip):
     names = git(root, "diff", "--name-only", base, tip).splitlines()
     return any(name.startswith(("app/backend/api/", "scripts/devchecks/", "scripts/check.py",
                                 "scripts/commit_guard.py", "requirements", "pyproject.toml", "review/",
-                                "deploy/", "revert/", "verify/", "sqitch.plan")) for name in names)
+                                "deploy/", "revert/", "verify/", "sqitch.plan", ".checks/", ".github/")) for name in names)
 
 
 def push(root, stream):

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "base": "a75bd0ec726df817ac082a6b032b608c1aa38616",
+  "native_schema": {
+    "name": "Community schema",
+    "environment": "EGI_DATABASE_SCHEMA",
+    "path": "../egi_database-community-text",
+    "revision": "947487fe2145c0000456a594ac3039216198ae0c"
+  },
+  "providers": [
+    {
+      "name": "database",
+      "environment": "EGI_DATABASE_PROVIDER",
+      "path": "../egi_database-development-checks",
+      "revision": "fd776a6f25314541ae4ce248dccd06e07d419190"
+    },
+    {
+      "name": "reviewer",
+      "environment": "EGI_REVIEWER_PROVIDER",
+      "path": "../egi-reviewer-development-checks",
+      "revision": "752cc8e5a757666077f279bd4b877d398a664185",
+      "wheel_sha256": "1c64e7e236f2bd7e0d23afa870a07899aca3ef66649974da4a7ee6f97d9d01c6"
+    }
+  ],
+  "consumer_wheel": {
+    "path": "../../../.local/artifacts/community/egi_reviewer-0.4.0-py3-none-any.whl",
+    "version": "0.4.0",
+    "source_revision": "151888f5477dac2e2393a482ec7019a45c34081e",
+    "sha256": "226f7c9d88e3052e133cf37d41054330eb58d079f2e04075926f1dab477e3bf8"
+  }
+}

@@ -3,30 +3,40 @@ import argparse
 import contextlib
 import io
 import json
+import os
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 
 from devchecks.python_tests import check as python_check
 from devchecks.report import Check, exit_code, report
 from devchecks.resources import ResourceRun, preflight, PrerequisiteError, CleanupError, run_check as run
+from devchecks.integration import prepare
 
 
 def checks(root, profile):
     """Discover executable suites, with later mandatory stages explicitly blocked."""
     # Keep Quick lightweight and unchanged; native Integration owns resource supervision.
+    selection = {}
     if profile == 'integration':
         try:
+            context = prepare(root)
+            os.environ['EGI_DATABASE_REPO'] = str(context['native_schema'])
+            selection = {key: context[key] for key in ('excluded_files', 'optional_skips')}
+            yield Check('integration-selection', 'passed', json.dumps({
+                'native_schema': str(context['native_schema']), 'excluded_files': context['excluded_files'],
+                'optional_skips': context['optional_skips']}))
             capacity = preflight()
             yield Check('resource-preflight', 'passed',
                         ('WARNING below30 GiB: ' if capacity['warning'] else '') + str(capacity))
-        except (OSError, PrerequisiteError) as error:
+        except (OSError, ValueError, KeyError, ImportError, PrerequisiteError, subprocess.SubprocessError) as error:
             yield Check('resource-preflight', 'blocked', str(error))
             return
     try:
         scope = ResourceRun(root).activate() if profile == 'integration' else contextlib.nullcontext()
         with scope, contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-            yield python_check(root, profile)
+            yield python_check(root, profile, **selection)
         if profile == 'integration':
             yield Check('resource-teardown', 'passed', 'Owned native run reconciled; unrelated environments preserved')
     except CleanupError as error:
